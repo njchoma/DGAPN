@@ -1,5 +1,7 @@
 import argparse
+
 from dataset import get_dataset, preprocess
+from predict_logp import predict_logp
 
 def read_args():
     parser = argparse.ArgumentParser()
@@ -17,6 +19,7 @@ def main():
     dataset_path = get_dataset.main(args.data_path)
     print(dataset_path)
     logp, smiles = preprocess.main(dataset_path)
+    predict_logp.main(logp, smiles)
 
 
 if __name__ == "__main__":
