@@ -1,7 +1,7 @@
 #!/bin/bash
 
 eval "$(conda shell.bash hook)"
-conda activate env_name
+conda activate my-rdkit-env
 
 PYARGS=""
 PYARGS="$PYARGS --data_path $DATA/exaLearnMol"
