@@ -1,4 +1,5 @@
 import os
+import yaml
 import logging
 import numpy as np
 
@@ -19,6 +20,23 @@ if torch.cuda.is_available():
     DEVICE='cuda'
 else:
     DEVICE='cpu'
+
+#####################################################
+#                   MODEL HANDLING                  #
+#####################################################
+def load_current_model(artifact_path):
+    net = torch.load(os.path.join(artifact_path, 'current_model.pth'))
+    return net
+
+def load_best_model(artifact_path):
+    net = torch.load(os.path.join(artifact_path, 'best_model.pth'))
+    return net
+
+def save_current_model(net, artifact_path):
+    torch.save(net, os.path.join(artifact_path, 'current_model.pth'))
+
+def save_best_model(net, artifact_path):
+    torch.save(net, os.path.join(artifact_path, 'best_model.pth'))
 
 #############################################
 #                   DATA                    #
@@ -133,15 +151,16 @@ def train(net,
           train_loader,
           valid_loader,
           optim,
-          starting_epoch=0,
-          best_loss=10**10):
+          arg_handler,
+          artifact_path):
 
     current_lr = optim.param_groups[0]['lr']
     lr_end = current_lr / 10**3
 
+    best_loss = arg_handler('best_loss')
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, 'min')
     scheduler.step(best_loss)
-    for i in range(starting_epoch, 100):
+    for i in range(arg_handler('current_epoch'), 100):
         t0 = time.time()
         logging.info("\n\nEpoch {}".format(i+1))
         logging.info("Learning rate: {0:.3g}".format(current_lr))
@@ -164,12 +183,53 @@ def train(net,
         if valid_loss < best_loss:
             logging.info("Best performance on valid set")
             best_loss = valid_loss
+            save_best_model(net, artifact_path)
         logging.info("{:6.1f} seconds, this epoch".format(time.time() - t0))
 
         current_lr = optim.param_groups[0]['lr']
+        arg_handler.update_args(current_lr, i+1, best_loss)
+        save_current_model(net, artifact_path)
         if current_lr < lr_end:
             break
 
+
+#############################################
+#                   ARGS                    #
+#############################################
+class ArgumentHandler:
+    def __init__(self, experiment_dir, starting_lr):
+        self.arg_file = os.path.join(experiment_dir, 'args.yaml')
+        try:
+            self.load_args()
+            logging.info("Arguments loaded.")
+        except Exception as e:
+            self.initialize_args(starting_lr)
+            logging.info("Arguments initialized.")
+
+    def load_args(self):
+        with open(self.arg_file, 'r') as f:
+            self.args = yaml.load(f, Loader=yaml.FullLoader)
+
+    def initialize_args(self, starting_lr):
+        args = {}
+        args['current_epoch'] = 0
+        args['current_lr'] = starting_lr
+        args['best_loss'] = 10**10
+        self.args = args
+        self.save_args()
+
+    def save_args(self):
+        with open(self.arg_file, 'w') as f:
+            yaml.dump(self.args, f)
+    
+    def update_args(self, current_lr, current_epoch, best_loss):
+        self.args['current_lr'] = current_lr
+        self.args['current_epoch'] = current_epoch
+        self.args['best_loss'] = best_loss
+        self.save_args()
+
+    def __call__(self, param):
+        return self.args[param]
 
 #############################################
 #                   MAIN                    #
@@ -181,11 +241,13 @@ def main(artifact_path,
          batch_size=128,
          num_workers=24,
          nb_hidden=256,
-         nb_layer=6,
+         nb_layer=3,
          lr=0.001):
     artifact_path = os.path.join(artifact_path, 'predict_logp')
     os.makedirs(artifact_path, exist_ok=True)
     general_utils.initialize_logger(artifact_path)
+
+    arg_handler = ArgumentHandler(artifact_path, lr)
 
     train_data, valid_data, test_data = create_datasets(logp, smiles)
     train_loader = DataLoader(train_data,
@@ -204,13 +266,18 @@ def main(artifact_path,
 
     valid_data.compute_baseline_error()
 
-    net = GNN(input_dim = train_data.get_input_dim(),
-              nb_hidden = nb_hidden,
-              nb_layer  = nb_layer)
+    try:
+        net = load_current_model(artifact_path)
+        logging.info("Model restored")
+    except Exception as e:
+        net = GNN(input_dim = train_data.get_input_dim(),
+                  nb_hidden = nb_hidden,
+                  nb_layer  = nb_layer)
+        logging.info(net)
+        logging.info("New model created")
     net = net.to(DEVICE)
-    logging.info(net)
 
-    optim = torch.optim.Adam(net.parameters(), lr=lr)
+    optim = torch.optim.Adam(net.parameters(), lr=arg_handler('current_lr'))
     criterion = torch.nn.MSELoss()
 
     train(net,
@@ -218,6 +285,9 @@ def main(artifact_path,
           batch_size,
           train_loader,
           valid_loader,
-          optim)
+          optim,
+          arg_handler,
+          artifact_path)
 
     general_utils.close_logger()
+    return load_best_model(artifact_storage)
