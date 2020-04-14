@@ -9,6 +9,8 @@ from rdkit import Chem
 
 import torch
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.tensorboard import SummaryWriter
+
 import torch_geometric as pyg
 
 
@@ -152,7 +154,8 @@ def train(net,
           valid_loader,
           optim,
           arg_handler,
-          artifact_path):
+          artifact_path,
+          writer):
 
     current_lr = optim.param_groups[0]['lr']
     lr_end = current_lr / 10**3
@@ -178,6 +181,9 @@ def train(net,
                                     valid_loader)
         logging.info("Train MSE: {:3.2f}".format(train_loss))
         logging.info("Valid MSE: {:3.2f}".format(valid_loss))
+        writer.add_scalars('loss',
+                           {'train':train_loss,'valid':valid_loss},
+                           i)
         scheduler.step(valid_loss)
 
         if valid_loss < best_loss:
@@ -249,6 +255,8 @@ def main(artifact_path,
 
     arg_handler = ArgumentHandler(artifact_path, lr)
 
+    writer = SummaryWriter(log_dir=os.path.join(artifact_path, 'runs'))
+
     train_data, valid_data, test_data = create_datasets(logp, smiles)
     train_loader = DataLoader(train_data,
                               shuffle=True,
@@ -287,7 +295,9 @@ def main(artifact_path,
           valid_loader,
           optim,
           arg_handler,
-          artifact_path)
+          artifact_path,
+          writer)
 
     general_utils.close_logger()
+    writer.close()
     return load_best_model(artifact_storage)
