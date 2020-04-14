@@ -158,12 +158,12 @@ def train(net,
           writer):
 
     current_lr = optim.param_groups[0]['lr']
-    lr_end = current_lr / 10**3
+    lr_end = current_lr / 10**2
 
     best_loss = arg_handler('best_loss')
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, 'min')
     scheduler.step(best_loss)
-    for i in range(arg_handler('current_epoch'), 100):
+    for i in range(arg_handler('current_epoch'), 1000):
         t0 = time.time()
         logging.info("\n\nEpoch {}".format(i+1))
         logging.info("Learning rate: {0:.3g}".format(current_lr))
