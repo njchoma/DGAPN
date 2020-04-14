@@ -16,7 +16,7 @@ import torch_geometric as pyg
 
 import utils.graph_utils as graph_utils
 import utils.general_utils as general_utils
-from .model import GNN
+from .model import GNN, GNN_Dense
 
 if torch.cuda.is_available():
     DEVICE='cuda'
@@ -43,6 +43,11 @@ def save_best_model(net, artifact_path):
 #############################################
 #                   DATA                    #
 #############################################
+def get_dense_edges(n):
+    x = np.arange(n)
+    src, dst = [np.tile(x, len(x)), np.repeat(x, len(x))]
+    return torch.tensor([src, dst], dtype=torch.long)
+
 
 class MolData(Dataset):
     def __init__(self, logp, smiles):
@@ -56,13 +61,18 @@ class MolData(Dataset):
 
         mol = Chem.MolFromSmiles(smiles)
         g = graph_utils.mol_to_pyg_graph(mol)
-        return g, torch.FloatTensor([logp])
+
+        nb_nodes = len(g.x)
+        dense_edges = get_dense_edges(len(g.x))
+        g2 = pyg.data.Data(edge_index=dense_edges)
+        g2.num_nodes=nb_nodes
+        return g, torch.FloatTensor([logp]), g2
 
     def __len__(self):
         return len(self.logp)
 
     def get_input_dim(self):
-        g, y = self[0]
+        g, y, g2 = self[0]
         input_dim = g.x.shape[1]
         return input_dim
 
@@ -91,12 +101,14 @@ def create_datasets(logp, smiles):
     return train_data, valid_data, test_data
 
 def my_collate(samples):
-    g = [s[0] for s in samples]
+    g1 = [s[0] for s in samples]
     y = [s[1] for s in samples]
+    g2 = [s[2] for s in samples]
 
-    G = pyg.data.Batch().from_data_list(g)
+    G1 = pyg.data.Batch().from_data_list(g1)
+    G2 = pyg.data.Batch().from_data_list(g2)
     y = torch.cat(y, dim=0)
-    return G, y
+    return G1, y, G2
 
 #################################################
 #                   TRAINING                    #
@@ -122,13 +134,14 @@ def proc_one_epoch(net,
 
     t0 = time.time()
     logging.info("  {} batches, {} samples".format(nb_batch, nb_samples))
-    for i, (G, y) in enumerate(loader):
+    for i, (G1, y, G2) in enumerate(loader):
         t1 = time.time()
         if train:
             optim.zero_grad()
         y = y.to(DEVICE, non_blocking=True)
-        G = G.to(DEVICE)
-        y_pred = net(G)
+        G1 = G1.to(DEVICE)
+        G2 = G2.to(DEVICE)
+        y_pred = net(G1, G2.edge_index)
 
         loss = criterion(y_pred, y)
         if train:
@@ -196,7 +209,7 @@ def train(net,
         current_lr = optim.param_groups[0]['lr']
         arg_handler.update_args(current_lr, i+1, best_loss)
         save_current_model(net, artifact_path)
-        if current_lr <= lr_end:
+        if current_lr < lr_end:
             break
 
 
@@ -248,7 +261,7 @@ def main(artifact_path,
          batch_size=512,
          num_workers=24,
          nb_hidden=256,
-         nb_layer=5,
+         nb_layer=4,
          lr=0.001):
     artifact_path = os.path.join(artifact_path, 'predict_logp')
     os.makedirs(artifact_path, exist_ok=True)
@@ -266,11 +279,11 @@ def main(artifact_path,
                               num_workers=num_workers)
     valid_loader = DataLoader(valid_data,
                               collate_fn=my_collate,
-                              batch_size=batch_size*2,
+                              batch_size=batch_size,
                               num_workers=num_workers)
     test_loader =  DataLoader(test_data,
                               collate_fn=my_collate,
-                              batch_size=batch_size*2,
+                              batch_size=batch_size,
                               num_workers=num_workers)
 
     valid_data.compute_baseline_error()
@@ -279,9 +292,9 @@ def main(artifact_path,
         net = load_current_model(artifact_path)
         logging.info("Model restored")
     except Exception as e:
-        net = GNN(input_dim = train_data.get_input_dim(),
-                  nb_hidden = nb_hidden,
-                  nb_layer  = nb_layer)
+        net = GNN_Dense(input_dim = train_data.get_input_dim(),
+                        nb_hidden = nb_hidden,
+                        nb_layer  = nb_layer)
         logging.info(net)
         logging.info("New model created")
     net = net.to(DEVICE)
