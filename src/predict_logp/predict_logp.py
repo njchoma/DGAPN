@@ -1,3 +1,5 @@
+import os
+import logging
 import numpy as np
 
 from rdkit import Chem
@@ -9,6 +11,12 @@ import torch_geometric as pyg
 
 
 import utils.graph_utils as graph_utils
+import utils.general_utils as general_utils
+from .model import GNN
+
+#############################################
+#                   DATA                    #
+#############################################
 
 class MolData(Dataset):
     def __init__(self, logp, smiles):
@@ -26,6 +34,11 @@ class MolData(Dataset):
 
     def __len__(self):
         return len(self.logp)
+
+    def get_input_dim(self):
+        g, y = self[0]
+        input_dim = g.x.shape[1]
+        return input_dim
 
 def create_datasets(logp, smiles):
     nb_samples = len(logp)
@@ -46,7 +59,24 @@ def create_datasets(logp, smiles):
     return train_data, valid_data, test_data
 
 
-def main(logp, smiles):
+#################################################
+#                   TRAINING                    #
+#################################################
+
+
+
+#############################################
+#                   MAIN                    #
+#############################################
+
+def main(artifact_path, logp, smiles):
+    artifact_path = os.path.join(artifact_path, 'predict_logp')
+    os.makedirs(artifact_path, exist_ok=True)
+    general_utils.initialize_logger(artifact_path)
+
     train_data, valid_data, test_data = create_datasets(logp, smiles)
-    g, y = train_data[1]
-    print(g, y)
+
+    net = GNN(train_data.get_input_dim())
+    logging.info(net)
+
+    general_utils.close_logger()

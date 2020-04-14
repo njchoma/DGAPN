@@ -1,3 +1,4 @@
+import os
 import argparse
 
 from dataset import get_dataset, preprocess
@@ -16,10 +17,14 @@ def read_args():
 
 def main():
     args = read_args()
+
+    artifact_path = os.path.join(args.artifact_path, args.name)
+    os.makedirs(artifact_path, exist_ok=True)
+
     dataset_path = get_dataset.main(args.data_path)
     print(dataset_path)
     logp, smiles = preprocess.main(dataset_path)
-    predict_logp.main(logp, smiles)
+    predict_logp.main(artifact_path, logp, smiles)
 
 
 if __name__ == "__main__":
