@@ -11,12 +11,14 @@ class GNN(nn.Module):
             layers.append(pyg.nn.GATConv(nb_hidden, nb_hidden))
         self.layers = nn.ModuleList(layers)
         self.final_layer = nn.Linear(nb_hidden, 1)
+        self.act = nn.ReLU()
 
     def forward(self, g):
         x = g.x
         edge_index = g.edge_index
         for l in self.layers:
             x = l(x, edge_index)
+            x = self.act(x)
         x = pyg.nn.global_add_pool(x, g.batch)
         y = self.final_layer(x).squeeze()
         return y

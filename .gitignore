@@ -1,5 +1,6 @@
 # MY ADDITIONS
 *.swp
+run*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

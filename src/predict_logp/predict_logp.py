@@ -181,6 +181,7 @@ def train(net,
                                     valid_loader)
         logging.info("Train MSE: {:3.2f}".format(train_loss))
         logging.info("Valid MSE: {:3.2f}".format(valid_loss))
+        writer.add_scalar('lr', current_lr, i)
         writer.add_scalars('loss',
                            {'train':train_loss,'valid':valid_loss},
                            i)
@@ -195,7 +196,7 @@ def train(net,
         current_lr = optim.param_groups[0]['lr']
         arg_handler.update_args(current_lr, i+1, best_loss)
         save_current_model(net, artifact_path)
-        if current_lr < lr_end:
+        if current_lr <= lr_end:
             break
 
 
@@ -244,10 +245,10 @@ class ArgumentHandler:
 def main(artifact_path,
          logp,
          smiles,
-         batch_size=128,
+         batch_size=512,
          num_workers=24,
          nb_hidden=256,
-         nb_layer=3,
+         nb_layer=5,
          lr=0.001):
     artifact_path = os.path.join(artifact_path, 'predict_logp')
     os.makedirs(artifact_path, exist_ok=True)
@@ -300,4 +301,4 @@ def main(artifact_path,
 
     general_utils.close_logger()
     writer.close()
-    return load_best_model(artifact_storage)
+    return load_best_model(artifact_path)
