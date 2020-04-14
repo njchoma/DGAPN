@@ -22,7 +22,6 @@ def main():
     os.makedirs(artifact_path, exist_ok=True)
 
     dataset_path = get_dataset.main(args.data_path)
-    print(dataset_path)
     logp, smiles = preprocess.main(dataset_path)
     predict_logp.main(artifact_path, logp, smiles)
 

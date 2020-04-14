@@ -1,10 +1,22 @@
 import torch
 import torch.nn as nn
 
-class GNN(nn.Module):
-    def __init__(self, input_dim):
-        super(GNN, self).__init__()
-        print("made gnn model")
+import torch_geometric as pyg
 
-    def forward(self):
-        pass
+class GNN(nn.Module):
+    def __init__(self, input_dim, nb_hidden, nb_layer):
+        super(GNN, self).__init__()
+        layers = [pyg.nn.GATConv(input_dim, nb_hidden)]
+        for _ in range(nb_layer-1):
+            layers.append(pyg.nn.GATConv(nb_hidden, nb_hidden))
+        self.layers = nn.ModuleList(layers)
+        self.final_layer = nn.Linear(nb_hidden, 1)
+
+    def forward(self, g):
+        x = g.x
+        edge_index = g.edge_index
+        for l in self.layers:
+            x = l(x, edge_index)
+        x = pyg.nn.global_add_pool(x, g.batch)
+        y = self.final_layer(x).squeeze()
+        return y
