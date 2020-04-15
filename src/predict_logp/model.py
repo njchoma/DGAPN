@@ -13,7 +13,7 @@ class GNN(nn.Module):
         self.final_layer = nn.Linear(nb_hidden, 1)
         self.act = nn.ReLU()
 
-    def forward(self, g):
+    def forward(self, g, dense_edge_idx):
         x = g.x
         edge_index = g.edge_index
         for l in self.layers:

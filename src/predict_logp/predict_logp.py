@@ -82,13 +82,14 @@ class MolData(Dataset):
         sq_sum = np.sum(np.square(logp-mean)) / len(logp)
         logging.info("{:5.3f} baseline L2 loss\n".format(sq_sum))
 
-def create_datasets(logp, smiles):
+def create_datasets(logp, smiles, np_seed=0):
     nb_samples = len(logp)
     assert nb_samples > 10
 
     nb_train = int(nb_samples * 0.6)
     nb_valid = int(nb_samples * 0.2)
 
+    np.random.seed(np_seed)
     sample_order = np.random.permutation(nb_samples)
 
     logp = np.asarray(logp)[sample_order].tolist()
@@ -261,7 +262,7 @@ def main(artifact_path,
          batch_size=512,
          num_workers=24,
          nb_hidden=256,
-         nb_layer=4,
+         nb_layer=7,
          lr=0.001):
     artifact_path = os.path.join(artifact_path, 'predict_logp')
     os.makedirs(artifact_path, exist_ok=True)
@@ -292,7 +293,7 @@ def main(artifact_path,
         net = load_current_model(artifact_path)
         logging.info("Model restored")
     except Exception as e:
-        net = GNN_Dense(input_dim = train_data.get_input_dim(),
+        net = GNN(input_dim = train_data.get_input_dim(),
                         nb_hidden = nb_hidden,
                         nb_layer  = nb_layer)
         logging.info(net)
