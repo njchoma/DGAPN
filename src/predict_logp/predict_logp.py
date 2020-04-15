@@ -16,6 +16,7 @@ import torch_geometric as pyg
 
 import utils.graph_utils as graph_utils
 import utils.general_utils as general_utils
+from . import model
 from .model import GNN, GNN_Dense
 
 if torch.cuda.is_available():
@@ -66,6 +67,7 @@ class MolData(Dataset):
         dense_edges = get_dense_edges(len(g.x))
         g2 = pyg.data.Data(edge_index=dense_edges)
         g2.num_nodes=nb_nodes
+
         return g, torch.FloatTensor([logp]), g2
 
     def __len__(self):
@@ -261,7 +263,7 @@ def main(artifact_path,
          smiles,
          batch_size=512,
          num_workers=24,
-         nb_hidden=256,
+         nb_hidden=512,
          nb_layer=7,
          lr=0.001):
     artifact_path = os.path.join(artifact_path, 'predict_logp')
@@ -293,7 +295,7 @@ def main(artifact_path,
         net = load_current_model(artifact_path)
         logging.info("Model restored")
     except Exception as e:
-        net = GNN(input_dim = train_data.get_input_dim(),
+        net = model.GNN_MyGAT(input_dim = train_data.get_input_dim(),
                         nb_hidden = nb_hidden,
                         nb_layer  = nb_layer)
         logging.info(net)
