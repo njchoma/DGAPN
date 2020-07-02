@@ -10,7 +10,7 @@ from torch_geometric.utils import dense_to_sparse
 
 from .gcpn_policy import GCPN
 
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class Memory:
     def __init__(self):
@@ -295,12 +295,12 @@ def train_ppo(args, env):
         # stop training if avg_reward > solved_reward
         if running_reward > (log_interval*solved_reward):
             print("########## Solved! ##########")
-            torch.save(ppo.policy.state_dict(), './PPO_continuous_solved_{}.pth'.format(env_name))
+            torch.save(ppo.policy.state_dict(), './PPO_continuous_solved_{}.pth'.format('test'))
             break
         
         # save every 500 episodes
         if i_episode % 500 == 0:
-            torch.save(ppo.policy.state_dict(), './PPO_continuous_{}.pth'.format(env_name))
+            torch.save(ppo.policy.state_dict(), './PPO_continuous_{}.pth'.format('test'))
             
         # logging
         if i_episode % log_interval == 0:
