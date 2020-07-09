@@ -194,6 +194,13 @@ class PPO_GCPN:
                 surr1 = r * advantages
                 surr2 = torch.clamp(r, 1-self.eps_clip, 1+self.eps_clip) * advantages
                 l = -torch.min(surr1, surr2) + 0.5*self.MseLoss(state_values, rewards)
+                if torch.isnan(l).any():
+                    print("found nan in loss")
+                    print(l)
+                    print(torch.isnan(surr1).any())
+                    print(torch.isnan(surr2).any())
+                    print(torch.isnan(advantages).any())
+                    exit()
                 loss.append(l)
             loss = torch.stack(loss)
             
@@ -201,7 +208,7 @@ class PPO_GCPN:
             self.optimizer.zero_grad()
             loss.mean().backward()
             self.optimizer.step()
-            if (i%5)==0:
+            if (i%10)==0:
                 print("  {:3d}: Loss: {:7.3f}".format(i, loss.mean()))
             
         # Copy new weights into old policy:
@@ -221,12 +228,12 @@ def train_ppo(args, env):
     ############## Hyperparameters ##############
     render = True
     solved_reward = 10          # stop training if avg_reward > solved_reward
-    log_interval = 20           # print avg reward in the interval
+    log_interval = 40           # print avg reward in the interval
     max_episodes = 10000        # max training episodes
     max_timesteps = 1500        # max timesteps in one episode
     
-    update_timestep = 400       # update policy every n timesteps
-    K_epochs = 20               # update policy for K epochs
+    update_timestep = 1600      # update policy every n timesteps
+    K_epochs = 40               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
     gamma = 0.99                # discount factor
     
@@ -280,7 +287,6 @@ def train_ppo(args, env):
 
             # update if its time
             if time_step % update_timestep == 0:
-                print("updating ppo")
                 ppo.update(memory)
                 memory.clear_memory()
                 time_step = 0
@@ -307,7 +313,7 @@ def train_ppo(args, env):
             avg_length = int(avg_length/log_interval)
             running_reward = running_reward/log_interval
             
-            print('Episode {} \t Avg length: {} \t Avg reward: {}'.format(i_episode, avg_length, running_reward))
+            print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
             running_reward = 0
             avg_length = 0
 
