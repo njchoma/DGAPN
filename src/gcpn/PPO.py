@@ -10,7 +10,7 @@ from torch_geometric.utils import dense_to_sparse
 
 from .gcpn_policy import GCPN
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Memory:
     def __init__(self):
@@ -228,16 +228,16 @@ def train_ppo(args, env):
     ############## Hyperparameters ##############
     render = True
     solved_reward = 10          # stop training if avg_reward > solved_reward
-    log_interval = 40           # print avg reward in the interval
-    max_episodes = 10000        # max training episodes
+    log_interval = 80           # print avg reward in the interval
+    max_episodes = 30000        # max training episodes
     max_timesteps = 1500        # max timesteps in one episode
     
-    update_timestep = 1600      # update policy every n timesteps
-    K_epochs = 40               # update policy for K epochs
+    update_timestep = 2000      # update policy every n timesteps
+    K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
     gamma = 0.99                # discount factor
     
-    lr = 0.0003                 # parameters for Adam optimizer
+    lr = 0.0001                 # parameters for Adam optimizer
     betas = (0.9, 0.999)
     
     #############################################
