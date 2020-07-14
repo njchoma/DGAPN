@@ -1,0 +1,3938 @@
+Arguments initialized.
+1.580 baseline L2 loss
+
+GNN_MyGAT(
+  (layers): ModuleList(
+    (0): MyGATConv(121, 512, heads=1)
+    (1): MyGATConv(512, 512, heads=1)
+    (2): MyGATConv(512, 512, heads=1)
+    (3): MyGATConv(512, 512, heads=1)
+    (4): MyGATConv(512, 512, heads=1)
+    (5): MyGATConv(512, 512, heads=1)
+    (6): MyGATConv(512, 512, heads=1)
+  )
+  (final_layer): Linear(in_features=512, out_features=1, bias=True)
+  (act): ReLU()
+)
+New model created
+
+
+Epoch 1
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+Arguments loaded.
+1.580 baseline L2 loss
+
+GNN_MyGAT(
+  (layers): ModuleList(
+    (0): MyGATConv(121, 512, heads=1)
+    (1): MyGATConv(512, 512, heads=1)
+    (2): MyGATConv(512, 512, heads=1)
+    (3): MyGATConv(512, 512, heads=1)
+    (4): MyGATConv(512, 512, heads=1)
+    (5): MyGATConv(512, 512, heads=1)
+    (6): MyGATConv(512, 512, heads=1)
+  )
+  (final_layer): Linear(in_features=512, out_features=1, bias=True)
+  (act): ReLU()
+)
+New model created
+
+
+Epoch 1
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+Arguments loaded.
+1.580 baseline L2 loss
+
+GNN_MyGAT(
+  (layers): ModuleList(
+    (0): MyGATConv(121, 512, heads=1)
+    (1): MyGATConv(512, 512, heads=1)
+    (2): MyGATConv(512, 512, heads=1)
+    (3): MyGATConv(512, 512, heads=1)
+    (4): MyGATConv(512, 512, heads=1)
+    (5): MyGATConv(512, 512, heads=1)
+    (6): MyGATConv(512, 512, heads=1)
+  )
+  (final_layer): Linear(in_features=512, out_features=1, bias=True)
+  (act): ReLU()
+)
+New model created
+
+
+Epoch 1
+Learning rate: 0.001
+  Train:
+  7 batches, 1792 samples
+Arguments loaded.
+1.580 baseline L2 loss
+
+GNN_MyGAT(
+  (layers): ModuleList(
+    (0): MyGATConv(121, 512, heads=1)
+    (1): MyGATConv(512, 512, heads=1)
+    (2): MyGATConv(512, 512, heads=1)
+    (3): MyGATConv(512, 512, heads=1)
+    (4): MyGATConv(512, 512, heads=1)
+    (5): MyGATConv(512, 512, heads=1)
+    (6): MyGATConv(512, 512, heads=1)
+  )
+  (final_layer): Linear(in_features=512, out_features=1, bias=True)
+  (act): ReLU()
+)
+New model created
+
+
+Epoch 1
+Learning rate: 0.001
+  Train:
+  7 batches, 1792 samples
+Arguments loaded.
+1.580 baseline L2 loss
+
+GNN_MyGAT(
+  (layers): ModuleList(
+    (0): MyGATConv(121, 512, heads=1)
+    (1): MyGATConv(512, 512, heads=1)
+    (2): MyGATConv(512, 512, heads=1)
+    (3): MyGATConv(512, 512, heads=1)
+    (4): MyGATConv(512, 512, heads=1)
+    (5): MyGATConv(512, 512, heads=1)
+    (6): MyGATConv(512, 512, heads=1)
+  )
+  (final_layer): Linear(in_features=512, out_features=1, bias=True)
+  (act): ReLU()
+)
+New model created
+
+
+Epoch 1
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 24.49
+  Model elapsed:  23.62
+  Loader elapsed: 0.61
+  Total elapsed:  24.24
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 5.27
+  Model elapsed:  3.71
+  Loader elapsed: 0.52
+  Total elapsed:  4.23
+Train MSE: 24.49
+Valid MSE: 5.27
+Best performance on valid set
+  28.6 seconds, this epoch
+
+
+Epoch 2
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 6.04
+  Model elapsed:  23.55
+  Loader elapsed: 0.53
+  Total elapsed:  24.08
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 8.17
+  Model elapsed:  3.80
+  Loader elapsed: 0.53
+  Total elapsed:  4.34
+Train MSE: 6.04
+Valid MSE: 8.17
+  28.5 seconds, this epoch
+
+
+Epoch 3
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 6.06
+  Model elapsed:  23.70
+  Loader elapsed: 0.56
+  Total elapsed:  24.26
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 5.31
+  Model elapsed:  3.74
+  Loader elapsed: 0.53
+  Total elapsed:  4.27
+Train MSE: 6.06
+Valid MSE: 5.31
+  28.6 seconds, this epoch
+
+
+Epoch 4
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 5.01
+  Model elapsed:  23.49
+  Loader elapsed: 0.56
+  Total elapsed:  24.05
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 4.47
+  Model elapsed:  3.72
+  Loader elapsed: 0.51
+  Total elapsed:  4.23
+Train MSE: 5.01
+Valid MSE: 4.47
+Best performance on valid set
+  28.3 seconds, this epoch
+
+
+Epoch 5
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 4.52
+  Model elapsed:  23.68
+  Loader elapsed: 0.52
+  Total elapsed:  24.21
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 4.08
+  Model elapsed:  3.74
+  Loader elapsed: 0.50
+  Total elapsed:  4.24
+Train MSE: 4.52
+Valid MSE: 4.08
+Best performance on valid set
+  28.5 seconds, this epoch
+
+
+Epoch 6
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 4.22
+  Model elapsed:  23.93
+  Loader elapsed: 0.51
+  Total elapsed:  24.44
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.87
+  Model elapsed:  3.66
+  Loader elapsed: 0.54
+  Total elapsed:  4.20
+Train MSE: 4.22
+Valid MSE: 3.87
+Best performance on valid set
+  28.7 seconds, this epoch
+
+
+Epoch 7
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.96
+  Model elapsed:  23.47
+  Loader elapsed: 0.51
+  Total elapsed:  23.99
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.76
+  Model elapsed:  3.78
+  Loader elapsed: 0.50
+  Total elapsed:  4.28
+Train MSE: 3.96
+Valid MSE: 3.76
+Best performance on valid set
+  28.3 seconds, this epoch
+
+
+Epoch 8
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+Arguments loaded.
+1.580 baseline L2 loss
+
+Model restored
+
+
+Epoch 8
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 31.75
+  Model elapsed:  24.53
+  Loader elapsed: 0.75
+  Total elapsed:  25.28
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 18.58
+  Model elapsed:  3.84
+  Loader elapsed: 0.53
+  Total elapsed:  4.36
+Train MSE: 31.75
+Valid MSE: 18.58
+  29.7 seconds, this epoch
+
+
+Epoch 9
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 25.18
+  Model elapsed:  23.65
+  Loader elapsed: 0.52
+  Total elapsed:  24.17
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 27.65
+  Model elapsed:  3.74
+  Loader elapsed: 0.54
+  Total elapsed:  4.27
+Train MSE: 25.18
+Valid MSE: 27.65
+  28.5 seconds, this epoch
+
+
+Epoch 10
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 20.65
+  Model elapsed:  23.00
+  Loader elapsed: 0.60
+  Total elapsed:  23.59
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 4.99
+  Model elapsed:  3.72
+  Loader elapsed: 0.53
+  Total elapsed:  4.24
+Train MSE: 20.65
+Valid MSE: 4.99
+  27.9 seconds, this epoch
+
+
+Epoch 11
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 7.88
+  Model elapsed:  23.71
+  Loader elapsed: 0.54
+  Total elapsed:  24.24
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 4.18
+  Model elapsed:  3.71
+  Loader elapsed: 0.51
+  Total elapsed:  4.22
+Train MSE: 7.88
+Valid MSE: 4.18
+  28.5 seconds, this epoch
+
+
+Epoch 12
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 5.14
+  Model elapsed:  23.42
+  Loader elapsed: 0.52
+  Total elapsed:  23.94
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 6.17
+  Model elapsed:  3.76
+  Loader elapsed: 0.52
+  Total elapsed:  4.27
+Train MSE: 5.14
+Valid MSE: 6.17
+  28.3 seconds, this epoch
+
+
+Epoch 13
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+Arguments loaded.
+1.580 baseline L2 loss
+
+Model restored
+
+
+Epoch 13
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 11.41
+  Model elapsed:  24.58
+  Loader elapsed: 0.70
+  Total elapsed:  25.28
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 13.15
+  Model elapsed:  3.59
+  Loader elapsed: 0.56
+  Total elapsed:  4.15
+Train MSE: 11.41
+Valid MSE: 13.15
+  29.5 seconds, this epoch
+
+
+Epoch 14
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 13.95
+  Model elapsed:  24.42
+  Loader elapsed: 0.51
+  Total elapsed:  24.93
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 8.43
+  Model elapsed:  3.84
+  Loader elapsed: 0.51
+  Total elapsed:  4.36
+Train MSE: 13.95
+Valid MSE: 8.43
+  29.4 seconds, this epoch
+
+
+Epoch 15
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 6.67
+  Model elapsed:  24.24
+  Loader elapsed: 0.54
+  Total elapsed:  24.77
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 7.73
+  Model elapsed:  4.20
+  Loader elapsed: 0.55
+  Total elapsed:  4.75
+Train MSE: 6.67
+Valid MSE: 7.73
+  29.6 seconds, this epoch
+
+
+Epoch 16
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 5.18
+  Model elapsed:  23.53
+  Loader elapsed: 0.57
+  Total elapsed:  24.10
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 4.62
+  Model elapsed:  3.81
+  Loader elapsed: 0.50
+  Total elapsed:  4.31
+Train MSE: 5.18
+Valid MSE: 4.62
+  28.5 seconds, this epoch
+
+
+Epoch 17
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 4.87
+  Model elapsed:  24.58
+  Loader elapsed: 0.51
+  Total elapsed:  25.09
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.97
+  Model elapsed:  4.19
+  Loader elapsed: 0.78
+  Total elapsed:  4.98
+Train MSE: 4.87
+Valid MSE: 3.97
+  30.1 seconds, this epoch
+
+
+Epoch 18
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 4.04
+  Model elapsed:  24.12
+  Loader elapsed: 0.68
+  Total elapsed:  24.80
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 4.39
+  Model elapsed:  3.84
+  Loader elapsed: 0.53
+  Total elapsed:  4.37
+Train MSE: 4.04
+Valid MSE: 4.39
+  29.2 seconds, this epoch
+
+
+Epoch 19
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 4.16
+  Model elapsed:  23.87
+  Loader elapsed: 0.51
+  Total elapsed:  24.38
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.80
+  Model elapsed:  3.87
+  Loader elapsed: 0.50
+  Total elapsed:  4.37
+Train MSE: 4.16
+Valid MSE: 3.80
+  28.8 seconds, this epoch
+
+
+Epoch 20
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.94
+  Model elapsed:  24.01
+  Loader elapsed: 0.49
+  Total elapsed:  24.50
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.67
+  Model elapsed:  3.81
+  Loader elapsed: 0.51
+  Total elapsed:  4.32
+Train MSE: 3.94
+Valid MSE: 3.67
+Best performance on valid set
+  28.9 seconds, this epoch
+
+
+Epoch 21
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.71
+  Model elapsed:  24.27
+  Loader elapsed: 0.52
+  Total elapsed:  24.78
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.68
+  Model elapsed:  3.96
+  Loader elapsed: 0.54
+  Total elapsed:  4.50
+Train MSE: 3.71
+Valid MSE: 3.68
+  29.3 seconds, this epoch
+
+
+Epoch 22
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.56
+  Model elapsed:  24.99
+  Loader elapsed: 0.55
+  Total elapsed:  25.54
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.54
+  Model elapsed:  4.12
+  Loader elapsed: 0.53
+  Total elapsed:  4.65
+Train MSE: 3.56
+Valid MSE: 3.54
+Best performance on valid set
+  30.3 seconds, this epoch
+
+
+Epoch 23
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.46
+  Model elapsed:  24.11
+  Loader elapsed: 0.53
+  Total elapsed:  24.64
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.57
+  Model elapsed:  3.84
+  Loader elapsed: 0.51
+  Total elapsed:  4.35
+Train MSE: 3.46
+Valid MSE: 3.57
+  29.0 seconds, this epoch
+
+
+Epoch 24
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.44
+  Model elapsed:  23.54
+  Loader elapsed: 0.51
+  Total elapsed:  24.04
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.46
+  Model elapsed:  3.76
+  Loader elapsed: 0.49
+  Total elapsed:  4.25
+Train MSE: 3.44
+Valid MSE: 3.46
+Best performance on valid set
+  28.3 seconds, this epoch
+
+
+Epoch 25
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.32
+  Model elapsed:  23.46
+  Loader elapsed: 0.49
+  Total elapsed:  23.95
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.46
+  Model elapsed:  3.82
+  Loader elapsed: 0.50
+  Total elapsed:  4.32
+Train MSE: 3.32
+Valid MSE: 3.46
+Best performance on valid set
+  28.3 seconds, this epoch
+
+
+Epoch 26
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.39
+  Model elapsed:  24.37
+  Loader elapsed: 0.48
+  Total elapsed:  24.85
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.41
+  Model elapsed:  3.97
+  Loader elapsed: 0.51
+  Total elapsed:  4.49
+Train MSE: 3.39
+Valid MSE: 3.41
+Best performance on valid set
+  29.4 seconds, this epoch
+
+
+Epoch 27
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.30
+  Model elapsed:  23.75
+  Loader elapsed: 0.53
+  Total elapsed:  24.28
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.67
+  Model elapsed:  3.82
+  Loader elapsed: 0.50
+  Total elapsed:  4.32
+Train MSE: 3.30
+Valid MSE: 3.67
+  28.6 seconds, this epoch
+
+
+Epoch 28
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.27
+  Model elapsed:  23.84
+  Loader elapsed: 0.54
+  Total elapsed:  24.37
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.56
+  Model elapsed:  3.86
+  Loader elapsed: 0.50
+  Total elapsed:  4.35
+Train MSE: 3.27
+Valid MSE: 3.56
+  28.8 seconds, this epoch
+
+
+Epoch 29
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.24
+  Model elapsed:  23.53
+  Loader elapsed: 0.50
+  Total elapsed:  24.03
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.35
+  Model elapsed:  3.80
+  Loader elapsed: 0.49
+  Total elapsed:  4.29
+Train MSE: 3.24
+Valid MSE: 3.35
+Best performance on valid set
+  28.4 seconds, this epoch
+
+
+Epoch 30
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.23
+  Model elapsed:  23.76
+  Loader elapsed: 0.49
+  Total elapsed:  24.25
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.29
+  Model elapsed:  3.80
+  Loader elapsed: 0.50
+  Total elapsed:  4.30
+Train MSE: 3.23
+Valid MSE: 3.29
+Best performance on valid set
+  28.6 seconds, this epoch
+
+
+Epoch 31
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.21
+  Model elapsed:  23.52
+  Loader elapsed: 0.49
+  Total elapsed:  24.01
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.32
+  Model elapsed:  3.80
+  Loader elapsed: 0.50
+  Total elapsed:  4.30
+Train MSE: 3.21
+Valid MSE: 3.32
+  28.4 seconds, this epoch
+
+
+Epoch 32
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.11
+  Model elapsed:  16885.84
+  Loader elapsed: 0.50
+  Total elapsed:  16886.34
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.18
+  Model elapsed:  3.77
+  Loader elapsed: 0.52
+  Total elapsed:  4.28
+Train MSE: 3.11
+Valid MSE: 3.18
+Best performance on valid set
+16890.7 seconds, this epoch
+
+
+Epoch 33
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.03
+  Model elapsed:  78.06
+  Loader elapsed: 0.52
+  Total elapsed:  78.58
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.15
+  Model elapsed:  4.02
+  Loader elapsed: 0.75
+  Total elapsed:  4.76
+Train MSE: 3.03
+Valid MSE: 3.15
+Best performance on valid set
+  83.4 seconds, this epoch
+
+
+Epoch 34
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 3.02
+  Model elapsed:  29.56
+  Loader elapsed: 0.76
+  Total elapsed:  30.32
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.07
+  Model elapsed:  5.21
+  Loader elapsed: 1.03
+  Total elapsed:  6.24
+Train MSE: 3.02
+Valid MSE: 3.07
+Best performance on valid set
+  36.6 seconds, this epoch
+
+
+Epoch 35
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.90
+  Model elapsed:  30.19
+  Loader elapsed: 1.08
+  Total elapsed:  31.27
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.07
+  Model elapsed:  4.42
+  Loader elapsed: 0.79
+  Total elapsed:  5.21
+Train MSE: 2.90
+Valid MSE: 3.07
+  36.5 seconds, this epoch
+
+
+Epoch 36
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.97
+  Model elapsed:  11597.78
+  Loader elapsed: 0.78
+  Total elapsed:  11598.56
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.01
+  Model elapsed:  3.90
+  Loader elapsed: 0.52
+  Total elapsed:  4.42
+Train MSE: 2.97
+Valid MSE: 3.01
+Best performance on valid set
+11603.1 seconds, this epoch
+
+
+Epoch 37
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.79
+  Model elapsed:  23.86
+  Loader elapsed: 0.51
+  Total elapsed:  24.37
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.05
+  Model elapsed:  3.82
+  Loader elapsed: 0.51
+  Total elapsed:  4.33
+Train MSE: 2.79
+Valid MSE: 3.05
+  28.7 seconds, this epoch
+
+
+Epoch 38
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.81
+  Model elapsed:  23.84
+  Loader elapsed: 0.50
+  Total elapsed:  24.35
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.21
+  Model elapsed:  3.83
+  Loader elapsed: 0.49
+  Total elapsed:  4.32
+Train MSE: 2.81
+Valid MSE: 3.21
+  28.7 seconds, this epoch
+
+
+Epoch 39
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.76
+  Model elapsed:  23.48
+  Loader elapsed: 0.51
+  Total elapsed:  23.99
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.89
+  Model elapsed:  3.84
+  Loader elapsed: 0.50
+  Total elapsed:  4.34
+Train MSE: 2.76
+Valid MSE: 2.89
+Best performance on valid set
+  28.4 seconds, this epoch
+
+
+Epoch 40
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.67
+  Model elapsed:  23.58
+  Loader elapsed: 0.50
+  Total elapsed:  24.08
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.91
+  Model elapsed:  3.89
+  Loader elapsed: 0.50
+  Total elapsed:  4.39
+Train MSE: 2.67
+Valid MSE: 2.91
+  28.5 seconds, this epoch
+
+
+Epoch 41
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.61
+  Model elapsed:  24.48
+  Loader elapsed: 0.51
+  Total elapsed:  24.99
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.80
+  Model elapsed:  3.91
+  Loader elapsed: 0.51
+  Total elapsed:  4.42
+Train MSE: 2.61
+Valid MSE: 2.80
+Best performance on valid set
+  29.5 seconds, this epoch
+
+
+Epoch 42
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.43
+  Model elapsed:  24.39
+  Loader elapsed: 0.52
+  Total elapsed:  24.91
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.83
+  Model elapsed:  3.57
+  Loader elapsed: 0.51
+  Total elapsed:  4.08
+Train MSE: 2.43
+Valid MSE: 2.83
+  29.0 seconds, this epoch
+
+
+Epoch 43
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.47
+  Model elapsed:  23.90
+  Loader elapsed: 0.55
+  Total elapsed:  24.45
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.84
+  Model elapsed:  3.82
+  Loader elapsed: 0.52
+  Total elapsed:  4.34
+Train MSE: 2.47
+Valid MSE: 2.84
+  28.8 seconds, this epoch
+
+
+Epoch 44
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.52
+  Model elapsed:  23.49
+  Loader elapsed: 0.50
+  Total elapsed:  23.99
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.77
+  Model elapsed:  3.85
+  Loader elapsed: 0.51
+  Total elapsed:  4.36
+Train MSE: 2.52
+Valid MSE: 2.77
+Best performance on valid set
+  28.4 seconds, this epoch
+
+
+Epoch 45
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.45
+  Model elapsed:  23.81
+  Loader elapsed: 0.51
+  Total elapsed:  24.32
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.79
+  Model elapsed:  3.84
+  Loader elapsed: 0.51
+  Total elapsed:  4.35
+Train MSE: 2.45
+Valid MSE: 2.79
+  28.7 seconds, this epoch
+
+
+Epoch 46
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.35
+  Model elapsed:  23.98
+  Loader elapsed: 0.51
+  Total elapsed:  24.48
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.80
+  Model elapsed:  3.79
+  Loader elapsed: 0.51
+  Total elapsed:  4.29
+Train MSE: 2.35
+Valid MSE: 2.80
+  28.8 seconds, this epoch
+
+
+Epoch 47
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.34
+  Model elapsed:  23.98
+  Loader elapsed: 0.51
+  Total elapsed:  24.49
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.83
+  Model elapsed:  3.85
+  Loader elapsed: 0.51
+  Total elapsed:  4.36
+Train MSE: 2.34
+Valid MSE: 2.83
+  28.9 seconds, this epoch
+
+
+Epoch 48
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.43
+  Model elapsed:  23.94
+  Loader elapsed: 0.51
+  Total elapsed:  24.45
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.17
+  Model elapsed:  3.86
+  Loader elapsed: 0.51
+  Total elapsed:  4.36
+Train MSE: 2.43
+Valid MSE: 3.17
+  28.9 seconds, this epoch
+
+
+Epoch 49
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.61
+  Model elapsed:  23.83
+  Loader elapsed: 0.50
+  Total elapsed:  24.34
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.77
+  Model elapsed:  3.85
+  Loader elapsed: 0.51
+  Total elapsed:  4.36
+Train MSE: 2.61
+Valid MSE: 2.77
+  28.7 seconds, this epoch
+
+
+Epoch 50
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.60
+  Model elapsed:  23.71
+  Loader elapsed: 0.52
+  Total elapsed:  24.24
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.03
+  Model elapsed:  3.88
+  Loader elapsed: 0.51
+  Total elapsed:  4.39
+Train MSE: 2.60
+Valid MSE: 3.03
+  28.7 seconds, this epoch
+
+
+Epoch 51
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.57
+  Model elapsed:  23.88
+  Loader elapsed: 0.51
+  Total elapsed:  24.39
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.94
+  Model elapsed:  3.80
+  Loader elapsed: 0.51
+  Total elapsed:  4.31
+Train MSE: 2.57
+Valid MSE: 2.94
+  28.7 seconds, this epoch
+
+
+Epoch 52
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.49
+  Model elapsed:  23.76
+  Loader elapsed: 0.51
+  Total elapsed:  24.27
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.82
+  Model elapsed:  3.85
+  Loader elapsed: 0.51
+  Total elapsed:  4.37
+Train MSE: 2.49
+Valid MSE: 2.82
+  28.7 seconds, this epoch
+
+
+Epoch 53
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.39
+  Model elapsed:  23.82
+  Loader elapsed: 0.53
+  Total elapsed:  24.35
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.82
+  Model elapsed:  3.80
+  Loader elapsed: 0.51
+  Total elapsed:  4.31
+Train MSE: 2.39
+Valid MSE: 2.82
+  28.7 seconds, this epoch
+
+
+Epoch 54
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.34
+  Model elapsed:  23.55
+  Loader elapsed: 0.54
+  Total elapsed:  24.10
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.84
+  Model elapsed:  3.86
+  Loader elapsed: 0.51
+  Total elapsed:  4.38
+Train MSE: 2.34
+Valid MSE: 2.84
+  28.5 seconds, this epoch
+
+
+Epoch 55
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.25
+  Model elapsed:  24.08
+  Loader elapsed: 0.52
+  Total elapsed:  24.61
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.72
+  Model elapsed:  3.83
+  Loader elapsed: 0.51
+  Total elapsed:  4.34
+Train MSE: 2.25
+Valid MSE: 2.72
+Best performance on valid set
+  29.0 seconds, this epoch
+
+
+Epoch 56
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.19
+  Model elapsed:  23.68
+  Loader elapsed: 0.51
+  Total elapsed:  24.20
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.84
+  Model elapsed:  3.83
+  Loader elapsed: 0.50
+  Total elapsed:  4.33
+Train MSE: 2.19
+Valid MSE: 2.84
+  28.6 seconds, this epoch
+
+
+Epoch 57
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.31
+  Model elapsed:  23.88
+  Loader elapsed: 0.52
+  Total elapsed:  24.40
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.66
+  Model elapsed:  3.85
+  Loader elapsed: 0.51
+  Total elapsed:  4.37
+Train MSE: 2.31
+Valid MSE: 2.66
+Best performance on valid set
+  28.8 seconds, this epoch
+
+
+Epoch 58
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.24
+  Model elapsed:  23.79
+  Loader elapsed: 0.53
+  Total elapsed:  24.32
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.73
+  Model elapsed:  3.83
+  Loader elapsed: 0.51
+  Total elapsed:  4.33
+Train MSE: 2.24
+Valid MSE: 2.73
+  28.7 seconds, this epoch
+
+
+Epoch 59
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.31
+  Model elapsed:  23.48
+  Loader elapsed: 0.51
+  Total elapsed:  23.98
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.66
+  Model elapsed:  3.79
+  Loader elapsed: 0.50
+  Total elapsed:  4.29
+Train MSE: 2.31
+Valid MSE: 2.66
+  28.3 seconds, this epoch
+
+
+Epoch 60
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.39
+  Model elapsed:  2442.78
+  Loader elapsed: 0.70
+  Total elapsed:  2443.48
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.63
+  Model elapsed:  3.81
+  Loader elapsed: 4867.15
+  Total elapsed:  4870.96
+Train MSE: 2.39
+Valid MSE: 2.63
+Best performance on valid set
+7314.5 seconds, this epoch
+
+
+Epoch 61
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.18
+  Model elapsed:  25.11
+  Loader elapsed: 0.76
+  Total elapsed:  25.87
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.73
+  Model elapsed:  3.69
+  Loader elapsed: 0.61
+  Total elapsed:  4.30
+Train MSE: 2.18
+Valid MSE: 2.73
+  30.2 seconds, this epoch
+
+
+Epoch 62
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.12
+  Model elapsed:  24.19
+  Loader elapsed: 0.66
+  Total elapsed:  24.85
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.64
+  Model elapsed:  3.75
+  Loader elapsed: 0.49
+  Total elapsed:  4.24
+Train MSE: 2.12
+Valid MSE: 2.64
+  29.1 seconds, this epoch
+
+
+Epoch 63
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.15
+  Model elapsed:  23.99
+  Loader elapsed: 0.50
+  Total elapsed:  24.48
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.77
+  Model elapsed:  3.79
+  Loader elapsed: 0.49
+  Total elapsed:  4.28
+Train MSE: 2.15
+Valid MSE: 2.77
+  28.8 seconds, this epoch
+
+
+Epoch 64
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.21
+  Model elapsed:  23.66
+  Loader elapsed: 0.50
+  Total elapsed:  24.15
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.80
+  Model elapsed:  3.81
+  Loader elapsed: 0.50
+  Total elapsed:  4.31
+Train MSE: 2.21
+Valid MSE: 2.80
+  28.5 seconds, this epoch
+
+
+Epoch 65
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.35
+  Model elapsed:  24.70
+  Loader elapsed: 0.55
+  Total elapsed:  25.26
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.68
+  Model elapsed:  3.89
+  Loader elapsed: 0.56
+  Total elapsed:  4.45
+Train MSE: 2.35
+Valid MSE: 2.68
+  29.7 seconds, this epoch
+
+
+Epoch 66
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.38
+  Model elapsed:  24.58
+  Loader elapsed: 0.57
+  Total elapsed:  25.15
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.92
+  Model elapsed:  3.83
+  Loader elapsed: 0.52
+  Total elapsed:  4.35
+Train MSE: 2.38
+Valid MSE: 2.92
+  29.5 seconds, this epoch
+
+
+Epoch 67
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.32
+  Model elapsed:  24.87
+  Loader elapsed: 0.52
+  Total elapsed:  25.39
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.83
+  Model elapsed:  3.87
+  Loader elapsed: 0.54
+  Total elapsed:  4.41
+Train MSE: 2.32
+Valid MSE: 2.83
+  29.8 seconds, this epoch
+
+
+Epoch 68
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.31
+  Model elapsed:  24.87
+  Loader elapsed: 0.54
+  Total elapsed:  25.41
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.71
+  Model elapsed:  3.86
+  Loader elapsed: 0.53
+  Total elapsed:  4.39
+Train MSE: 2.31
+Valid MSE: 2.71
+  29.8 seconds, this epoch
+
+
+Epoch 69
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.22
+  Model elapsed:  23.73
+  Loader elapsed: 0.52
+  Total elapsed:  24.25
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.63
+  Model elapsed:  3.82
+  Loader elapsed: 0.50
+  Total elapsed:  4.32
+Train MSE: 2.22
+Valid MSE: 2.63
+Best performance on valid set
+  28.6 seconds, this epoch
+
+
+Epoch 70
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.07
+  Model elapsed:  24.26
+  Loader elapsed: 0.51
+  Total elapsed:  24.76
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.94
+  Model elapsed:  3.81
+  Loader elapsed: 0.53
+  Total elapsed:  4.34
+Train MSE: 2.07
+Valid MSE: 2.94
+  29.1 seconds, this epoch
+
+
+Epoch 71
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.24
+  Model elapsed:  23.94
+  Loader elapsed: 0.56
+  Total elapsed:  24.50
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.83
+  Model elapsed:  3.74
+  Loader elapsed: 0.52
+  Total elapsed:  4.26
+Train MSE: 2.24
+Valid MSE: 2.83
+  28.8 seconds, this epoch
+
+
+Epoch 72
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.18
+  Model elapsed:  23.69
+  Loader elapsed: 0.51
+  Total elapsed:  24.20
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.67
+  Model elapsed:  3.76
+  Loader elapsed: 0.52
+  Total elapsed:  4.29
+Train MSE: 2.18
+Valid MSE: 2.67
+  28.5 seconds, this epoch
+
+
+Epoch 73
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.09
+  Model elapsed:  23.36
+  Loader elapsed: 0.50
+  Total elapsed:  23.87
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.56
+  Model elapsed:  3.79
+  Loader elapsed: 0.54
+  Total elapsed:  4.33
+Train MSE: 2.09
+Valid MSE: 2.56
+Best performance on valid set
+  28.2 seconds, this epoch
+
+
+Epoch 74
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.11
+  Model elapsed:  24.53
+  Loader elapsed: 0.51
+  Total elapsed:  25.04
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 3.03
+  Model elapsed:  3.69
+  Loader elapsed: 0.53
+  Total elapsed:  4.22
+Train MSE: 2.11
+Valid MSE: 3.03
+  29.3 seconds, this epoch
+
+
+Epoch 75
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.17
+  Model elapsed:  24.64
+  Loader elapsed: 0.54
+  Total elapsed:  25.19
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.67
+  Model elapsed:  3.88
+  Loader elapsed: 0.52
+  Total elapsed:  4.40
+Train MSE: 2.17
+Valid MSE: 2.67
+  29.6 seconds, this epoch
+
+
+Epoch 76
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.10
+  Model elapsed:  24.62
+  Loader elapsed: 0.54
+  Total elapsed:  25.16
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.68
+  Model elapsed:  3.80
+  Loader elapsed: 0.52
+  Total elapsed:  4.32
+Train MSE: 2.10
+Valid MSE: 2.68
+  29.5 seconds, this epoch
+
+
+Epoch 77
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.12
+  Model elapsed:  24.63
+  Loader elapsed: 0.53
+  Total elapsed:  25.16
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.56
+  Model elapsed:  3.82
+  Loader elapsed: 0.53
+  Total elapsed:  4.35
+Train MSE: 2.12
+Valid MSE: 2.56
+Best performance on valid set
+  29.6 seconds, this epoch
+
+
+Epoch 78
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 2.07
+  Model elapsed:  24.42
+  Loader elapsed: 0.54
+  Total elapsed:  24.96
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.60
+  Model elapsed:  3.81
+  Loader elapsed: 0.53
+  Total elapsed:  4.34
+Train MSE: 2.07
+Valid MSE: 2.60
+  29.3 seconds, this epoch
+
+
+Epoch 79
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.94
+  Model elapsed:  25.82
+  Loader elapsed: 0.57
+  Total elapsed:  26.39
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.56
+  Model elapsed:  3.81
+  Loader elapsed: 0.57
+  Total elapsed:  4.38
+Train MSE: 1.94
+Valid MSE: 2.56
+Best performance on valid set
+  30.8 seconds, this epoch
+
+
+Epoch 80
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.97
+  Model elapsed:  23.97
+  Loader elapsed: 0.59
+  Total elapsed:  24.55
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.59
+  Model elapsed:  3.85
+  Loader elapsed: 0.56
+  Total elapsed:  4.41
+Train MSE: 1.97
+Valid MSE: 2.59
+  29.0 seconds, this epoch
+
+
+Epoch 81
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.91
+  Model elapsed:  25.11
+  Loader elapsed: 0.64
+  Total elapsed:  25.76
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.59
+  Model elapsed:  3.89
+  Loader elapsed: 0.53
+  Total elapsed:  4.43
+Train MSE: 1.91
+Valid MSE: 2.59
+  30.2 seconds, this epoch
+
+
+Epoch 82
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.86
+  Model elapsed:  25.58
+  Loader elapsed: 0.56
+  Total elapsed:  26.14
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.53
+  Model elapsed:  4.08
+  Loader elapsed: 0.59
+  Total elapsed:  4.66
+Train MSE: 1.86
+Valid MSE: 2.53
+Best performance on valid set
+  30.9 seconds, this epoch
+
+
+Epoch 83
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.90
+  Model elapsed:  24.43
+  Loader elapsed: 0.66
+  Total elapsed:  25.09
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.49
+  Model elapsed:  3.76
+  Loader elapsed: 0.51
+  Total elapsed:  4.27
+Train MSE: 1.90
+Valid MSE: 2.49
+Best performance on valid set
+  29.4 seconds, this epoch
+
+
+Epoch 84
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.88
+  Model elapsed:  23.86
+  Loader elapsed: 0.51
+  Total elapsed:  24.37
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.47
+  Model elapsed:  3.74
+  Loader elapsed: 0.51
+  Total elapsed:  4.25
+Train MSE: 1.88
+Valid MSE: 2.47
+Best performance on valid set
+  28.7 seconds, this epoch
+
+
+Epoch 85
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.77
+  Model elapsed:  24.24
+  Loader elapsed: 0.51
+  Total elapsed:  24.75
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.68
+  Model elapsed:  3.75
+  Loader elapsed: 0.52
+  Total elapsed:  4.27
+Train MSE: 1.77
+Valid MSE: 2.68
+  29.1 seconds, this epoch
+
+
+Epoch 86
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.97
+  Model elapsed:  24.13
+  Loader elapsed: 0.52
+  Total elapsed:  24.64
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.62
+  Model elapsed:  3.84
+  Loader elapsed: 0.52
+  Total elapsed:  4.36
+Train MSE: 1.97
+Valid MSE: 2.62
+  29.0 seconds, this epoch
+
+
+Epoch 87
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.96
+  Model elapsed:  23.92
+  Loader elapsed: 0.55
+  Total elapsed:  24.47
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.44
+  Model elapsed:  3.77
+  Loader elapsed: 0.51
+  Total elapsed:  4.28
+Train MSE: 1.96
+Valid MSE: 2.44
+Best performance on valid set
+  28.8 seconds, this epoch
+
+
+Epoch 88
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.96
+  Model elapsed:  23.25
+  Loader elapsed: 0.52
+  Total elapsed:  23.77
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.44
+  Model elapsed:  3.82
+  Loader elapsed: 0.53
+  Total elapsed:  4.35
+Train MSE: 1.96
+Valid MSE: 2.44
+Best performance on valid set
+  28.2 seconds, this epoch
+
+
+Epoch 89
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.91
+  Model elapsed:  23.84
+  Loader elapsed: 0.51
+  Total elapsed:  24.35
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.50
+  Model elapsed:  3.68
+  Loader elapsed: 0.51
+  Total elapsed:  4.19
+Train MSE: 1.91
+Valid MSE: 2.50
+  28.6 seconds, this epoch
+
+
+Epoch 90
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.94
+  Model elapsed:  24.07
+  Loader elapsed: 0.53
+  Total elapsed:  24.60
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.79
+  Model elapsed:  3.73
+  Loader elapsed: 0.61
+  Total elapsed:  4.34
+Train MSE: 1.94
+Valid MSE: 2.79
+  29.0 seconds, this epoch
+
+
+Epoch 91
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.91
+  Model elapsed:  23.68
+  Loader elapsed: 0.54
+  Total elapsed:  24.22
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.50
+  Model elapsed:  3.66
+  Loader elapsed: 0.51
+  Total elapsed:  4.17
+Train MSE: 1.91
+Valid MSE: 2.50
+  28.4 seconds, this epoch
+
+
+Epoch 92
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.77
+  Model elapsed:  23.69
+  Loader elapsed: 0.52
+  Total elapsed:  24.21
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.39
+  Model elapsed:  3.72
+  Loader elapsed: 0.55
+  Total elapsed:  4.27
+Train MSE: 1.77
+Valid MSE: 2.39
+Best performance on valid set
+  28.5 seconds, this epoch
+
+
+Epoch 93
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.81
+  Model elapsed:  23.89
+  Loader elapsed: 0.50
+  Total elapsed:  24.39
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.46
+  Model elapsed:  3.75
+  Loader elapsed: 0.54
+  Total elapsed:  4.29
+Train MSE: 1.81
+Valid MSE: 2.46
+  28.7 seconds, this epoch
+
+
+Epoch 94
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.78
+  Model elapsed:  23.66
+  Loader elapsed: 0.56
+  Total elapsed:  24.22
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.52
+  Model elapsed:  3.75
+  Loader elapsed: 0.51
+  Total elapsed:  4.27
+Train MSE: 1.78
+Valid MSE: 2.52
+  28.5 seconds, this epoch
+
+
+Epoch 95
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.84
+  Model elapsed:  23.56
+  Loader elapsed: 0.51
+  Total elapsed:  24.07
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.44
+  Model elapsed:  3.78
+  Loader elapsed: 0.50
+  Total elapsed:  4.28
+Train MSE: 1.84
+Valid MSE: 2.44
+  28.4 seconds, this epoch
+
+
+Epoch 96
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.76
+  Model elapsed:  23.64
+  Loader elapsed: 0.55
+  Total elapsed:  24.19
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.39
+  Model elapsed:  3.76
+  Loader elapsed: 0.51
+  Total elapsed:  4.27
+Train MSE: 1.76
+Valid MSE: 2.39
+  28.5 seconds, this epoch
+
+
+Epoch 97
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.75
+  Model elapsed:  24.42
+  Loader elapsed: 0.52
+  Total elapsed:  24.94
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.34
+  Model elapsed:  3.73
+  Loader elapsed: 0.59
+  Total elapsed:  4.32
+Train MSE: 1.75
+Valid MSE: 2.34
+Best performance on valid set
+  29.3 seconds, this epoch
+
+
+Epoch 98
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.69
+  Model elapsed:  24.11
+  Loader elapsed: 0.54
+  Total elapsed:  24.65
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.43
+  Model elapsed:  3.81
+  Loader elapsed: 0.52
+  Total elapsed:  4.33
+Train MSE: 1.69
+Valid MSE: 2.43
+  29.0 seconds, this epoch
+
+
+Epoch 99
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.75
+  Model elapsed:  23.35
+  Loader elapsed: 0.56
+  Total elapsed:  23.91
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.68
+  Model elapsed:  3.77
+  Loader elapsed: 0.50
+  Total elapsed:  4.27
+Train MSE: 1.75
+Valid MSE: 2.68
+  28.2 seconds, this epoch
+
+
+Epoch 100
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.72
+  Model elapsed:  23.71
+  Loader elapsed: 0.51
+  Total elapsed:  24.22
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.38
+  Model elapsed:  3.78
+  Loader elapsed: 0.50
+  Total elapsed:  4.28
+Train MSE: 1.72
+Valid MSE: 2.38
+  28.5 seconds, this epoch
+
+
+Epoch 101
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.65
+  Model elapsed:  23.83
+  Loader elapsed: 0.52
+  Total elapsed:  24.35
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.32
+  Model elapsed:  3.81
+  Loader elapsed: 0.53
+  Total elapsed:  4.34
+Train MSE: 1.65
+Valid MSE: 2.32
+Best performance on valid set
+  28.7 seconds, this epoch
+
+
+Epoch 102
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.66
+  Model elapsed:  24.07
+  Loader elapsed: 0.53
+  Total elapsed:  24.60
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.35
+  Model elapsed:  3.74
+  Loader elapsed: 0.52
+  Total elapsed:  4.26
+Train MSE: 1.66
+Valid MSE: 2.35
+  28.9 seconds, this epoch
+
+
+Epoch 103
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.66
+  Model elapsed:  23.70
+  Loader elapsed: 0.53
+  Total elapsed:  24.23
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.40
+  Model elapsed:  3.74
+  Loader elapsed: 0.51
+  Total elapsed:  4.26
+Train MSE: 1.66
+Valid MSE: 2.40
+  28.5 seconds, this epoch
+
+
+Epoch 104
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.73
+  Model elapsed:  24.00
+  Loader elapsed: 0.52
+  Total elapsed:  24.52
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.36
+  Model elapsed:  3.74
+  Loader elapsed: 0.56
+  Total elapsed:  4.29
+Train MSE: 1.73
+Valid MSE: 2.36
+  28.9 seconds, this epoch
+
+
+Epoch 105
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.61
+  Model elapsed:  23.51
+  Loader elapsed: 0.53
+  Total elapsed:  24.04
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.28
+  Model elapsed:  3.76
+  Loader elapsed: 0.51
+  Total elapsed:  4.26
+Train MSE: 1.61
+Valid MSE: 2.28
+Best performance on valid set
+  28.3 seconds, this epoch
+
+
+Epoch 106
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.62
+  Model elapsed:  23.96
+  Loader elapsed: 0.50
+  Total elapsed:  24.46
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.35
+  Model elapsed:  3.74
+  Loader elapsed: 0.50
+  Total elapsed:  4.24
+Train MSE: 1.62
+Valid MSE: 2.35
+  28.7 seconds, this epoch
+
+
+Epoch 107
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.64
+  Model elapsed:  23.60
+  Loader elapsed: 0.53
+  Total elapsed:  24.12
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.42
+  Model elapsed:  3.74
+  Loader elapsed: 0.52
+  Total elapsed:  4.26
+Train MSE: 1.64
+Valid MSE: 2.42
+  28.4 seconds, this epoch
+
+
+Epoch 108
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.59
+  Model elapsed:  23.30
+  Loader elapsed: 0.61
+  Total elapsed:  23.91
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.47
+  Model elapsed:  3.84
+  Loader elapsed: 0.90
+  Total elapsed:  4.74
+Train MSE: 1.59
+Valid MSE: 2.47
+  28.7 seconds, this epoch
+
+
+Epoch 109
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.64
+  Model elapsed:  23.83
+  Loader elapsed: 0.51
+  Total elapsed:  24.35
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.52
+  Model elapsed:  3.74
+  Loader elapsed: 0.50
+  Total elapsed:  4.25
+Train MSE: 1.64
+Valid MSE: 2.52
+  28.6 seconds, this epoch
+
+
+Epoch 110
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.61
+  Model elapsed:  23.38
+  Loader elapsed: 0.50
+  Total elapsed:  23.88
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.54
+  Model elapsed:  3.56
+  Loader elapsed: 0.52
+  Total elapsed:  4.08
+Train MSE: 1.61
+Valid MSE: 2.54
+  28.0 seconds, this epoch
+
+
+Epoch 111
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.58
+  Model elapsed:  22.98
+  Loader elapsed: 0.61
+  Total elapsed:  23.59
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.31
+  Model elapsed:  3.77
+  Loader elapsed: 0.51
+  Total elapsed:  4.27
+Train MSE: 1.58
+Valid MSE: 2.31
+  27.9 seconds, this epoch
+
+
+Epoch 112
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.68
+  Model elapsed:  23.57
+  Loader elapsed: 0.52
+  Total elapsed:  24.09
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.41
+  Model elapsed:  3.70
+  Loader elapsed: 0.50
+  Total elapsed:  4.20
+Train MSE: 1.68
+Valid MSE: 2.41
+  28.3 seconds, this epoch
+
+
+Epoch 113
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.67
+  Model elapsed:  23.29
+  Loader elapsed: 0.69
+  Total elapsed:  23.98
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.47
+  Model elapsed:  3.74
+  Loader elapsed: 0.68
+  Total elapsed:  4.43
+Train MSE: 1.67
+Valid MSE: 2.47
+  28.4 seconds, this epoch
+
+
+Epoch 114
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.73
+  Model elapsed:  23.73
+  Loader elapsed: 0.72
+  Total elapsed:  24.45
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.41
+  Model elapsed:  3.72
+  Loader elapsed: 0.50
+  Total elapsed:  4.22
+Train MSE: 1.73
+Valid MSE: 2.41
+  28.7 seconds, this epoch
+
+
+Epoch 115
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.67
+  Model elapsed:  23.59
+  Loader elapsed: 0.50
+  Total elapsed:  24.09
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.34
+  Model elapsed:  3.75
+  Loader elapsed: 0.51
+  Total elapsed:  4.26
+Train MSE: 1.67
+Valid MSE: 2.34
+  28.4 seconds, this epoch
+
+
+Epoch 116
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.69
+  Model elapsed:  23.82
+  Loader elapsed: 0.51
+  Total elapsed:  24.33
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.23
+  Model elapsed:  3.78
+  Loader elapsed: 0.52
+  Total elapsed:  4.30
+Train MSE: 1.69
+Valid MSE: 2.23
+Best performance on valid set
+  28.7 seconds, this epoch
+
+
+Epoch 117
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.52
+  Model elapsed:  23.09
+  Loader elapsed: 0.60
+  Total elapsed:  23.69
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.38
+  Model elapsed:  3.76
+  Loader elapsed: 0.68
+  Total elapsed:  4.44
+Train MSE: 1.52
+Valid MSE: 2.38
+  28.2 seconds, this epoch
+
+
+Epoch 118
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.73
+  Model elapsed:  23.76
+  Loader elapsed: 0.71
+  Total elapsed:  24.47
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.45
+  Model elapsed:  3.89
+  Loader elapsed: 0.66
+  Total elapsed:  4.55
+Train MSE: 1.73
+Valid MSE: 2.45
+  29.1 seconds, this epoch
+
+
+Epoch 119
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.73
+  Model elapsed:  23.81
+  Loader elapsed: 0.79
+  Total elapsed:  24.60
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.48
+  Model elapsed:  3.79
+  Loader elapsed: 0.70
+  Total elapsed:  4.49
+Train MSE: 1.73
+Valid MSE: 2.48
+  29.1 seconds, this epoch
+
+
+Epoch 120
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.63
+  Model elapsed:  23.85
+  Loader elapsed: 0.54
+  Total elapsed:  24.39
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.56
+  Model elapsed:  3.70
+  Loader elapsed: 0.52
+  Total elapsed:  4.21
+Train MSE: 1.63
+Valid MSE: 2.56
+  28.6 seconds, this epoch
+
+
+Epoch 121
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.64
+  Model elapsed:  24.00
+  Loader elapsed: 0.54
+  Total elapsed:  24.55
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.44
+  Model elapsed:  3.77
+  Loader elapsed: 0.53
+  Total elapsed:  4.29
+Train MSE: 1.64
+Valid MSE: 2.44
+  28.9 seconds, this epoch
+
+
+Epoch 122
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.54
+  Model elapsed:  24.10
+  Loader elapsed: 0.74
+  Total elapsed:  24.84
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.39
+  Model elapsed:  3.79
+  Loader elapsed: 0.72
+  Total elapsed:  4.51
+Train MSE: 1.54
+Valid MSE: 2.39
+  29.4 seconds, this epoch
+
+
+Epoch 123
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.48
+  Model elapsed:  23.62
+  Loader elapsed: 0.69
+  Total elapsed:  24.31
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.53
+  Model elapsed:  3.80
+  Loader elapsed: 0.73
+  Total elapsed:  4.52
+Train MSE: 1.48
+Valid MSE: 2.53
+  28.9 seconds, this epoch
+
+
+Epoch 124
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.50
+  Model elapsed:  23.33
+  Loader elapsed: 0.72
+  Total elapsed:  24.05
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.46
+  Model elapsed:  3.76
+  Loader elapsed: 0.67
+  Total elapsed:  4.43
+Train MSE: 1.50
+Valid MSE: 2.46
+  28.5 seconds, this epoch
+
+
+Epoch 125
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.48
+  Model elapsed:  24.44
+  Loader elapsed: 0.77
+  Total elapsed:  25.20
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.29
+  Model elapsed:  3.71
+  Loader elapsed: 0.92
+  Total elapsed:  4.63
+Train MSE: 1.48
+Valid MSE: 2.29
+  29.9 seconds, this epoch
+
+
+Epoch 126
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.41
+  Model elapsed:  23.28
+  Loader elapsed: 0.54
+  Total elapsed:  23.83
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.24
+  Model elapsed:  3.78
+  Loader elapsed: 0.54
+  Total elapsed:  4.33
+Train MSE: 1.41
+Valid MSE: 2.24
+  28.2 seconds, this epoch
+
+
+Epoch 127
+Learning rate: 0.001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.39
+  Model elapsed:  24.23
+  Loader elapsed: 0.60
+  Total elapsed:  24.83
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.27
+  Model elapsed:  3.71
+  Loader elapsed: 0.51
+  Total elapsed:  4.22
+Train MSE: 1.39
+Valid MSE: 2.27
+  29.1 seconds, this epoch
+
+
+Epoch 128
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.39
+  Model elapsed:  23.04
+  Loader elapsed: 0.53
+  Total elapsed:  23.58
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.25
+  Model elapsed:  3.73
+  Loader elapsed: 0.49
+  Total elapsed:  4.23
+Train MSE: 1.39
+Valid MSE: 2.25
+  27.8 seconds, this epoch
+
+
+Epoch 129
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.34
+  Model elapsed:  23.13
+  Loader elapsed: 0.49
+  Total elapsed:  23.62
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.24
+  Model elapsed:  3.71
+  Loader elapsed: 0.49
+  Total elapsed:  4.20
+Train MSE: 1.34
+Valid MSE: 2.24
+  27.9 seconds, this epoch
+
+
+Epoch 130
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.34
+  Model elapsed:  23.14
+  Loader elapsed: 0.49
+  Total elapsed:  23.63
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.23
+  Model elapsed:  3.74
+  Loader elapsed: 0.50
+  Total elapsed:  4.24
+Train MSE: 1.34
+Valid MSE: 2.23
+Best performance on valid set
+  27.9 seconds, this epoch
+
+
+Epoch 131
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.34
+  Model elapsed:  23.18
+  Loader elapsed: 0.51
+  Total elapsed:  23.69
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.22
+  Model elapsed:  3.75
+  Loader elapsed: 0.51
+  Total elapsed:  4.26
+Train MSE: 1.34
+Valid MSE: 2.22
+Best performance on valid set
+  28.0 seconds, this epoch
+
+
+Epoch 132
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.31
+  Model elapsed:  23.39
+  Loader elapsed: 0.57
+  Total elapsed:  23.95
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.25
+  Model elapsed:  3.74
+  Loader elapsed: 0.53
+  Total elapsed:  4.28
+Train MSE: 1.31
+Valid MSE: 2.25
+  28.3 seconds, this epoch
+
+
+Epoch 133
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.34
+  Model elapsed:  24.32
+  Loader elapsed: 0.68
+  Total elapsed:  25.00
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.22
+  Model elapsed:  3.77
+  Loader elapsed: 0.52
+  Total elapsed:  4.29
+Train MSE: 1.34
+Valid MSE: 2.22
+Best performance on valid set
+  29.4 seconds, this epoch
+
+
+Epoch 134
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.31
+  Model elapsed:  23.49
+  Loader elapsed: 0.54
+  Total elapsed:  24.03
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.22
+  Model elapsed:  3.65
+  Loader elapsed: 0.49
+  Total elapsed:  4.14
+Train MSE: 1.31
+Valid MSE: 2.22
+Best performance on valid set
+  28.2 seconds, this epoch
+
+
+Epoch 135
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.33
+  Model elapsed:  23.12
+  Loader elapsed: 0.50
+  Total elapsed:  23.61
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.21
+  Model elapsed:  3.74
+  Loader elapsed: 0.50
+  Total elapsed:  4.24
+Train MSE: 1.33
+Valid MSE: 2.21
+Best performance on valid set
+  27.9 seconds, this epoch
+
+
+Epoch 136
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.34
+  Model elapsed:  24.37
+  Loader elapsed: 0.53
+  Total elapsed:  24.89
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.23
+  Model elapsed:  3.69
+  Loader elapsed: 0.54
+  Total elapsed:  4.23
+Train MSE: 1.34
+Valid MSE: 2.23
+  29.2 seconds, this epoch
+
+
+Epoch 137
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.33
+  Model elapsed:  25.23
+  Loader elapsed: 0.54
+  Total elapsed:  25.77
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.21
+  Model elapsed:  3.92
+  Loader elapsed: 0.66
+  Total elapsed:  4.58
+Train MSE: 1.33
+Valid MSE: 2.21
+Best performance on valid set
+  30.4 seconds, this epoch
+
+
+Epoch 138
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.29
+  Model elapsed:  24.67
+  Loader elapsed: 0.60
+  Total elapsed:  25.27
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.22
+  Model elapsed:  3.73
+  Loader elapsed: 0.54
+  Total elapsed:  4.27
+Train MSE: 1.29
+Valid MSE: 2.22
+  29.6 seconds, this epoch
+
+
+Epoch 139
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.30
+  Model elapsed:  23.56
+  Loader elapsed: 0.57
+  Total elapsed:  24.12
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.19
+  Model elapsed:  3.88
+  Loader elapsed: 0.52
+  Total elapsed:  4.40
+Train MSE: 1.30
+Valid MSE: 2.19
+Best performance on valid set
+  28.6 seconds, this epoch
+
+
+Epoch 140
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.32
+  Model elapsed:  23.62
+  Loader elapsed: 0.58
+  Total elapsed:  24.20
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.21
+  Model elapsed:  3.61
+  Loader elapsed: 0.52
+  Total elapsed:  4.14
+Train MSE: 1.32
+Valid MSE: 2.21
+  28.4 seconds, this epoch
+
+
+Epoch 141
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.30
+  Model elapsed:  23.80
+  Loader elapsed: 0.58
+  Total elapsed:  24.38
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.22
+  Model elapsed:  3.78
+  Loader elapsed: 0.52
+  Total elapsed:  4.30
+Train MSE: 1.30
+Valid MSE: 2.22
+  28.7 seconds, this epoch
+
+
+Epoch 142
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.30
+  Model elapsed:  23.84
+  Loader elapsed: 0.50
+  Total elapsed:  24.34
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.21
+  Model elapsed:  3.67
+  Loader elapsed: 0.50
+  Total elapsed:  4.17
+Train MSE: 1.30
+Valid MSE: 2.21
+  28.5 seconds, this epoch
+
+
+Epoch 143
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.31
+  Model elapsed:  23.70
+  Loader elapsed: 0.57
+  Total elapsed:  24.27
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.22
+  Model elapsed:  3.83
+  Loader elapsed: 0.51
+  Total elapsed:  4.35
+Train MSE: 1.31
+Valid MSE: 2.22
+  28.7 seconds, this epoch
+
+
+Epoch 144
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.28
+  Model elapsed:  23.97
+  Loader elapsed: 0.51
+  Total elapsed:  24.48
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.19
+  Model elapsed:  3.72
+  Loader elapsed: 0.50
+  Total elapsed:  4.22
+Train MSE: 1.28
+Valid MSE: 2.19
+Best performance on valid set
+  28.8 seconds, this epoch
+
+
+Epoch 145
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.30
+  Model elapsed:  23.78
+  Loader elapsed: 0.52
+  Total elapsed:  24.30
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.20
+  Model elapsed:  3.75
+  Loader elapsed: 0.58
+  Total elapsed:  4.33
+Train MSE: 1.30
+Valid MSE: 2.20
+  28.7 seconds, this epoch
+
+
+Epoch 146
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.27
+  Model elapsed:  23.98
+  Loader elapsed: 0.68
+  Total elapsed:  24.66
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.23
+  Model elapsed:  3.81
+  Loader elapsed: 0.52
+  Total elapsed:  4.33
+Train MSE: 1.27
+Valid MSE: 2.23
+  29.0 seconds, this epoch
+
+
+Epoch 147
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.32
+  Model elapsed:  23.85
+  Loader elapsed: 0.55
+  Total elapsed:  24.40
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.19
+  Model elapsed:  3.74
+  Loader elapsed: 0.58
+  Total elapsed:  4.32
+Train MSE: 1.32
+Valid MSE: 2.19
+  28.8 seconds, this epoch
+
+
+Epoch 148
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.25
+  Model elapsed:  23.53
+  Loader elapsed: 0.52
+  Total elapsed:  24.06
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.22
+  Model elapsed:  3.70
+  Loader elapsed: 0.50
+  Total elapsed:  4.20
+Train MSE: 1.25
+Valid MSE: 2.22
+  28.3 seconds, this epoch
+
+
+Epoch 149
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.33
+  Model elapsed:  23.86
+  Loader elapsed: 0.49
+  Total elapsed:  24.35
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.19
+  Model elapsed:  3.68
+  Loader elapsed: 0.52
+  Total elapsed:  4.20
+Train MSE: 1.33
+Valid MSE: 2.19
+Best performance on valid set
+  28.6 seconds, this epoch
+
+
+Epoch 150
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.26
+  Model elapsed:  24.44
+  Loader elapsed: 0.52
+  Total elapsed:  24.96
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.21
+  Model elapsed:  3.63
+  Loader elapsed: 0.52
+  Total elapsed:  4.15
+Train MSE: 1.26
+Valid MSE: 2.21
+  29.1 seconds, this epoch
+
+
+Epoch 151
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.25
+  Model elapsed:  23.39
+  Loader elapsed: 0.56
+  Total elapsed:  23.95
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  3.73
+  Loader elapsed: 0.50
+  Total elapsed:  4.23
+Train MSE: 1.25
+Valid MSE: 2.18
+Best performance on valid set
+  28.2 seconds, this epoch
+
+
+Epoch 152
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.26
+  Model elapsed:  23.23
+  Loader elapsed: 0.51
+  Total elapsed:  23.74
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.20
+  Model elapsed:  3.72
+  Loader elapsed: 0.50
+  Total elapsed:  4.22
+Train MSE: 1.26
+Valid MSE: 2.20
+  28.0 seconds, this epoch
+
+
+Epoch 153
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.28
+  Model elapsed:  23.73
+  Loader elapsed: 0.50
+  Total elapsed:  24.23
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.19
+  Model elapsed:  3.67
+  Loader elapsed: 0.52
+  Total elapsed:  4.19
+Train MSE: 1.28
+Valid MSE: 2.19
+  28.5 seconds, this epoch
+
+
+Epoch 154
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.26
+  Model elapsed:  23.26
+  Loader elapsed: 0.52
+  Total elapsed:  23.78
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  3.69
+  Loader elapsed: 0.51
+  Total elapsed:  4.20
+Train MSE: 1.26
+Valid MSE: 2.18
+  28.0 seconds, this epoch
+
+
+Epoch 155
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.28
+  Model elapsed:  23.49
+  Loader elapsed: 0.51
+  Total elapsed:  24.00
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.17
+  Model elapsed:  3.74
+  Loader elapsed: 0.50
+  Total elapsed:  4.24
+Train MSE: 1.28
+Valid MSE: 2.17
+Best performance on valid set
+  28.3 seconds, this epoch
+
+
+Epoch 156
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.24
+  Model elapsed:  23.35
+  Loader elapsed: 0.50
+  Total elapsed:  23.85
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.20
+  Model elapsed:  3.73
+  Loader elapsed: 0.55
+  Total elapsed:  4.28
+Train MSE: 1.24
+Valid MSE: 2.20
+  28.2 seconds, this epoch
+
+
+Epoch 157
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.26
+  Model elapsed:  24.07
+  Loader elapsed: 0.53
+  Total elapsed:  24.60
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.19
+  Model elapsed:  3.72
+  Loader elapsed: 0.52
+  Total elapsed:  4.24
+Train MSE: 1.26
+Valid MSE: 2.19
+  28.9 seconds, this epoch
+
+
+Epoch 158
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.25
+  Model elapsed:  24.45
+  Loader elapsed: 0.55
+  Total elapsed:  25.00
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.19
+  Model elapsed:  3.89
+  Loader elapsed: 0.56
+  Total elapsed:  4.45
+Train MSE: 1.25
+Valid MSE: 2.19
+  29.5 seconds, this epoch
+
+
+Epoch 159
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.33
+  Model elapsed:  23.85
+  Loader elapsed: 0.52
+  Total elapsed:  24.37
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.16
+  Model elapsed:  3.79
+  Loader elapsed: 0.51
+  Total elapsed:  4.30
+Train MSE: 1.33
+Valid MSE: 2.16
+Best performance on valid set
+  28.7 seconds, this epoch
+
+
+Epoch 160
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.24
+  Model elapsed:  23.26
+  Loader elapsed: 0.50
+  Total elapsed:  23.76
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  3.77
+  Loader elapsed: 0.52
+  Total elapsed:  4.29
+Train MSE: 1.24
+Valid MSE: 2.18
+  28.1 seconds, this epoch
+
+
+Epoch 161
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.24
+  Model elapsed:  23.26
+  Loader elapsed: 0.49
+  Total elapsed:  23.75
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.19
+  Model elapsed:  3.74
+  Loader elapsed: 0.50
+  Total elapsed:  4.24
+Train MSE: 1.24
+Valid MSE: 2.19
+  28.0 seconds, this epoch
+
+
+Epoch 162
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.26
+  Model elapsed:  24.09
+  Loader elapsed: 0.52
+  Total elapsed:  24.61
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.20
+  Model elapsed:  3.82
+  Loader elapsed: 0.56
+  Total elapsed:  4.38
+Train MSE: 1.26
+Valid MSE: 2.20
+  29.0 seconds, this epoch
+
+
+Epoch 163
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.24
+  Model elapsed:  23.70
+  Loader elapsed: 0.51
+  Total elapsed:  24.21
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  3.74
+  Loader elapsed: 0.50
+  Total elapsed:  4.24
+Train MSE: 1.24
+Valid MSE: 2.18
+  28.5 seconds, this epoch
+
+
+Epoch 164
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.23
+  Model elapsed:  23.61
+  Loader elapsed: 0.52
+  Total elapsed:  24.12
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  3.84
+  Loader elapsed: 0.53
+  Total elapsed:  4.37
+Train MSE: 1.23
+Valid MSE: 2.18
+  28.5 seconds, this epoch
+
+
+Epoch 165
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.23
+  Model elapsed:  23.79
+  Loader elapsed: 0.51
+  Total elapsed:  24.30
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  3.84
+  Loader elapsed: 0.51
+  Total elapsed:  4.35
+Train MSE: 1.23
+Valid MSE: 2.18
+  28.7 seconds, this epoch
+
+
+Epoch 166
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.22
+  Model elapsed:  23.65
+  Loader elapsed: 0.51
+  Total elapsed:  24.16
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.15
+  Model elapsed:  3.80
+  Loader elapsed: 0.50
+  Total elapsed:  4.30
+Train MSE: 1.22
+Valid MSE: 2.15
+Best performance on valid set
+  28.5 seconds, this epoch
+
+
+Epoch 167
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.19
+  Model elapsed:  24.17
+  Loader elapsed: 0.51
+  Total elapsed:  24.68
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.15
+  Model elapsed:  4.15
+  Loader elapsed: 0.53
+  Total elapsed:  4.68
+Train MSE: 1.19
+Valid MSE: 2.15
+  29.4 seconds, this epoch
+
+
+Epoch 168
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.22
+  Model elapsed:  23.76
+  Loader elapsed: 0.75
+  Total elapsed:  24.51
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.15
+  Model elapsed:  3.72
+  Loader elapsed: 0.55
+  Total elapsed:  4.28
+Train MSE: 1.22
+Valid MSE: 2.15
+  28.8 seconds, this epoch
+
+
+Epoch 169
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.18
+  Model elapsed:  24.07
+  Loader elapsed: 0.71
+  Total elapsed:  24.79
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  3.70
+  Loader elapsed: 0.53
+  Total elapsed:  4.24
+Train MSE: 1.18
+Valid MSE: 2.18
+  29.1 seconds, this epoch
+
+
+Epoch 170
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.20
+  Model elapsed:  24.17
+  Loader elapsed: 0.54
+  Total elapsed:  24.71
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.16
+  Model elapsed:  3.88
+  Loader elapsed: 0.59
+  Total elapsed:  4.47
+Train MSE: 1.20
+Valid MSE: 2.16
+  29.2 seconds, this epoch
+
+
+Epoch 171
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.21
+  Model elapsed:  23.79
+  Loader elapsed: 0.55
+  Total elapsed:  24.34
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.16
+  Model elapsed:  3.75
+  Loader elapsed: 0.49
+  Total elapsed:  4.24
+Train MSE: 1.21
+Valid MSE: 2.16
+  28.6 seconds, this epoch
+
+
+Epoch 172
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.18
+  Model elapsed:  23.51
+  Loader elapsed: 0.51
+  Total elapsed:  24.01
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.16
+  Model elapsed:  3.75
+  Loader elapsed: 0.51
+  Total elapsed:  4.26
+Train MSE: 1.18
+Valid MSE: 2.16
+  28.3 seconds, this epoch
+
+
+Epoch 173
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.23
+  Model elapsed:  24.01
+  Loader elapsed: 0.50
+  Total elapsed:  24.52
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.19
+  Model elapsed:  3.80
+  Loader elapsed: 0.54
+  Total elapsed:  4.34
+Train MSE: 1.23
+Valid MSE: 2.19
+  28.9 seconds, this epoch
+
+
+Epoch 174
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.20
+  Model elapsed:  23.49
+  Loader elapsed: 0.51
+  Total elapsed:  24.00
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.17
+  Model elapsed:  3.73
+  Loader elapsed: 0.50
+  Total elapsed:  4.22
+Train MSE: 1.20
+Valid MSE: 2.17
+  28.3 seconds, this epoch
+
+
+Epoch 175
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.27
+  Model elapsed:  23.84
+  Loader elapsed: 0.51
+  Total elapsed:  24.36
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.17
+  Model elapsed:  3.95
+  Loader elapsed: 0.51
+  Total elapsed:  4.46
+Train MSE: 1.27
+Valid MSE: 2.17
+  28.9 seconds, this epoch
+
+
+Epoch 176
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.18
+  Model elapsed:  24.24
+  Loader elapsed: 0.51
+  Total elapsed:  24.75
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.16
+  Model elapsed:  3.75
+  Loader elapsed: 0.51
+  Total elapsed:  4.26
+Train MSE: 1.18
+Valid MSE: 2.16
+  29.1 seconds, this epoch
+
+
+Epoch 177
+Learning rate: 0.0001
+  Train:
+  4 batches, 2048 samples
+        2048: 1.17
+  Model elapsed:  25.28
+  Loader elapsed: 0.53
+  Total elapsed:  25.81
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.15
+  Model elapsed:  5.24
+  Loader elapsed: 0.66
+  Total elapsed:  5.90
+Train MSE: 1.17
+Valid MSE: 2.15
+  31.8 seconds, this epoch
+
+
+Epoch 178
+Learning rate: 1e-05
+  Train:
+  4 batches, 2048 samples
+        2048: 1.20
+  Model elapsed:  25.57
+  Loader elapsed: 0.59
+  Total elapsed:  26.16
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.16
+  Model elapsed:  4.30
+  Loader elapsed: 0.55
+  Total elapsed:  4.84
+Train MSE: 1.20
+Valid MSE: 2.16
+  31.0 seconds, this epoch
+
+
+Epoch 179
+Learning rate: 1e-05
+  Train:
+  4 batches, 2048 samples
+        2048: 1.18
+  Model elapsed:  24.32
+  Loader elapsed: 0.50
+  Total elapsed:  24.82
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.17
+  Model elapsed:  3.76
+  Loader elapsed: 0.55
+  Total elapsed:  4.31
+Train MSE: 1.18
+Valid MSE: 2.17
+  29.2 seconds, this epoch
+
+
+Epoch 180
+Learning rate: 1e-05
+  Train:
+  4 batches, 2048 samples
+        2048: 1.20
+  Model elapsed:  24.27
+  Loader elapsed: 0.50
+  Total elapsed:  24.77
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  3.80
+  Loader elapsed: 0.52
+  Total elapsed:  4.32
+Train MSE: 1.20
+Valid MSE: 2.18
+  29.1 seconds, this epoch
+
+
+Epoch 181
+Learning rate: 1e-05
+  Train:
+  4 batches, 2048 samples
+        2048: 1.19
+  Model elapsed:  24.51
+  Loader elapsed: 0.57
+  Total elapsed:  25.08
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  3.81
+  Loader elapsed: 0.50
+  Total elapsed:  4.31
+Train MSE: 1.19
+Valid MSE: 2.18
+  29.4 seconds, this epoch
+
+
+Epoch 182
+Learning rate: 1e-05
+  Train:
+  4 batches, 2048 samples
+        2048: 1.17
+  Model elapsed:  23.83
+  Loader elapsed: 0.51
+  Total elapsed:  24.34
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  3.92
+  Loader elapsed: 0.53
+  Total elapsed:  4.45
+Train MSE: 1.17
+Valid MSE: 2.18
+  28.8 seconds, this epoch
+
+
+Epoch 183
+Learning rate: 1e-05
+  Train:
+  4 batches, 2048 samples
+        2048: 1.18
+  Model elapsed:  23.70
+  Loader elapsed: 0.51
+  Total elapsed:  24.21
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.17
+  Model elapsed:  3.85
+  Loader elapsed: 0.53
+  Total elapsed:  4.37
+Train MSE: 1.18
+Valid MSE: 2.17
+  28.6 seconds, this epoch
+
+
+Epoch 184
+Learning rate: 1e-05
+  Train:
+  4 batches, 2048 samples
+        2048: 1.20
+  Model elapsed:  23.99
+  Loader elapsed: 0.50
+  Total elapsed:  24.50
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.17
+  Model elapsed:  3.85
+  Loader elapsed: 0.51
+  Total elapsed:  4.35
+Train MSE: 1.20
+Valid MSE: 2.17
+  28.9 seconds, this epoch
+
+
+Epoch 185
+Learning rate: 1e-05
+  Train:
+  4 batches, 2048 samples
+        2048: 1.19
+  Model elapsed:  24.06
+  Loader elapsed: 0.51
+  Total elapsed:  24.57
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.17
+  Model elapsed:  3.79
+  Loader elapsed: 0.51
+  Total elapsed:  4.31
+Train MSE: 1.19
+Valid MSE: 2.17
+  28.9 seconds, this epoch
+
+
+Epoch 186
+Learning rate: 1e-05
+  Train:
+  4 batches, 2048 samples
+        2048: 1.18
+  Model elapsed:  24.08
+  Loader elapsed: 0.50
+  Total elapsed:  24.58
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.17
+  Model elapsed:  3.86
+  Loader elapsed: 0.51
+  Total elapsed:  4.37
+Train MSE: 1.18
+Valid MSE: 2.17
+  29.0 seconds, this epoch
+
+
+Epoch 187
+Learning rate: 1e-05
+  Train:
+  4 batches, 2048 samples
+        2048: 1.19
+  Model elapsed:  24.83
+  Loader elapsed: 0.50
+  Total elapsed:  25.33
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  4.07
+  Loader elapsed: 0.55
+  Total elapsed:  4.63
+Train MSE: 1.19
+Valid MSE: 2.18
+  30.0 seconds, this epoch
+
+
+Epoch 188
+Learning rate: 1e-05
+  Train:
+  4 batches, 2048 samples
+        2048: 1.18
+  Model elapsed:  23.70
+  Loader elapsed: 0.54
+  Total elapsed:  24.24
+
+  Valid:
+  2 batches, 1024 samples
+        1024: 2.18
+  Model elapsed:  3.76
+  Loader elapsed: 0.50
+  Total elapsed:  4.25
+Train MSE: 1.18
+Valid MSE: 2.18
+  28.5 seconds, this epoch

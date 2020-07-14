@@ -82,5 +82,5 @@ def mol_to_pyg_graph(mol):
     for bond in mol.GetBonds():
         edges.append(bond_to_edge(bond))
     
-    g = construct_graph(nodes, edges)
+    g = construct_graph(nodes, torch.FloatTensor(edges))
     return g

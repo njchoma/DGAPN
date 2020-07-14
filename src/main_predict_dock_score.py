@@ -9,7 +9,7 @@ def read_args():
     add_arg = parser.add_argument
 
     add_arg('--data_path', required=True)
-    add_arg('--artifact_path', default="~/exaLearnMol/dock_score_models")
+    add_arg('--artifact_path', default="dock_score_models")
     add_arg('--name', default="default_run")
 
     return parser.parse_args()
