@@ -1,0 +1,249 @@
+Arguments initialized.
+0.073 baseline L2 loss
+
+GNN_MyGAT(
+  (layers): ModuleList(
+    (0): MyGATConv(121, 512, heads=1)
+    (1): MyGATConv(512, 512, heads=1)
+    (2): MyGATConv(512, 512, heads=1)
+    (3): MyGATConv(512, 512, heads=1)
+    (4): MyGATConv(512, 512, heads=1)
+    (5): MyGATConv(512, 512, heads=1)
+    (6): MyGATConv(512, 512, heads=1)
+  )
+  (final_layer): Linear(in_features=512, out_features=1, bias=True)
+  (act): ReLU()
+)
+New model created
+
+
+Epoch 1
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
+        5376: 0.31
+  Model elapsed:  62.33
+  Loader elapsed: 1.95
+  Total elapsed:  64.29
+
+  Valid:
+  7 batches, 1792 samples
+        1792: 0.08
+  Model elapsed:  10.84
+  Loader elapsed: 0.65
+  Total elapsed:  11.49
+Train MSE: 0.31
+Valid MSE: 0.08
+Best performance on valid set
+  76.0 seconds, this epoch
+
+
+Epoch 2
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
+        5376: 0.08
+  Model elapsed:  75.80
+  Loader elapsed: 2.07
+  Total elapsed:  77.87
+
+  Valid:
+  7 batches, 1792 samples
+        1792: 0.08
+  Model elapsed:  10.54
+  Loader elapsed: 0.70
+  Total elapsed:  11.25
+Train MSE: 0.08
+Valid MSE: 0.08
+Best performance on valid set
+  89.2 seconds, this epoch
+
+
+Epoch 3
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
+        5376: 0.08
+  Model elapsed:  62.32
+  Loader elapsed: 1.39
+  Total elapsed:  63.71
+
+  Valid:
+  7 batches, 1792 samples
+        1792: 0.08
+  Model elapsed:  9.82
+  Loader elapsed: 0.55
+  Total elapsed:  10.37
+Train MSE: 0.08
+Valid MSE: 0.08
+Best performance on valid set
+  74.2 seconds, this epoch
+
+
+Epoch 4
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
+        5376: 0.08
+  Model elapsed:  62.51
+  Loader elapsed: 1.44
+  Total elapsed:  63.96
+
+  Valid:
+  7 batches, 1792 samples
+        1792: 0.08
+  Model elapsed:  9.28
+  Loader elapsed: 0.55
+  Total elapsed:  9.82
+Train MSE: 0.08
+Valid MSE: 0.08
+  73.9 seconds, this epoch
+
+
+Epoch 5
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
+        5376: 0.08
+  Model elapsed:  61.38
+  Loader elapsed: 1.41
+  Total elapsed:  62.79
+
+  Valid:
+  7 batches, 1792 samples
+        1792: 0.08
+  Model elapsed:  9.22
+  Loader elapsed: 0.55
+  Total elapsed:  9.76
+Train MSE: 0.08
+Valid MSE: 0.08
+  72.6 seconds, this epoch
+
+
+Epoch 6
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
+        5376: 0.08
+  Model elapsed:  61.03
+  Loader elapsed: 1.35
+  Total elapsed:  62.37
+
+  Valid:
+  7 batches, 1792 samples
+        1792: 0.08
+  Model elapsed:  9.19
+  Loader elapsed: 0.56
+  Total elapsed:  9.75
+Train MSE: 0.08
+Valid MSE: 0.08
+Best performance on valid set
+  72.2 seconds, this epoch
+
+
+Epoch 7
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
+        5376: 0.08
+  Model elapsed:  60.62
+  Loader elapsed: 1.35
+  Total elapsed:  61.97
+
+  Valid:
+  7 batches, 1792 samples
+        1792: 0.08
+  Model elapsed:  9.16
+  Loader elapsed: 0.54
+  Total elapsed:  9.70
+Train MSE: 0.08
+Valid MSE: 0.08
+  71.8 seconds, this epoch
+
+
+Epoch 8
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
+        5376: 0.08
+  Model elapsed:  61.07
+  Loader elapsed: 1.34
+  Total elapsed:  62.41
+
+  Valid:
+  7 batches, 1792 samples
+        1792: 0.08
+  Model elapsed:  9.20
+  Loader elapsed: 0.54
+  Total elapsed:  9.74
+Train MSE: 0.08
+Valid MSE: 0.08
+Best performance on valid set
+  72.2 seconds, this epoch
+
+
+Epoch 9
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
+        5376: 0.08
+  Model elapsed:  60.71
+  Loader elapsed: 1.37
+  Total elapsed:  62.08
+
+  Valid:
+  7 batches, 1792 samples
+        1792: 0.08
+  Model elapsed:  9.16
+  Loader elapsed: 0.55
+  Total elapsed:  9.71
+Train MSE: 0.08
+Valid MSE: 0.08
+Best performance on valid set
+  71.9 seconds, this epoch
+
+
+Epoch 10
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
+        5376: 0.08
+  Model elapsed:  61.81
+  Loader elapsed: 1.32
+  Total elapsed:  63.13
+
+  Valid:
+  7 batches, 1792 samples
+        1792: 0.08
+  Model elapsed:  9.50
+  Loader elapsed: 0.57
+  Total elapsed:  10.08
+Train MSE: 0.08
+Valid MSE: 0.08
+  73.3 seconds, this epoch
+
+
+Epoch 11
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
+        5376: 0.08
+  Model elapsed:  62.55
+  Loader elapsed: 1.45
+  Total elapsed:  64.00
+
+  Valid:
+  7 batches, 1792 samples
+        1792: 0.08
+  Model elapsed:  9.46
+  Loader elapsed: 0.59
+  Total elapsed:  10.05
+Train MSE: 0.08
+Valid MSE: 0.08
+  74.1 seconds, this epoch
+
+
+Epoch 12
+Learning rate: 0.001
+  Train:
+  21 batches, 5376 samples
