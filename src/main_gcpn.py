@@ -1,5 +1,6 @@
 import os
 import argparse
+from mpi4py import MPI
 
 from gcpn.train import train
 
@@ -84,9 +85,8 @@ def molecule_arg_parser():
 
 def main():
     args = molecule_arg_parser().parse_args()
-    print(args)
-
-    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs'))
+    print("====args====", args)
+    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/'))
 
     train(args,seed=args.seed,writer=writer)
 

@@ -41,7 +41,7 @@ def train(args,seed,writer=None):
 
 
     # TRAIN
-    train_ppo(args, env)
+    train_ppo(args, env, writer=writer)
 
     env.close()
     print("Environment successfully closed.")
