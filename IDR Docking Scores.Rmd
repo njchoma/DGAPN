@@ -1,0 +1,87 @@
+---
+title: "IDR Docking Scores for NSP15 Endoribonuclease"
+author: "Andrew Chen"
+date: "7/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(idr)
+```
+
+>Lack of consistency in virtual screening and structure reproduction results is the Achilles' heel of docking programs. They tend to do very well on some systems and terribly on others. The worst virtual screening method (measured by AUC) is on average only slightly better than random; nevertheless, it is expected to outperform the best virtual screening method (measured by AUC) 1 in 7 times. (FRED Pose Prediction and Virtual Screening Accuracy)
+
+
+- FRED: Score is an estimate of Binding Affinity. 
+- Autodock Vina. Score is an estimate of Binding Affinity.
+- DOCK6. Dock Score is an estimate of approximate binding energy (more positive indicates better binding.)
+
+### Importing Data
+```{r}
+dock6 <- read.delim("~/Downloads/DockingScores/NSP15_6W01_AB_1_F.dock6.results.txt")
+fred <- read.delim("~/Downloads/DockingScores/NSP15_6W01_AB_1_F.fred.results.txt")
+vina <- read.delim("~/Downloads/DockingScores/NSP15_6W01_AB_1_F.vina.results.txt")
+```
+
+### Comparing Ranks
+```{r}
+#rank, gives ranks starting from lowest, order is like np.argsort
+dock6["dock_rank"] <- rank(dock6$Score)
+fred["fred_rank"] <- rank(-1*fred$Score)
+vina["vina_rank"] <- rank(-1*vina$Score)
+
+merged_ranks <- merge(merge(dock6, fred, by = "Title"), vina, by = "Title")
+merged_ranks <- select(merged_ranks, dock_rank, fred_rank, vina_rank)
+```
+
+```{r}
+pairs(merged_ranks, pch = 20)
+```
+```{r}
+print(c(cor(merged_ranks$dock_rank, merged_ranks$fred_rank, method = "spearman"),
+      cor(merged_ranks$fred_rank, merged_ranks$vina_rank, method = "spearman"),
+      cor(merged_ranks$dock_rank, merged_ranks$vina_rank, method = "spearman")))
+```
+
+### IDR
+
+```{r}
+# Correspondence Curves
+dock_fred <- get.correspondence(merged_ranks$dock_rank, merged_ranks$fred_rank, seq(0.01,0.99,by = 1/2928))
+dock_vina <- get.correspondence(merged_ranks$dock_rank, merged_ranks$vina_rank, seq(0.01,0.99,by = 1/2928))
+vina_fred <- get.correspondence(merged_ranks$vina_rank, merged_ranks$fred_rank, seq(0.01,0.99,by = 1/2928))
+```
+
+```{r}
+plot(dock_fred$psi$t, dock_fred$psi$value, xlab="t", ylab="psi", main = "Dock_Fred correspondence", xlim=c(0, max(dock_fred$psi$t)), ylim=c(0, max(dock_fred$psi$value)), cex.lab=2)
+lines(dock_fred$psi$smoothed.line, lwd=4)
+abline(coef=c(0,1), lty=3)
+```
+```{r}
+plot(dock_vina$psi$t, dock_vina$psi$value, xlab="t", ylab="psi", main = "Dock_Vina Correspondence", xlim=c(0, max(dock_vina$psi$t)), ylim=c(0, max(dock_vina$psi$value)), cex.lab=2)
+lines(dock_vina$psi$smoothed.line, lwd=4)
+abline(coef=c(0,1), lty=3)
+```
+```{r}
+plot(vina_fred$psi$t, vina_fred$psi$value, xlab="t", ylab="psi", main = "Vina_Fred Correspondence", xlim=c(0, max(vina_fred$psi$t)), ylim=c(0, max(vina_fred$psi$value)), cex.lab=2)
+lines(vina_fred$psi$smoothed.line, lwd=4)
+abline(coef=c(0,1), lty=3)
+```
+
+```{r}
+mu <- 2.6
+sigma <- 1.3
+rho <- 0.8
+p <- 0.7
+idr.out <- est.IDR(merged_ranks, mu, sigma, rho, p, eps=0.001, max.ite=20)
+# select observations exceeding IDR threshold=0.001
+IDR.level <- 0.001
+obs.selected <- select.IDR(merged_ranks, idr.out$IDR, IDR.level)
+```
+
+```{r}
+obs.selected$n
+```
+
