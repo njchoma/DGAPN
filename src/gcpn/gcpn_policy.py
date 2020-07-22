@@ -1,3 +1,4 @@
+import time
 import numpy as np
 
 import torch
@@ -38,7 +39,8 @@ class GCPN(nn.Module):
         self.me = Action_Prediction(mlp_nb_layers,
                                     mlp_nb_hidden,
                                     2*emb_dim,
-                                    nb_edge_types=nb_edge_types)
+                                    nb_edge_types=nb_edge_types,
+                                    apply_softmax=False)
         self.mt = Action_Prediction(mlp_nb_layers,
                                     mlp_nb_hidden,
                                     emb_dim,
@@ -82,7 +84,8 @@ class GCPN(nn.Module):
         X_second = X[a_second]
         X_cat = torch.cat((X_first, X_second),dim=0)
 
-        f_probs = self.me(X_cat)
+        f_logits = self.me(X_cat)
+        f_probs = nn.functional.softmax(f_logits, dim=0)
         return sample_from_probs(f_probs, eval_action)
 
     def get_stop(self, X, eval_action=None):
@@ -96,24 +99,66 @@ class GCPN(nn.Module):
         return int(a), f_prob
         
 
+    def get_first_opt(self, X, eval_actions, batch):
+        f_probs = self.mf(X, batch)
+        probs = f_probs[eval_actions]
+        return probs
+
+    def get_second_opt(self, X, a_first, a_second, batch):
+        X_first = X[a_first]
+        X_first = torch.index_select(X_first, 0, batch)
+        X_cat = torch.cat((X_first, X), dim=1)
+
+        f_probs = self.ms(X_cat, batch)
+        p_second = f_probs[a_second]
+        return p_second
+        
+    def get_edge_opt(self, X, a_first, a_second, a_edge):
+        X_first  = X[a_first]
+        X_second = X[a_second]
+        X_cat = torch.cat((X_first, X_second), dim=1)
+
+        f_logits = self.me(X_cat)
+        f_prob = nn.functional.softmax(f_logits, dim=1)
+        probs = torch.gather(f_prob, 1, a_edge.unsqueeze(1)).squeeze()
+        return probs
+
+    def get_stop_opt(self, X, batch, a_stop):
+        X_agg = pyg.nn.global_mean_pool(X, batch)
+
+        prob_stop = torch.sigmoid(self.mt(X_agg))
+        prob_not_stop = 1-prob_stop
+        f_prob = torch.cat((prob_not_stop, prob_stop), dim=1)
+
+        prob = torch.gather(f_prob, 1, a_stop.unsqueeze(1)).squeeze()
+        return prob
+
     def evaluate(self, orig_states, actions):
         batch = orig_states.batch
         X = self.gnn_embed(orig_states)
-        states = orig_states.clone()
-        states.x = X
-        states = states.to_data_list()
-        probs = []
-        for s, a in zip(states, actions):
-            _, p_first  = self.get_first(s.x, eval_action=a[0])
-            _, p_second = self.get_second(s.x, a[0], eval_action=a[1])
-            _, p_edge   = self.get_edge(s.x, a[0], a[1], eval_action=a[2])
-            _, p_stop   = self.get_stop(s.x, eval_action=a[3])
-            probs.append(torch.stack([p_first, p_second, p_edge, p_stop]))
-        probs = torch.stack(probs)
+
+        a_first, a_second, batch_num_nodes, = get_batch_idx(batch, actions)
+        p_first_agg  = self.get_first_opt(X, a_first, batch)
+        p_second_agg = self.get_second_opt(X, a_first, a_second, batch)
+        p_edge_agg   = self.get_edge_opt(X, a_first, a_second, actions[:,2])
+        p_stop_agg   = self.get_stop_opt(X, batch, actions[:,3])
+        probs_agg = torch.stack((p_first_agg,
+                                 p_second_agg,
+                                 p_edge_agg,
+                                 p_stop_agg),
+                                dim=1)
         X_agg = pyg.nn.global_add_pool(X, batch)
-        return probs, X_agg
+        return probs_agg, X_agg
 
+def get_batch_idx(batch, actions):
+    batch_num_nodes = torch.bincount(batch)
+    batch_size = batch_num_nodes.shape[0]
+    cumsum = torch.cumsum(batch_num_nodes, dim=0) - batch_num_nodes[0]
 
+    a_first  = cumsum + actions[:,0]
+    a_second = cumsum + actions[:,1]
+    return a_first, a_second, batch_num_nodes
+    
 
 class GNN_Embed(nn.Module):
   def __init__(self,
@@ -169,19 +214,28 @@ class Action_Prediction(nn.Module):
         if apply_softmax:
             self.softmax = nn.Softmax(dim=0)
 
-    def forward(self, X):
+    def forward(self, X, batch=None):
         for l in self.layers:
             X = self.act(l(X))
         logits = self.final_layer(X)
 
         if self.apply_softmax:
             logits = logits.squeeze()
-            probs = self.softmax(logits)
+            if batch is not None:
+                probs = batched_softmax(logits, batch)
+            else:
+                probs = self.softmax(logits)
             return probs
         else:
             return logits
 
+def batched_softmax(logits, batch):
+    logits = torch.exp(logits)
 
+    logit_sum = pyg.nn.global_add_pool(logits, batch)
+    logit_sum = torch.index_select(logit_sum, 0, batch)
+    probs = torch.div(logits, logit_sum)
+    return probs
 
 
 #####################################################
