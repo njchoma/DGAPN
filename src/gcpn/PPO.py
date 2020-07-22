@@ -1,5 +1,6 @@
 import gym
 import numpy as np
+from collections import deque
 
 import torch
 import torch.nn as nn
@@ -62,7 +63,7 @@ class ActorCriticGCPN(nn.Module):
         super(ActorCriticGCPN, self).__init__()
 
         # action mean range -1 to 1
-        self.actor =  GCPN(input_dim,
+        self.actor = GCPN(input_dim,
                            emb_dim,
                            nb_edge_types,
                            gnn_nb_layers,
@@ -158,7 +159,7 @@ class PPO_GCPN:
         action = self.policy_old.act(state, memory)
         return action
     
-    def update(self, memory):
+    def update(self, memory, i_episode, writer=None):
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
@@ -179,6 +180,7 @@ class PPO_GCPN:
         
         # Optimize policy for K epochs:
         print("Optimizing...")
+
         for i in range(self.K_epochs):
             # Evaluating old actions and values :
             logprobs, state_values, _ = self.policy.evaluate(old_states, old_actions)
@@ -210,7 +212,7 @@ class PPO_GCPN:
             self.optimizer.step()
             if (i%10)==0:
                 print("  {:3d}: Loss: {:7.3f}".format(i, loss.mean()))
-            
+
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
 
@@ -221,7 +223,7 @@ class PPO_GCPN:
 
 
 
-def train_ppo(args, env):
+def train_ppo(args, env, writer=None):
     print("WARNING!!! Only using ONE input bond graph right now")
     print("INFO: Not training with entropy term in loss")
 
@@ -262,15 +264,21 @@ def train_ppo(args, env):
     
     print(ppo)
     memory = Memory()
-    print(lr,betas)
+    print("lr:", lr, "beta:", betas)
     
     # logging variables
     running_reward = 0
     avg_length = 0
     time_step = 0
-    
+
+    episode_count = 0
+
+    # variables for plotting rewards
+
+    rewbuffer_env = deque(maxlen=100)
     # training loop
     for i_episode in range(1, max_episodes+1):
+        cur_ep_ret_env = 0
         state = env.reset()
         for t in range(max_timesteps):
             time_step +=1
@@ -281,23 +289,28 @@ def train_ppo(args, env):
             # Saving reward and is_terminals:
             memory.rewards.append(reward)
             memory.is_terminals.append(done)
-            
-
-
 
             # update if its time
             if time_step % update_timestep == 0:
-                ppo.update(memory)
+                print("updating ppo")
+                ppo.update(memory, i_episode, writer)
                 memory.clear_memory()
                 time_step = 0
             running_reward += reward
+            cur_ep_ret_env += reward
             if (((i_episode+1)%20)==0) and render:
                 env.render()
             if done:
                 break
-        
+        rewbuffer_env.append(cur_ep_ret_env)
         avg_length += t
-        
+
+        # write to Tensorboard
+        writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), episode_count)
+        # writer.add_scalar("Average Length", avg_length, global_step=episode_count)
+        # writer.add_scalar("Running Reward", running_reward, global_step=episode_count)
+        episode_count += 1
+
         # stop training if avg_reward > solved_reward
         if running_reward > (log_interval*solved_reward):
             print("########## Solved! ##########")
@@ -307,7 +320,7 @@ def train_ppo(args, env):
         # save every 500 episodes
         if i_episode % 500 == 0:
             torch.save(ppo.policy.state_dict(), './PPO_continuous_{}.pth'.format('test'))
-            
+
         # logging
         if i_episode % log_interval == 0:
             avg_length = int(avg_length/log_interval)
