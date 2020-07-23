@@ -82,11 +82,12 @@ class MolData(Dataset):
         input_dim = g.x.shape[1]
         return input_dim
 
-    def compute_baseline_error(self):
+    def compute_baseline_error(self, dataset_name):
         logp = np.array(self.logp)
         mean = logp.mean()
         sq_sum = np.sum(np.square(logp - mean)) / len(logp)
-        logging.info("{:5.3f} baseline L2 loss\n".format(sq_sum))
+        logging.info("{:5.3f} baseline L2 loss, {}\n".format(
+                                            sq_sum, dataset_name))
 
 
 def create_datasets(logp, smiles, np_seed=0):
@@ -131,8 +132,8 @@ def proc_one_epoch(net,
                    optim=None,
                    train=False):
     # There's only a handful of batches.
-    print_freq = 1
-    # print_freq = 10 if train else 4
+    # print_freq = 1
+    print_freq = 10 if train else 4
     nb_batch = len(loader)
     nb_samples = nb_batch * batch_size
 
@@ -163,7 +164,7 @@ def proc_one_epoch(net,
 
         if ((i + 1) % (nb_batch // print_freq)) == 0:
             nb_proc = (i + 1) * batch_size
-            logging.info("    {:8d}: {:4.2f}".format(nb_proc, epoch_loss / (i + 1)))
+            logging.info("    {:8d}: {:5.3f}".format(nb_proc, epoch_loss / (i + 1)))
         elapsed += time.time() - t1
 
     logging.info("  Model elapsed:  {:.2f}".format(elapsed))
@@ -185,7 +186,7 @@ def train(net,
     lr_end = current_lr / 10 ** 2
 
     best_loss = arg_handler('best_loss')
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, 'min')
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, 'min', patience=10)
     scheduler.step(best_loss)
     for i in range(arg_handler('current_epoch'), 1000):
         t0 = time.time()
@@ -203,8 +204,8 @@ def train(net,
                                     criterion,
                                     batch_size,
                                     valid_loader)
-        logging.info("Train MSE: {:3.2f}".format(train_loss))
-        logging.info("Valid MSE: {:3.2f}".format(valid_loss))
+        logging.info("Train MSE: {:6.4f}".format(train_loss))
+        logging.info("Valid MSE: {:6.4f}".format(valid_loss))
         writer.add_scalar('lr', current_lr, i)
         writer.add_scalars('loss',
                            {'train': train_loss, 'valid': valid_loss},
@@ -300,7 +301,8 @@ def main(artifact_path,
                              batch_size=batch_size,
                              num_workers=num_workers)
 
-    valid_data.compute_baseline_error()
+    train_data.compute_baseline_error('train')
+    valid_data.compute_baseline_error('valid')
 
     try:
         net = load_current_model(artifact_path)
