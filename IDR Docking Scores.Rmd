@@ -1,14 +1,18 @@
 ---
-title: "IDR Docking Scores for NSP15 Endoribonuclease"
+title: "IDR Docking Scores"
 author: "Andrew Chen"
 date: "7/17/2020"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(idr)
+library(reticulate)
+use_condaenv("r-reticulate")
 ```
 
 >Lack of consistency in virtual screening and structure reproduction results is the Achilles' heel of docking programs. They tend to do very well on some systems and terribly on others. The worst virtual screening method (measured by AUC) is on average only slightly better than random; nevertheless, it is expected to outperform the best virtual screening method (measured by AUC) 1 in 7 times. (FRED Pose Prediction and Virtual Screening Accuracy)
@@ -19,99 +23,171 @@ library(idr)
 - DOCK6. Dock Score is an estimate of approximate binding energy (more positive indicates better binding.)
 
 ### Importing Data
-```{r}
-dock6 <- read.delim("~/Downloads/DockingScores/NSP15_6W01_AB_1_F.dock6.results.txt")
-fred <- read.delim("~/Downloads/DockingScores/NSP15_6W01_AB_1_F.fred.results.txt")
-vina <- read.delim("~/Downloads/DockingScores/NSP15_6W01_AB_1_F.vina.results.txt")
+
+```{python}
+import pandas as pd
+import glob
+from functools import reduce
+
+#Find all targets that have data from three pipelines. There should only be 7. 
+docking_scores_path = "/Users/ADChen/Downloads/DockingScores"
+results_paths = glob.glob("/Users/ADChen/Downloads/DockingScores/*/*.results.txt")
+targets = list(set([path.split(".")[0].split("/")[-1] for path in results_paths]))
+match_targets = [i for i in targets if len(glob.glob(docking_scores_path+"/*/*"+i+"*")) == 3]
+
+data_dict = {}
+for i in match_targets:
+  #Vina has an unused footer
+  vina = pd.read_csv(docking_scores_path + "/vina/"+i+".vina.results.txt", sep = "\t", names = ["Title", "Score_vina"], skipfooter = 1)
+  vina["rank_vina"] = vina["Score_vina"].rank(ascending = False)
+  
+  #Fred has an existing header
+  fred = pd.read_csv(docking_scores_path + "/fred/"+i+".fred.results.txt", sep = "\t",  header = 0, names = ["Title", "Score_fred"])
+  fred["rank_fred"] = fred["Score_fred"].rank(ascending = False)
+
+  dock = pd.read_csv(docking_scores_path + "/dock6/"+i+".dock6.results.txt", sep = "\t",  names = ["Title", "Score_dock"])
+  dock["rank_dock"] = dock["Score_dock"].rank(ascending = True)
+  
+  if i == "NSP15_6W01_AB_1_F":
+    qvina = pd.read_csv(docking_scores_path+"/NSP15_6w01_AB_Mcule.qvina.results.txt", header = 0, names = ["Title", "Score_qvina"])
+    qvina["rank_qvina"] = qvina["Score_qvina"].rank(ascending = False)
+    data_frames = [vina, fred, dock, qvina]
+  else:
+    data_frames = [vina, fred, dock]
+
+  data_dict[i] = reduce(lambda left,right: pd.merge(left,right, on = ['Title'], how = 'inner'), data_frames)
+
+  print(i, vina.shape, fred.shape, dock.shape, data_dict[i].shape)
+
+#Some targets do not have enough data.
+data_dict = {k:v for k,v in data_dict.items() if v.shape[0]>2000}
 ```
 
-### Comparing Ranks
-```{r}
-#rank, gives ranks starting from lowest, order is like np.argsort
-dock6["dock_rank"] <- rank(dock6$Score)
-fred["fred_rank"] <- rank(-1*fred$Score)
-vina["vina_rank"] <- rank(-1*vina$Score)
 
-merged_ranks <- merge(merge(dock6, fred, by = "Title"), vina, by = "Title")
-merged_ranks <- select(merged_ranks, dock_rank, fred_rank, vina_rank)
-```
+### Pair Plots of Ranks
+```{r}
+names <- names(py$data_dict)
+data_list <- lapply(py$data_dict, py_to_r)
 
-```{r}
-pairs(merged_ranks, pch = 20)
-```
-```{r}
-print(c(cor(merged_ranks$dock_rank, merged_ranks$fred_rank, method = "spearman"),
-      cor(merged_ranks$fred_rank, merged_ranks$vina_rank, method = "spearman"),
-      cor(merged_ranks$dock_rank, merged_ranks$vina_rank, method = "spearman")))
+for (i in 1:4){
+  if(names[i] == "NSP15_6W01_AB_1_F"){
+    pairs(data_list[[i]][c(3,5,7,9)],pch=20, main = names[i])
+  } else {
+    pairs(data_list[[i]][c(3,5,7)],pch=20, main = names[i])
+  }
+}
+
 ```
 
 ### IDR
-
-```{r}
-# Correspondence Curves
-dock_fred <- get.correspondence(merged_ranks$dock_rank, merged_ranks$fred_rank, seq(0.01,0.99,by = 1/2928))
-dock_vina <- get.correspondence(merged_ranks$dock_rank, merged_ranks$vina_rank, seq(0.01,0.99,by = 1/2928))
-vina_fred <- get.correspondence(merged_ranks$vina_rank, merged_ranks$fred_rank, seq(0.01,0.99,by = 1/2928))
-```
-
-```{r}
-plot(dock_fred$psi$t, dock_fred$psi$value, xlab="t", ylab="psi", main = "Dock_Fred correspondence", xlim=c(0, max(dock_fred$psi$t)), ylim=c(0, max(dock_fred$psi$value)), cex.lab=2)
-lines(dock_fred$psi$smoothed.line, lwd=4)
-abline(coef=c(0,1), lty=3)
-```
-```{r}
-plot(dock_vina$psi$t, dock_vina$psi$value, xlab="t", ylab="psi", main = "Dock_Vina Correspondence", xlim=c(0, max(dock_vina$psi$t)), ylim=c(0, max(dock_vina$psi$value)), cex.lab=2)
-lines(dock_vina$psi$smoothed.line, lwd=4)
-abline(coef=c(0,1), lty=3)
-```
-```{r}
-plot(vina_fred$psi$t, vina_fred$psi$value, xlab="t", ylab="psi", main = "Vina_Fred Correspondence", xlim=c(0, max(vina_fred$psi$t)), ylim=c(0, max(vina_fred$psi$value)), cex.lab=2)
-lines(vina_fred$psi$smoothed.line, lwd=4)
-abline(coef=c(0,1), lty=3)
-```
 
 ```{r}
 mu <- 2.6
 sigma <- 2.5
 rho <- 0.3
 p <- 0.1
-idr.out <- est.IDR(merged_ranks, mu, sigma, rho, p, eps=0.001, max.ite=20)
-# select observations exceeding IDR threshold=0.01
 IDR.level <- 0.01
-obs.selected <- select.IDR(merged_ranks, idr.out$IDR, IDR.level)
-```
 
-```{r}
-obs.selected$n
-```
-
-```{r}
-top_200 <- order(idr.out$idr)[1:200]
-plot(seq(200), idr.out$idr[top_200], xlab = "observation", ylab = "local IDR")
-```
-
-
-### Contour plot of selected observations given starting values
-```{r}
-contour_data  <- matrix(nrow = 861,ncol = 3)
-
-mu <- 2.6
-p <- 0.1
-IDR.level <- 0.01
-counter <- 1
-
-for (i in seq(1,3,by=1/20)) {
-  for (j in seq(0,1,by=1/20)) {
-    sigma <- i
-    rho <- j
-    idr.out <- est.IDR(merged_ranks, mu, sigma, rho, p, eps=0.001, max.ite=20)
-    obs.selected <- select.IDR(merged_ranks, idr.out$IDR, IDR.level)
-    row <- c(sigma, rho, obs.selected$n)
-    #print(row)
-    contour_data[counter,] <- row
-    #print(counter)
-    counter <- counter + 1
+idrs <- list()
+obs <-list()
+for (i in 1:4){
+  if(names[i] == "NSP15_6W01_AB_1_F"){
+    idr.out <- est.IDR(data_list[[i]][c(3,5,7,9)], mu, sigma, rho, p, eps=0.001, max.ite=20)
+    obs.selected <- select.IDR(data_list[[i]][c(3,5,7,9)], idr.out$IDR, IDR.level)
+    
+  } else {
+    idr.out <- est.IDR(data_list[[i]][c(3,5,7)], mu, sigma, rho, p, eps=0.001, max.ite=20)
+    obs.selected <- select.IDR(data_list[[i]][c(3,5,7)], idr.out$IDR, IDR.level)
   }
+  idrs[[names[i]]] <- idr.out
+  obs[[names[i]]] <- obs.selected
+
+}
+rm(idr.out, obs.selected)
+```
+
+### Diagnostics
+- Filter by top 5% and color on pair plots. 
+- Make collated csv.
+- Check if any chemicals appear in top 5% for two or more targets.
+
+```{r}
+# Top5% IDR
+top <- list()
+top_mols <- list()
+for (i in 1:4){
+  top[[names[i]]] <- which(idrs[[i]]$IDR < 0.05)
+  top_mols[[names[i]]] <- data_list[[names[i]]]['Title'][top[[names[i]]],]
+}
+
+```
+
+```{r}
+for (i in 1:4){
+  rank_cols <- character(nrow(data_list[[i]]))
+  rank_cols[] <- "black"
+  rank_cols[top[[i]]] <- "red"
+  jpeg(file = paste(names[[i]], ".jpg", sep = ""))
+  
+  if(names[i] == "NSP15_6W01_AB_1_F"){
+      pairs(data_list[[i]][c(3,5,7,9)], col = rank_cols, pch = 20, main = names[[i]])
+  } else {
+      pairs(data_list[[i]][c(3,5,7)], col = rank_cols, pch = 20, main = names[[i]])
+  }
+  
+  dev.off()
+}
+```
+
+### Molecules that bind to several targets well
+
+```{python}
+import itertools
+from operator import and_
+import pandas as pd
+
+df = pd.DataFrame(columns = ['Interaction', 'Molecules'])
+
+def common_member(*args): 
+    data = []
+    for arg in args:
+      data.append(set(arg))
+  
+    if reduce(and_, data):
+      return reduce(and_, data)
+    else: 
+      return 0
+        
+print("Two targets:")
+for i in list(itertools.combinations(r.top_mols,2)):
+  row = {'Interaction':i, 'Molecules': common_member(r.top_mols[i[0]], r.top_mols[i[1]])}
+  df = df.append(row, ignore_index = True)
+  #print(i, common_member(r.top_mols[i[0]], r.top_mols[i[1]]))
+
+print("Three targets:")
+for i in list(itertools.combinations(r.top,3)):
+  row = {'Interaction':i, 'Molecules': common_member(r.top_mols[i[0]], r.top_mols[i[1]], r.top_mols[i[2]])}
+  df = df.append(row, ignore_index = True)
+  #print(i, common_member(r.top_mols[i[0]], r.top_mols[i[1]], r.top_mols[i[2]]))
+  
+print("Four targets:")
+for i in list(itertools.combinations(r.top,4)):
+  row = {'Interaction':i, 'Molecules': common_member(r.top_mols[i[0]], r.top_mols[i[1]], r.top_mols[i[2]], r.top_mols[i[3]])}
+  df = df.append(row, ignore_index = True)
+  #print(i, common_member(r.top_mols[i[0]], r.top_mols[i[1]], r.top_mols[i[2]], r.top_mols[i[3]]))
+  
+df.to_csv("multiple_targets.csv",index = False)
+```
+
+
+### Export IDR Data
+
+```{r}
+for (i in 1:4){
+  data_list[[i]]["local_idr"] <- idrs[[i]]$idr
+  data_list[[i]]["global_idr"] <- idrs[[i]]$IDR
+  
+  write.table(data_list[[i]], file = paste(names[i],".csv", sep = ""), sep = ",", row.names = FALSE)
 }
 ```
 
