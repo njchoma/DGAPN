@@ -11,6 +11,7 @@ def read_args():
     add_arg('--data_path', required=True)
     add_arg('--artifact_path', required=True)
     add_arg('--name', default='default_run')
+    add_arg('--ssl', default=False)
 
     return parser.parse_args()
 
@@ -23,8 +24,9 @@ def main():
 
     dataset_path = get_dataset.main(args.data_path)
     logp, smiles = preprocess.main(dataset_path)
+    ssl = args.ssl
 
-    predict_logp.main(artifact_path, logp, smiles)
+    predict_logp.main(artifact_path, logp, smiles, ssl)
 
 
 if __name__ == "__main__":
