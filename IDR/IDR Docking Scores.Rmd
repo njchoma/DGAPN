@@ -123,6 +123,13 @@ for (i in 1:4){
 ```
 
 ```{r}
+#Min FRED docking scores for each of the top reproducible parts
+for (i in 1:4){
+  print(c(names[i],max(data_list[[names[i]]]['Score_fred'][top[[names[i]]],])))
+}
+```
+
+```{r}
 for (i in 1:4){
   rank_cols <- character(nrow(data_list[[i]]))
   rank_cols[] <- "black"

@@ -55,6 +55,26 @@ class GNN_Dense(nn.Module):
 
 
 
+class GNN_SSLGAT(nn.Module):
+    def __init__(self, input_dim, nb_hidden, nb_layer):
+        super(GNN_SSLGAT, self).__init__()
+        layers = [MyGATConv(input_dim, nb_hidden)]
+        for _ in range(nb_layer-1):
+            layers.append(MyGATConv(nb_hidden, nb_hidden))
+        self.layers = nn.ModuleList(layers)
+        #self.final_layer = nn.Linear(nb_hidden, 1)
+        self.act = nn.Relu()
+
+    def forward(self, g, dense_edge_idx):
+        x = g.x
+        edge_index = g.edge_index
+        edge_attr  = g.edge_attr
+        for l in self.layers:
+            x = l(x, edge_index, edge_attr)
+            x = self.act(x)
+        x = pyg.nn.global_add_pool(x, g.batch)
+        y = self.final_layer(x).squeeze()
+        return y
 
 
 class GNN_MyGAT(nn.Module):
