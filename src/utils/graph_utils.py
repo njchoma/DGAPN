@@ -74,7 +74,11 @@ def construct_graph(nodes, edges):
 def mol_to_pyg_graph(mol):
     nodes = []
     for atom in mol.GetAtoms():
-        nodes.append(atom_to_node(atom))
+        #Not sure some atoms are None. Will assume that it's a typo in the Smile string.
+        try:
+            nodes.append(atom_to_node(atom))
+        except:
+            continue
     idx = [n[0] for n in nodes]
     assert is_sorted(idx)
     nodes = np.array(nodes, dtype=float)[:,1:]
