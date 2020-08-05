@@ -6,8 +6,11 @@ def main(dataset_path):
     with open(dataset_path, newline='') as csvfile:
         reader = csv.reader(csvfile)
         for i, (logp, smiles) in enumerate (reader):
-            print(i)
-            all_logp.append(float(logp))
-            all_smiles.append(smiles)
+            try:
+                all_logp.append(float(logp))
+                all_smiles.append(smiles)
+            except:
+                print("Row " + str(i) + "was not read.")
+                continue
     return all_logp, all_smiles
 

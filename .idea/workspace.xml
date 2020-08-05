@@ -65,7 +65,7 @@
       <option name="presentableId" value="Default" />
       <updated>1596650261491</updated>
       <workItem from="1596650264726" duration="458000" />
-      <workItem from="1596650863548" duration="2434000" />
+      <workItem from="1596650863548" duration="2701000" />
     </task>
     <servers />
   </component>
@@ -82,5 +82,11 @@
         </entry>
       </map>
     </option>
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="2065" y="241" width="670" height="676" key="search.everywhere.popup" timestamp="1596663471380">
+      <screen x="1440" y="0" width="1920" height="1080" />
+    </state>
+    <state x="2065" y="241" width="670" height="676" key="search.everywhere.popup/0.0.1440.900/1440.0.1920.1080@1440.0.1920.1080" timestamp="1596663471380" />
   </component>
 </project>
