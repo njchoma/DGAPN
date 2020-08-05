@@ -59,8 +59,15 @@ class MolData(Dataset):
     def __getitem__(self, index):
         logp = self.logp[index]
         smiles = self.smiles[index]
-
+        # Hot fix, get first in list if mol is none...
         mol = Chem.MolFromSmiles(smiles)
+
+        if mol is None:
+            smiles = self.smiles[0]
+            logp = self.logp[0]
+            mol = Chem.MolFromSmiles(smiles)
+            print("Invalid SMILE encountered. Using first row instead.")
+
         g = graph_utils.mol_to_pyg_graph(mol)
 
         nb_nodes = len(g.x)
