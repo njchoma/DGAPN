@@ -272,8 +272,9 @@ def main(artifact_path,
          nb_layer=7,
          lr=0.001):
 
+    global DEVICE
     if torch.cuda.is_available():
-        DEVICE = device = torch.device('cuda:'+str(gpu_num))
+        DEVICE = torch.device('cuda:'+str(gpu_num))
     else:
         DEVICE = 'cpu'
 
