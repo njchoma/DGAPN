@@ -22,7 +22,6 @@ from dataset.preprocess import *
 from predict_logp.predict_logp import *
 import torch_geometric as pyg
 
-
 # # Assessing GCN Performance at the top of the ranked list
 
 # In[2]:
@@ -30,13 +29,15 @@ import torch_geometric as pyg
 
 import csv
 
+
 def read_data(dataset_path):
     all_logp = []
     all_smiles = []
     with open(dataset_path, newline='') as csvfile:
         reader = csv.reader(csvfile)
-        for i, (logp, smiles) in enumerate (reader):
-            #Some fields are empty, if logp is empty it will be caught by the exception. If smile is empty, conditional kicks in.
+
+        for i, (logp, smiles) in enumerate(reader):
+            # Some fields are empty, if logp is empty it will be caught by the exception. If smile is empty, conditional kicks in.
             try:
                 if smiles is not None:
                     all_logp.append(float(logp))
@@ -65,7 +66,7 @@ scores, smiles = read_data("/global/home/users/adchen/MD/2col/3CLPro_7BQY_A_1_F.
 
 
 #Np_seed remains the same so the same split is used.
-train_data, valid_data, test_data = create_datasets(scores, smiles) 
+train_data, valid_data, test_data = create_datasets(scores, smiles)
 test_labels = np.array(test_data.logp)
 
 # In[5]:
@@ -96,14 +97,15 @@ test_loader =  DataLoader(test_data,
 # In[7]:
 
 
+
 #len(train_data.logp), len(valid_data.logp), len(test_data.logp)
 
 
 # In[8]:
 
 
-#compute_baseline_error(np.array(train_data.logp)), compute_baseline_error(np.array(valid_data.logp)),compute_baseline_error(np.array(test_data.logp))
-
+# print(compute_baseline_error(np.array(train_data.logp)), compute_baseline_error(np.array(valid_data.logp)),\
+#       compute_baseline_error(np.array(test_data.logp)))
 
 # In[39]:
 
@@ -113,6 +115,7 @@ if torch.cuda.is_available():
 else:
     DEVICE = 'cpu'
 print(DEVICE)
+
 #DEVICE = 'cpu'
 
 # In[40]:
@@ -131,6 +134,9 @@ with torch.no_grad():
         y_pred = gcn_net(g1, g2.edge_index).cpu()
         pred_dock_scores = torch.cat((pred_dock_scores, y_pred))
         print("Batch " + str(i))
+
+# Want to plot accuracy
+
 # In[40]:
 
 
@@ -144,7 +150,6 @@ pred_labels_sorted = pred_labels[sort_idx]
 
 
 # In[41]:
-
 
 def tail_mse(a,b):
     assert len(a) == len(b)
@@ -165,20 +170,18 @@ def tail_mse(a,b):
 
 gcn_tail_mse = tail_mse(pred_labels_sorted, test_labels_sorted)
 
-
 # In[31]:
 
 
 import matplotlib.pyplot as plt
 
-
 # In[60]:
 
 
-fig = plt.figure(figsize = (12,7))
+fig = plt.figure(figsize=(12, 7))
 ax = fig.add_subplot(111)
 ax.plot(test_labels_sorted, gcn_tail_mse)
-ax.axvline(-3.4517, color = 'red')
-ax.set(title = "MSE on top fractions of Test Dataset", ylabel="MSE", xlabel="Dock Score")
+ax.axvline(-3.4517, color='red')
+ax.axhline(1.0405, color='purple')
+ax.set(title="MSE on top fractions of Test Dataset", ylabel="MSE", xlabel="Dock Score")
 plt.savefig('gcn_tail_mse.png')
-
