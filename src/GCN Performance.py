@@ -120,24 +120,17 @@ print(DEVICE)
 
 #Loading model, remove map_location if running on exalearn.
 gcn_net = torch.load("../3CLPro_default/predict_logp/best_model.pth", map_location=DEVICE)
-
+gcn_net.eval()
 
 # In[ ]:
-
-
-pred_dock_scores = torch.empty(0).to(DEVICE)
-# counter = 0
-for i, (g1,y,g2) in enumerate(test_loader):
-    g1 = g1.to(DEVICE)
-    g2 = g2.to(DEVICE)
-    y_pred = gcn_net(g1, g2.edge_index)
-    pred_dock_scores = torch.cat((pred_dock_scores, y_pred))
-    print("Batch " + str(i))
-#     if counter > 100:
-#         break
-#     counter +=1
-
-
+with torch.no_grad():
+    pred_dock_scores = torch.empty(0)
+    for i, (g1,y,g2) in enumerate(test_loader):
+        g1 = g1.to(DEVICE)
+        g2 = g2.to(DEVICE)
+        y_pred = gcn_net(g1, g2.edge_index).cpu()
+        pred_dock_scores = torch.cat((pred_dock_scores, y_pred))
+        print("Batch " + str(i))
 # In[40]:
 
 
@@ -146,7 +139,7 @@ for i, (g1,y,g2) in enumerate(test_loader):
 sort_idx = np.argsort(test_labels)
 test_labels_sorted = test_labels[sort_idx]
 
-pred_labels = pred_dock_scores.detach().numpy()
+pred_labels = pred_dock_scores.numpy()
 pred_labels_sorted = pred_labels[sort_idx]
 
 
