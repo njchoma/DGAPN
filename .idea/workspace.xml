@@ -22,7 +22,6 @@
     <list default="true" id="d912434f-c8fc-4e33-819a-3e7472f586eb" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/predict_logp/predict_logp.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/predict_logp/predict_logp.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utils/graph_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/graph_utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -83,6 +82,7 @@
         </entry>
       </map>
     </option>
+    <option name="oldMeFiltersMigrated" value="true" />
   </component>
   <component name="WindowStateProjectService">
     <state x="2065" y="241" width="670" height="676" key="search.everywhere.popup" timestamp="1596663471380">

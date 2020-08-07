@@ -19,10 +19,6 @@ import utils.general_utils as general_utils
 from . import model
 from .model import GNN, GNN_Dense
 
-if torch.cuda.is_available():
-    DEVICE='cuda'
-else:
-    DEVICE='cpu'
 
 #####################################################
 #                   MODEL HANDLING                  #
@@ -33,6 +29,7 @@ def load_current_model(artifact_path):
 
 def load_best_model(artifact_path):
     net = torch.load(os.path.join(artifact_path, 'best_model.pth'))
+
     return net
 
 def save_current_model(net, artifact_path):
@@ -268,11 +265,18 @@ class ArgumentHandler:
 def main(artifact_path,
          logp,
          smiles,
+         gpu_num=0,
          batch_size=512,
          num_workers=24,
          nb_hidden=512,
          nb_layer=7,
          lr=0.001):
+
+    if torch.cuda.is_available():
+        DEVICE = device = torch.device('cuda:'+str(gpu_num))
+    else:
+        DEVICE = 'cpu'
+
     artifact_path = os.path.join(artifact_path, 'predict_logp')
     os.makedirs(artifact_path, exist_ok=True)
     general_utils.initialize_logger(artifact_path)
