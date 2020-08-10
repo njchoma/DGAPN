@@ -158,7 +158,6 @@ def tail_mse(a,b):
     denom = np.arange(len(a))+1
     return sum_sqdiff/denom
 
-
 # In[42]:
 
 
@@ -167,7 +166,20 @@ def tail_mse(a,b):
 
 # In[43]:
 
+# Want R-squared for pred and test < -11
+from scipy.stats import pearsonr
 
+def tail_corr(a,b):
+    assert len(a) == len(b)
+    tail_corr = np.array([pearsonr(a[:i],b[:i]) for i in np.arange(30, len(a))], dtype = float)
+    tail_corr = np.insert(tail_corr, 0, np.repeat(np.nan, 30)) 
+    return tail_corr
+
+pred_labels_11, test_labels_11 = pred_labels_sorted[test_labels_sorted < -11], test_labels_sorted[test_labels_sorted < -11]
+corr, _ = pearsonr(pred_labels_11, test_labels_11)
+print("R-squared: " + str(corr**2))
+
+gcn_tail_cor = tail_corr(pred_labels_sorted, test_labels_sorted)
 gcn_tail_mse = tail_mse(pred_labels_sorted, test_labels_sorted)
 
 # In[31]:
@@ -180,8 +192,10 @@ import matplotlib.pyplot as plt
 
 fig = plt.figure(figsize=(12, 7))
 ax = fig.add_subplot(111)
-ax.plot(test_labels_sorted, gcn_tail_mse)
+ax.plot(test_labels_sorted, gcn_tail_mse, c="Blue", label="MSE")
+ax.plot(test_labels_sorted, gcn_tail_cor, c="Orange", label = "Cor")
 ax.axvline(-3.4517, color='red')
 ax.axhline(1.0405, color='purple')
+ax.legend()
 ax.set(title="MSE on top fractions of Test Dataset", ylabel="MSE", xlabel="Dock Score")
 plt.savefig('gcn_tail_mse.png')
