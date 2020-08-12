@@ -316,7 +316,6 @@ def main(artifact_path,
         test_sampler = torch.utils.data.sampler.WeightedRandomSampler(test_weights, len(test_weights))
 
         train_loader = DataLoader(train_data,
-                                  shuffle=True,
                                   collate_fn=my_collate,
                                   batch_size=batch_size,
                                   sampler=train_sampler,

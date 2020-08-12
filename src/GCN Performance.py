@@ -116,7 +116,7 @@ def tail_mse(a, b):
 
 def tail_corr(a, b):
     assert len(a) == len(b)
-    tail_corr = np.array([pearsonr(a[:i], b[:i]) for i in np.arange(30, len(a))], dtype=float)
+    tail_corr = np.array([pearsonr(a[:i], b[:i])[0] for i in np.arange(30, len(a))], dtype=float)
     tail_corr = np.insert(tail_corr, 0, np.repeat(np.nan, 30))
     return tail_corr
 
