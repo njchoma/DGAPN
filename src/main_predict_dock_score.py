@@ -13,6 +13,7 @@ def read_args():
     add_arg('--name', default='default_run')
     add_arg('--gpu', default=0)
     add_arg('--upsample', default=False)
+    add_arg('--exp_loss', default=False)
 
     return parser.parse_args()
 
@@ -25,7 +26,8 @@ def main():
 
     scores, smiles = preprocess.main(args.data_path)
 
-    predict_logp.main(artifact_path, scores, smiles, gpu_num=args.gpu, upsample=args.upsample)
+    predict_logp.main(artifact_path, scores, smiles,\
+                      gpu_num=args.gpu, upsample=args.upsample, exp_loss=args.exp_loss)
 
 
 if __name__ == "__main__":
