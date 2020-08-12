@@ -42,7 +42,7 @@ def save_best_model(net, artifact_path):
 
 
 #############################################
-#                   DATA                    #
+#            Custom Functions               #
 #############################################
 def dock_score_weights(scores):
     """If sample has a docking score south of -6, it is more likely to be sampled in the batch."""
@@ -55,6 +55,16 @@ def dock_score_weights(scores):
         weights[idx] = weight
     return weights
 
+
+def exp_weighted_mse(output, target):
+    """Custom loss function assigning greater weight to errors at the top of the ranked list."""
+    loss = torch.mean(torch.exp(-0.4 * (target + 5)) * (output - target) ** 2)
+    return loss
+
+
+#############################################
+#                   DATA                    #
+#############################################
 
 def get_dense_edges(n):
     x = np.arange(n)
@@ -285,6 +295,7 @@ def main(artifact_path,
          smiles,
          gpu_num=0,
          upsample=False,
+         exp_loss=False,
          batch_size=512,
          num_workers=24,
          nb_hidden=512,
@@ -359,7 +370,11 @@ def main(artifact_path,
     net = net.to(DEVICE)
 
     optim = torch.optim.Adam(net.parameters(), lr=arg_handler('current_lr'))
-    criterion = torch.nn.MSELoss()
+
+    if exp_loss:
+        criterion = exp_weighted_mse
+    else:
+        criterion = torch.nn.MSELoss()
 
     train(net,
           criterion,
