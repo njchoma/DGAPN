@@ -111,6 +111,7 @@ def main():
     # Loading model
     models = args.model_path
     gcn_tail_mses = np.empty((len(models), len(test_labels)))
+    corrs = []
 
     for i, model_path in enumerate(models):
         print(model_path)
@@ -135,12 +136,13 @@ def main():
         top5percentidx = int(len(test_labels)//20)
         pred_labels_top, test_labels_top = pred_labels_sorted[:top5percentidx], test_labels_sorted[:top5percentidx]
         corr, _ = pearsonr(pred_labels_top, test_labels_top)
-        print("R-squared: " + str(corr ** 2))
-
+        #print("R-squared: " + str(corr ** 2))
+        corrs = np.append(corrs, cor)
         #gcn_tail_cor = tail_corr(pred_labels_sorted, test_labels_sorted)
         gcn_tail_mse = tail_mse(pred_labels_sorted, test_labels_sorted)
         gcn_tail_mses[i] = gcn_tail_mse
 
+    print(corrs)
     fig = plt.figure(figsize=(12, 7))
     ax = fig.add_subplot(111)
     ax.plot(test_labels_sorted, gcn_tail_mses[0], c="Blue", label="MSE_default")
