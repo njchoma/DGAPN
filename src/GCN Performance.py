@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-
+import os
+import argparse
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -13,6 +14,12 @@ import csv
 
 
 # # Assessing GCN Performance at the top of the ranked list
+def read_args():
+    parser = argparse.ArgumentParser()
+    add_arg = parser.add_argument
+    add_arg('--data_path', required=True)
+
+    return parser.parse_args()
 
 def read_data(dataset_path):
     all_logp = []
