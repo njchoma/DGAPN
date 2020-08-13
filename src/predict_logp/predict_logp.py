@@ -179,7 +179,7 @@ def proc_one_epoch(net,
         y_pred = net(G1, G2.edge_index)
 
         loss = criterion(y_pred, y)
-        with torch.autograd.detect_anomaly():
+        with torch.autograd.set_detect_anomaly(True):
             if train:
                 loss.backward()
                 optim.step()
