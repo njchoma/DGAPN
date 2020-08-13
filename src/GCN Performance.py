@@ -76,8 +76,8 @@ def main():
     train_data, valid_data, test_data = create_datasets(scores, smiles)
     test_labels = np.array(test_data.logp)
 
-    test_weights = torch.DoubleTensor(dock_score_weights(test_labels))
-    test_sampler = torch.utils.data.sampler.WeightedRandomSampler(test_weights, len(test_weights))
+    #test_weights = torch.DoubleTensor(dock_score_weights(test_labels))
+    #test_sampler = torch.utils.data.sampler.WeightedRandomSampler(test_weights, len(test_weights))
 
     batch_size = 512
     num_workers = 24
@@ -93,7 +93,6 @@ def main():
     test_loader = DataLoader(test_data,
                              collate_fn=my_collate,
                              batch_size=batch_size,
-                             sampler=test_sampler,
                              num_workers=num_workers)
 
     # print(compute_baseline_error(np.array(train_data.logp)), compute_baseline_error(np.array(valid_data.logp)),\
