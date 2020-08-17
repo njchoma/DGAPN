@@ -45,20 +45,20 @@ def save_best_model(net, artifact_path):
 #            Custom Functions               #
 #############################################
 def dock_score_weights(scores):
-    """If sample has a docking score south of -6, it is more likely to be sampled in the batch."""
+    """If sample has a docking score south of a random split point, it is more likely to be sampled in the batch."""
     weights = np.zeros(len(scores))
     for idx, score in enumerate(scores):
-        if score < -6:
-            weight = 1
+        if score < split:
+            weight = upsampled_weight
         else:
-            weight = 0.1
+            weight = 1 - upsampled_weight
         weights[idx] = weight
     return weights
 
 
 def exp_weighted_mse(output, target):
     """Custom loss function assigning greater weight to errors at the top of the ranked list."""
-    loss = torch.mean(torch.exp(-0.4 * (target + 5)) * (output - target) ** 2)
+    loss = torch.mean((torch.exp(-(target - exp_loc)/exp_scale)/exp_scale) * (output - target) ** 2)
     return loss
 
 
@@ -302,7 +302,13 @@ def main(artifact_path,
          nb_hidden=512,
          nb_layer=7,
          lr=0.001):
+    # Global variables: GPU Device, random splits for upsampling, loc and scale parameter for exp weighted loss.
     global DEVICE
+    global split
+    global upsampled_weight
+    global exp_loc
+    global exp_scale
+
     if torch.cuda.is_available():
         DEVICE = torch.device('cuda:' + str(gpu_num))
     else:
@@ -319,13 +325,22 @@ def main(artifact_path,
     train_data, valid_data, test_data = create_datasets(logp, smiles)
 
     if upsample:
+        # Percentiles used in dock score weights.
+        train_25 = np.percentile(train_data.logp, 25)
+        train_75 = np.percentile(train_data.logp, 75)
+        upsampled_weight = np.random.uniform(0.5, 1, 1)[0]
+        split = np.random.uniform(train_25, train_75, 1)[0]
+        logging.info("Upsampling weights: {:3.2f}".format(upsampled_weight))
+        logging.info("Upsampling split: {:3.2f}".format(split))
+
+        # Initialize weighted sampler
         train_weights = torch.DoubleTensor(dock_score_weights(train_data.logp))
         valid_weights = torch.DoubleTensor(dock_score_weights(valid_data.logp))
-        test_weights = torch.DoubleTensor(dock_score_weights(test_data.logp))
+        # test_weights = torch.DoubleTensor(dock_score_weights(test_data.logp))
 
         train_sampler = torch.utils.data.sampler.WeightedRandomSampler(train_weights, len(train_weights))
         valid_sampler = torch.utils.data.sampler.WeightedRandomSampler(valid_weights, len(valid_weights))
-        test_sampler = torch.utils.data.sampler.WeightedRandomSampler(test_weights, len(test_weights))
+        # test_sampler = torch.utils.data.sampler.WeightedRandomSampler(test_weights, len(test_weights))
 
         train_loader = DataLoader(train_data,
                                   collate_fn=my_collate,
@@ -337,11 +352,6 @@ def main(artifact_path,
                                   batch_size=batch_size,
                                   sampler=valid_sampler,
                                   num_workers=num_workers)
-        test_loader = DataLoader(test_data,
-                                 collate_fn=my_collate,
-                                 batch_size=batch_size,
-                                 sampler=test_sampler,
-                                 num_workers=num_workers)
     else:
         train_loader = DataLoader(train_data,
                                   shuffle=True,
@@ -352,10 +362,6 @@ def main(artifact_path,
                                   collate_fn=my_collate,
                                   batch_size=batch_size,
                                   num_workers=num_workers)
-        test_loader = DataLoader(test_data,
-                                 collate_fn=my_collate,
-                                 batch_size=batch_size,
-                                 num_workers=num_workers)
 
     valid_data.compute_baseline_error()
 
@@ -373,6 +379,10 @@ def main(artifact_path,
     optim = torch.optim.Adam(net.parameters(), lr=arg_handler('current_lr'))
 
     if exp_loss:
+        exp_loc = min(train_data.logp)
+        exp_scale = np.random.uniform(1, 4, 1)[0]
+        logging.info("Exponential loc: {:3.2f}".format(exp_loc))
+        logging.info("Exponential scale: {:3.2f}".format(exp_scale))
         criterion = exp_weighted_mse
     else:
         criterion = torch.nn.MSELoss()

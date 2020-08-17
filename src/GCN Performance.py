@@ -21,6 +21,7 @@ def read_args():
     add_arg = parser.add_argument
     add_arg('--data_path', required=True)
     add_arg('--model_path', nargs="+", required=True)
+    add_arg('--name', required=True)
     add_arg('--gpu', default=0)
     return parser.parse_args()
 
@@ -136,7 +137,7 @@ def main():
         pred_labels_top, test_labels_top = pred_labels_sorted[:top5percentidx], test_labels_sorted[:top5percentidx]
         corr, _ = pearsonr(pred_labels_top, test_labels_top)
         #print("R-squared: " + str(corr ** 2))
-        corrs = np.append(corrs, cor)
+        corrs = np.append(corrs, corr)
         #gcn_tail_cor = tail_corr(pred_labels_sorted, test_labels_sorted)
         gcn_tail_mse = tail_mse(pred_labels_sorted, test_labels_sorted)
         gcn_tail_mses[i] = gcn_tail_mse
@@ -152,7 +153,7 @@ def main():
     ax.axhline(compute_baseline_error(test_labels), color='purple')
     ax.legend()
     ax.set(title="MSE on top fractions of Test Dataset", ylabel="MSE", xlabel="Dock Score")
-    plt.savefig('gcn_tail_mse.png')
+    plt.savefig(str(args.name)+'_tail_mse.png')
 
 
 if __name__ == "__main__":
