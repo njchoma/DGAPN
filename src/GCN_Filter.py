@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-
+import argparse
 import pandas as pd
 import numpy as np
 import torch
@@ -110,7 +110,7 @@ def main():
             print("Batch " + str(i))
 
     logpen_scores = logpen_scores.numpy()
-    qed_condition_scores = qed_condition_scores..numpy()
+    qed_condition_scores = qed_condition_scores.numpy()
     qedsa_scores = qedsa_scores.numpy()
     qed_scores = qed_scores.numpy()
 
