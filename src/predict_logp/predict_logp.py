@@ -58,8 +58,9 @@ def dock_score_weights(scores):
 
 def exp_weighted_mse(output, target):
     """Custom loss function assigning greater weight to errors at the top of the ranked list."""
-    epsilon = 0.01 # To avoid nan's?
-    loss = torch.mean((torch.exp(-(target - exp_loc)/exp_scale)/exp_scale)*(output - target) ** 2)+epsilon
+    epsilon = 0.001  # To avoid nan's?
+    weight = torch.clamp((torch.exp(-(target - exp_loc) / exp_scale) / exp_scale), min=0.0, max=1)
+    loss = torch.mean(weight * (output - target) ** 2) + epsilon
     return loss
 
 
