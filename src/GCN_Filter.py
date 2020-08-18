@@ -16,7 +16,7 @@ from predict_logp.predict_logp import *
 def read_args():
     parser = argparse.ArgumentParser()
     add_arg = parser.add_argument
-    add_arg('--model_path', nargs="+", required=True)
+    add_arg('--model_path', required=True)
     add_arg('--name', required=True)
     add_arg('--gpu', default=0)
     return parser.parse_args()
