@@ -5,7 +5,7 @@ import argparse
 import csv
 import torch
 from torch.utils.data import DataLoader
-
+import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Draw
 
