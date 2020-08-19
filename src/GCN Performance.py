@@ -132,6 +132,7 @@ def main():
 
         pred_labels = pred_dock_scores.numpy()
         pred_labels_sorted = pred_labels[sort_idx]
+        print("Overall r-squared: " + str(pearsonr(pred_dock_scores, test_labels)[0]))
 
         top5percentidx = int(len(test_labels)//20)
         pred_labels_top, test_labels_top = pred_labels_sorted[:top5percentidx], test_labels_sorted[:top5percentidx]
