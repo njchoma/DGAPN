@@ -146,9 +146,10 @@ def main():
     print(corrs)
     fig = plt.figure(figsize=(12, 7))
     ax = fig.add_subplot(111)
-    ax.plot(test_labels_sorted, gcn_tail_mses[0], c="Blue", label="MSE_default")
-    ax.plot(test_labels_sorted, gcn_tail_mses[1], c="Red", label="MSE_upsampled")
-    ax.plot(test_labels_sorted, gcn_tail_mses[2], c="Olive", label="MSE_exp")
+    for i in range(len(models)):
+        plot_label = models[i].spli("/")[-3]
+        ax.plot(test_labels_sorted, gcn_tail_mses[i], c="Blue", label=plot_label)
+
     #ax.plot(test_labels_sorted, gcn_tail_cor, c="Orange", label="Cor")
     #ax.axvline(-3.4517, color='red')
     ax.axhline(compute_baseline_error(test_labels), color='purple')
