@@ -328,6 +328,8 @@ def main(artifact_path,
 
     if upsample:
         # Percentiles used in dock score weights.
+        # Reset randomness
+        np.random.seed()
         train_25 = np.percentile(train_data.logp, 25)
         train_75 = np.percentile(train_data.logp, 75)
         upsampled_weight = np.random.uniform(0.5, 1, 1)[0]
