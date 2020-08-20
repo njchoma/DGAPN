@@ -147,7 +147,7 @@ def main():
     fig = plt.figure(figsize=(12, 7))
     ax = fig.add_subplot(111)
     for i in range(len(models)):
-        plot_label = models[i].spli("/")[-3]
+        plot_label = models[i].split("/")[-3]
         ax.plot(test_labels_sorted, gcn_tail_mses[i], c="Blue", label=plot_label)
 
     #ax.plot(test_labels_sorted, gcn_tail_cor, c="Orange", label="Cor")
