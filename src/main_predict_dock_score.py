@@ -30,7 +30,7 @@ def main():
 
     predict_logp.main(artifact_path, scores, smiles,\
                       gpu_num=args.gpu, upsample=args.upsample, exp_loss=args.exp_loss,\
-                      nb_hidden=args.hidden, nb_layers=args.layers)
+                      nb_hidden=args.hidden, nb_layer=args.layers)
 
 
 if __name__ == "__main__":
