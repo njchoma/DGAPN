@@ -383,6 +383,7 @@ def main(artifact_path,
     optim = torch.optim.Adam(net.parameters(), lr=arg_handler('current_lr'))
 
     if exp_loss:
+        np.random.seed()
         exp_loc = min(train_data.logp)
         exp_scale = np.random.uniform(1, 4, 1)[0]
         logging.info("Exponential loc: {:3.2f}".format(exp_loc))
