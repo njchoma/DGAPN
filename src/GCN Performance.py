@@ -111,7 +111,7 @@ def main():
     # Loading model
     models = args.model_path
     gcn_tail_mses = np.empty((len(models), len(test_labels)))
-    corrs = []
+    top_corrs, corrs = [], []
 
     for i, model_path in enumerate(models):
         print(model_path)
@@ -129,26 +129,47 @@ def main():
 
         # Want to plot accuracy
         # test_labels = np.array(test_scores[:1000])
-
         pred_labels = pred_dock_scores.numpy()
         pred_labels_sorted = pred_labels[sort_idx]
-        print("Overall r-squared: " + str(pearsonr(pred_dock_scores, test_labels)[0]))
 
+        #R-squared information
         top5percentidx = int(len(test_labels)//20)
         pred_labels_top, test_labels_top = pred_labels_sorted[:top5percentidx], test_labels_sorted[:top5percentidx]
-        corr, _ = pearsonr(pred_labels_top, test_labels_top)
-        #print("R-squared: " + str(corr ** 2))
+        top_corr, _ = pearsonr(pred_labels_top, test_labels_top)
+        top_corrs = np.append(top_corrs, top_corr)
+        corr = pearsonr(pred_labels, test_labels)[0]
         corrs = np.append(corrs, corr)
+
+        #MSE information
         #gcn_tail_cor = tail_corr(pred_labels_sorted, test_labels_sorted)
         gcn_tail_mse = tail_mse(pred_labels_sorted, test_labels_sorted)
         gcn_tail_mses[i] = gcn_tail_mse
 
+        #Pair plots
+        top5percent_shuffidx = np.random.permutation(top5percentidx)[:1000]
+        pred_labels_top, test_labels_top = pred_labels_top[top5percent_shuffidx], test_labels_top[top5percent_shuffidx]
+
+        shuff_idx = np.random.permutation(len(pred_dock_scores))[:2000]
+        sample_pred_scores, sample_target_scores = pred_labels[shuff_idx], test_labels[shuff_idx]
+
+        plot_label = models[i].split("/")[-3]
+        fig, ax = plt.subplots(1, 2, figsize=(15, 7), sharey=True)
+        ax[0].scatter(pred_labels_top, test_labels_top, c="Blue", label="Top 5%")
+        ax[0].set_xlabel("Predicted Scores")
+        ax[0].set_ylabel("Target Scores")
+        ax[1].scatter(sample_pred_scores, sample_target_scores, c="Blue", label="Whole Dataset")
+        ax[1].set_xlabel("Predicted Scores")
+        ax[1].set_ylabel("Target Scores")
+        fig.savefig(str(plot_label) + '_pairplots.png')
+        fig.clf()
+
     print(corrs)
+    print(top_corrs)
     fig = plt.figure(figsize=(12, 7))
     ax = fig.add_subplot(111)
     for i in range(len(models)):
         plot_label = models[i].split("/")[-3]
-        ax.plot(test_labels_sorted, gcn_tail_mses[i], c="Blue", label=plot_label)
+        ax.plot(test_labels_sorted, gcn_tail_mses[i], label=plot_label)
 
     #ax.plot(test_labels_sorted, gcn_tail_cor, c="Orange", label="Cor")
     #ax.axvline(-3.4517, color='red')

@@ -56,6 +56,7 @@ def is_sorted(l):
 
 def construct_graph(nodes, edges):
     # NODES
+    #Formal charge, implicit valence, ring_atom, then one hot encodings
     atom_num = torch.LongTensor(nodes[:,0])
     atom_num_oh = torch.nn.functional.one_hot(atom_num, HIGHEST_ATOMIC_NUMBER)
     node_feats = torch.FloatTensor(nodes[:,1:])
@@ -66,6 +67,7 @@ def construct_graph(nodes, edges):
     dst = [e[1] for e in edges]
     edge_index = torch.LongTensor([src, dst])
 
+    #Edge attr = bond order/bond type.
     edge_attr = torch.FloatTensor([e[2] for e in edges])
 
     g = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
