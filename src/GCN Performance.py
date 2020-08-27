@@ -10,7 +10,6 @@ from scipy.stats import pearsonr
 import logging
 
 from utils.graph_utils import *
-import utils.general_utils as general_utils
 from dataset.preprocess import *
 from predict_logp.predict_logp import *
 import csv
@@ -74,7 +73,7 @@ def main():
     args = read_args()
 
     #Initialize logger
-    general_utils.initialize_logger(str(args.name))
+    logging.basicConfig(filename=str(args.name) + "_log.txt", level=logging.DEBUG)
 
     # Loading Data
     scores, smiles = read_data(args.data_path)
