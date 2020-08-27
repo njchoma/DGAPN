@@ -162,10 +162,12 @@ def main():
         fig.savefig(str(plot_label) + '_pairplots.png')
         fig.clf()
 
-        logging.info("Overall r-squared: " + str(corrs))
-        logging.info("Top 5% r-squared: " + str(top_corrs))
-        logging.info("Top 100 MSE " + str(gcn_tail_mses[99]))
-        logging.info("Top 10 MSE " + str(gcn_tail_mses[9]))
+    # Saving Diagnostics to log.txt
+    logging.info("Models " + str([model.split("/")[-3] for model in models]))
+    logging.info("Overall r-squared: " + str(corrs))
+    logging.info("Top 5% r-squared: " + str(top_corrs))
+    logging.info("Top 100 MSE " + str(gcn_tail_mses[:,99]))
+    logging.info("Top 10 MSE " + str(gcn_tail_mses[:,9]))
 
     # After looping through all models and calculating tail_mse, plot on one plot.
     fig = plt.figure(figsize=(12, 7))
