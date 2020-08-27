@@ -7,8 +7,10 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from scipy.stats import pearsonr
+import logging
 
 from utils.graph_utils import *
+import utils.general_utils as general_utils
 from dataset.preprocess import *
 from predict_logp.predict_logp import *
 import csv
@@ -70,6 +72,10 @@ def compute_baseline_error(scores):
 
 def main():
     args = read_args()
+
+    #Initialize logger
+    general_utils.initialize_logger(artifact_path)
+
     # Loading Data
     scores, smiles = read_data(args.data_path)
 
@@ -82,15 +88,7 @@ def main():
 
     batch_size = 512
     num_workers = 24
-    # train_loader = DataLoader(train_data,
-    #                           shuffle=True,
-    #                           collate_fn=my_collate,
-    #                           batch_size=batch_size,
-    #                           num_workers=num_workers)
-    # valid_loader = DataLoader(valid_data,
-    #                           collate_fn=my_collate,
-    #                           batch_size=batch_size,
-    #                           num_workers=num_workers)
+
     test_loader = DataLoader(test_data,
                              collate_fn=my_collate,
                              batch_size=batch_size,
@@ -103,7 +101,7 @@ def main():
         DEVICE = torch.device('cuda:' + str(args.gpu))
     else:
         DEVICE = 'cpu'
-    print(DEVICE)
+    logging.info(DEVICE)
 
     sort_idx = np.argsort(test_labels)
     test_labels_sorted = test_labels[sort_idx]
@@ -114,7 +112,7 @@ def main():
     top_corrs, corrs = [], []
 
     for i, model_path in enumerate(models):
-        print(model_path)
+        logging.info(model_path)
         gcn_net = torch.load(model_path, map_location=DEVICE)
         gcn_net.eval()
 
@@ -142,8 +140,10 @@ def main():
 
         #MSE information
         #gcn_tail_cor = tail_corr(pred_labels_sorted, test_labels_sorted)
+        plot_label = models[i].split("/")[-3]
         gcn_tail_mse = tail_mse(pred_labels_sorted, test_labels_sorted)
         gcn_tail_mses[i] = gcn_tail_mse
+
 
         #Pair plots
         top5percent_shuffidx = np.random.permutation(top5percentidx)[:1000]
@@ -152,8 +152,8 @@ def main():
         shuff_idx = np.random.permutation(len(pred_dock_scores))[:2000]
         sample_pred_scores, sample_target_scores = pred_labels[shuff_idx], test_labels[shuff_idx]
 
-        plot_label = models[i].split("/")[-3]
         fig, ax = plt.subplots(1, 2, figsize=(15, 7), sharey=True)
+        plt.suptitle(str(plot_label))
         ax[0].scatter(pred_labels_top, test_labels_top, c="Blue", label="Top 5%")
         ax[0].set_xlabel("Predicted Scores")
         ax[0].set_ylabel("Target Scores")
@@ -163,8 +163,12 @@ def main():
         fig.savefig(str(plot_label) + '_pairplots.png')
         fig.clf()
 
-    print(corrs)
-    print(top_corrs)
+        logging.info("Overall r-squared: " + str(corrs))
+        logging.info("Top 5% r-squared: " + str(top_corrs))
+        logging.info("Top 100 MSE " + str(gcn_tail_mses[99]))
+        logging.info("Top 10 MSE " + str(gcn_tail_mses[9]))
+
+    # After looping through all models and calculating tail_mse, plot on one plot.
     fig = plt.figure(figsize=(12, 7))
     ax = fig.add_subplot(111)
     for i in range(len(models)):
