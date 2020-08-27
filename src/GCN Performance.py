@@ -74,7 +74,7 @@ def main():
     args = read_args()
 
     #Initialize logger
-    general_utils.initialize_logger(artifact_path)
+    general_utils.initialize_logger(str(args.name))
 
     # Loading Data
     scores, smiles = read_data(args.data_path)
