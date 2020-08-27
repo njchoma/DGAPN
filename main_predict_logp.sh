@@ -8,4 +8,4 @@ PYARGS="$PYARGS --name default"
 PYARGS="$PYARGS --data_path $DATA/exaLearnMol"
 PYARGS="$PYARGS --artifact_path $ARTIFACTS/exaLearnMol"
 
-python src/main.py $PYARGS
+python src/main_predict_logp.py $PYARGS
