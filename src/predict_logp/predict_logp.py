@@ -300,7 +300,7 @@ def main(artifact_path,
          upsample=False,
          exp_loss=False,
          batch_size=512,
-         num_workers=24,
+         num_workers=6,
          nb_hidden=512,
          nb_layer=7,
          lr=0.001):
