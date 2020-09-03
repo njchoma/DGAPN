@@ -138,6 +138,7 @@ def main():
         # Want to plot accuracy
         # test_labels = np.array(test_scores[:1000])
         pred_labels = pred_dock_scores.numpy()
+        pred_sort_idx = np.argsort(pred_labels)
         pred_labels_sorted = pred_labels[sort_idx]
 
         # R-squared information
@@ -162,8 +163,8 @@ def main():
         sample_pred_scores, sample_target_scores = pred_labels[shuff_idx], test_labels[shuff_idx]
 
         # Overlap of top 10 and top 100
-        intersection_10, intersection_100 = intersection_length(pred_labels_sorted[:10], test_labels_sorted[:10]), \
-                                            intersection_length(pred_labels_sorted[:100], test_labels_sorted[:100])
+        intersection_10, intersection_100 = intersection_length(sort_idx[:10], pred_sort_idx[:10]), \
+                                            intersection_length(sort_idx[:100], pred_sort_idx[:100])
         top10, top100 = np.append(top10, intersection_10), np.append(top100, intersection_100)
 
         fig, ax = plt.subplots(1, 2, figsize=(15, 7), sharey=True)
