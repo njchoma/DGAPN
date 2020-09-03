@@ -84,7 +84,7 @@ def main():
     logging.info(DEVICE)
 
     # Initialize logger
-    logging.basicConfig(filename=str(args.name) + "_log.txt", level=logging.info)
+    logging.basicConfig(filename=str(args.name) + "_log.txt", level=logging.INFO)
 
     data_paths = args.data_path
     models = args.model_path
