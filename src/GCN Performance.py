@@ -35,6 +35,7 @@ def tail_mse(a, b):
     return sum_sqdiff / denom
 
 
+# Currently pearsonr calculation is too computaionally expensive.
 def tail_corr(a, b):
     assert len(a) == len(b)
     tail_corr = np.array([pearsonr(a[:i], b[:i])[0] for i in np.arange(30, len(a))], dtype=float)
@@ -69,11 +70,16 @@ def compute_baseline_error(scores):
     return sq_sum
 
 
+def intersection_length(a, b):
+    """A and B are iterables"""
+    return len(set(a) & set(b))
+
+
 def main():
     args = read_args()
 
-    #Initialize logger
-    logging.basicConfig(filename=str(args.name) + "_log.txt", level=logging.DEBUG)
+    # Initialize logger
+    logging.basicConfig(filename=str(args.name) + "_log.txt")
 
     # Loading Data
     scores, smiles = read_data(args.data_path)
@@ -82,8 +88,8 @@ def main():
     train_data, valid_data, test_data = create_datasets(scores, smiles)
     test_labels = np.array(test_data.logp)
 
-    #test_weights = torch.DoubleTensor(dock_score_weights(test_labels))
-    #test_sampler = torch.utils.data.sampler.WeightedRandomSampler(test_weights, len(test_weights))
+    # test_weights = torch.DoubleTensor(dock_score_weights(test_labels))
+    # test_sampler = torch.utils.data.sampler.WeightedRandomSampler(test_weights, len(test_weights))
 
     batch_size = 512
     num_workers = 24
@@ -92,9 +98,6 @@ def main():
                              collate_fn=my_collate,
                              batch_size=batch_size,
                              num_workers=num_workers)
-
-    # print(compute_baseline_error(np.array(train_data.logp)), compute_baseline_error(np.array(valid_data.logp)),\
-    #       compute_baseline_error(np.array(test_data.logp)))
 
     if torch.cuda.is_available():
         DEVICE = torch.device('cuda:' + str(args.gpu))
@@ -129,27 +132,28 @@ def main():
         pred_labels = pred_dock_scores.numpy()
         pred_labels_sorted = pred_labels[sort_idx]
 
-        #R-squared information
-        top5percentidx = int(len(test_labels)//20)
+        # R-squared information
+        top5percentidx = int(len(test_labels) // 20)
         pred_labels_top, test_labels_top = pred_labels_sorted[:top5percentidx], test_labels_sorted[:top5percentidx]
         top_corr, _ = pearsonr(pred_labels_top, test_labels_top)
         top_corrs = np.append(top_corrs, top_corr)
         corr = pearsonr(pred_labels, test_labels)[0]
         corrs = np.append(corrs, corr)
 
-        #MSE information
-        #gcn_tail_cor = tail_corr(pred_labels_sorted, test_labels_sorted)
+        # MSE information
+        # gcn_tail_cor = tail_corr(pred_labels_sorted, test_labels_sorted)
         plot_label = models[i].split("/")[-3]
         gcn_tail_mse = tail_mse(pred_labels_sorted, test_labels_sorted)
         gcn_tail_mses[i] = gcn_tail_mse
 
-
-        #Pair plots
+        # Pair plots
         top5percent_shuffidx = np.random.permutation(top5percentidx)[:1000]
         pred_labels_top, test_labels_top = pred_labels_top[top5percent_shuffidx], test_labels_top[top5percent_shuffidx]
 
         shuff_idx = np.random.permutation(len(pred_dock_scores))[:2000]
         sample_pred_scores, sample_target_scores = pred_labels[shuff_idx], test_labels[shuff_idx]
+
+        # Overlap of top 10 and top 100
 
         fig, ax = plt.subplots(1, 2, figsize=(15, 7), sharey=True)
         plt.suptitle(str(plot_label))
@@ -164,10 +168,10 @@ def main():
 
     # Saving Diagnostics to log.txt
     logging.info("Models " + str([model.split("/")[-3] for model in models]))
-    logging.info("Overall r-squared: " + str(corrs))
     logging.info("Top 5% r-squared: " + str(top_corrs))
-    logging.info("Top 100 MSE " + str(gcn_tail_mses[:,99]))
-    logging.info("Top 10 MSE " + str(gcn_tail_mses[:,9]))
+    logging.info("Overall r-squared: " + str(corrs))
+    logging.info("Top 100 Intersection " + str(intersection_length(pred_labels_sorted[:100], test_labels_sorted[:100])))
+    logging.info("Top 10 Intersection " + str(intersection_length(pred_labels_sorted[:10], test_labels_sorted[:10])))
 
     # After looping through all models and calculating tail_mse, plot on one plot.
     fig = plt.figure(figsize=(12, 7))
@@ -176,12 +180,12 @@ def main():
         plot_label = model_path.split("/")[-3]
         ax.plot(test_labels_sorted, gcn_tail_mses[i], label=plot_label)
 
-    #ax.plot(test_labels_sorted, gcn_tail_cor, c="Orange", label="Cor")
-    #ax.axvline(-3.4517, color='red')
+    # ax.plot(test_labels_sorted, gcn_tail_cor, c="Orange", label="Cor")
+    # ax.axvline(-3.4517, color='red')
     ax.axhline(compute_baseline_error(test_labels), color='purple')
     ax.legend()
     ax.set(title="MSE on top fractions of Test Dataset", ylabel="MSE", xlabel="Dock Score")
-    plt.savefig(str(args.name)+'_tail_mse.png')
+    plt.savefig(str(args.name) + '_tail_mse.png')
 
 
 if __name__ == "__main__":
