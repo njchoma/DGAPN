@@ -16,11 +16,10 @@ import csv
 import matplotlib.pyplot as plt
 
 
-# # Assessing GCN Performance at the top of the ranked list
 def read_args():
     parser = argparse.ArgumentParser()
     add_arg = parser.add_argument
-    add_arg('--data_path', required=True)
+    add_arg('--data_path', nargs="+", required=True)
     add_arg('--model_path', nargs="+", required=True)
     add_arg('--name', required=True)
     add_arg('--gpu', default=0)
@@ -78,42 +77,46 @@ def intersection_length(a, b):
 def main():
     args = read_args()
 
-    # Initialize logger
-    logging.basicConfig(filename=str(args.name) + "_log.txt")
-
-    # Loading Data
-    scores, smiles = read_data(args.data_path)
-
-    # Np_seed remains the same so the same split is used.
-    train_data, valid_data, test_data = create_datasets(scores, smiles)
-    test_labels = np.array(test_data.logp)
-
-    # test_weights = torch.DoubleTensor(dock_score_weights(test_labels))
-    # test_sampler = torch.utils.data.sampler.WeightedRandomSampler(test_weights, len(test_weights))
-
-    batch_size = 512
-    num_workers = 24
-
-    test_loader = DataLoader(test_data,
-                             collate_fn=my_collate,
-                             batch_size=batch_size,
-                             num_workers=num_workers)
-
     if torch.cuda.is_available():
         DEVICE = torch.device('cuda:' + str(args.gpu))
     else:
         DEVICE = 'cpu'
     logging.info(DEVICE)
 
-    sort_idx = np.argsort(test_labels)
-    test_labels_sorted = test_labels[sort_idx]
+    # Initialize logger
+    logging.basicConfig(filename=str(args.name) + "_log.txt")
 
-    # Loading model
+    data_paths = args.data_path
     models = args.model_path
-    gcn_tail_mses = np.empty((len(models), len(test_labels)))
-    top_corrs, corrs = [], []
 
-    for i, model_path in enumerate(models):
+    # Forward pass
+    for i, (data, model_path) in enumerate(zip(data_paths, models)):
+
+        # Loading Data
+        scores, smiles = read_data(data)
+        # Np_seed remains the same so the same split is used.
+        train_data, valid_data, test_data = create_datasets(scores, smiles)
+        test_labels = np.array(test_data.logp)
+        # test_weights = torch.DoubleTensor(dock_score_weights(test_labels))
+        # test_sampler = torch.utils.data.sampler.WeightedRandomSampler(test_weights, len(test_weights))
+
+        batch_size = 512
+        num_workers = 12
+
+        test_loader = DataLoader(test_data,
+                                 collate_fn=my_collate,
+                                 batch_size=batch_size,
+                                 num_workers=num_workers)
+
+        # Sorting test labels to compare performance at top of the ranked list.
+        sort_idx = np.argsort(test_labels)
+        test_labels_sorted = test_labels[sort_idx]
+
+        # Storing MSE and R-squared
+        gcn_tail_mses = np.empty((len(models), len(test_labels)))
+        top_corrs, corrs = [], []
+
+        # Loading model
         logging.info(model_path)
         gcn_net = torch.load(model_path, map_location=DEVICE)
         gcn_net.eval()
