@@ -1,10 +1,14 @@
 import os
 import argparse
 from mpi4py import MPI
+import torch
 
 from gcpn.train import train
 
 from torch.utils.tensorboard import SummaryWriter
+
+from utils.general_utils import maybe_download_file
+from predict_logp import model
 
 def molecule_arg_parser():
     parser = argparse.ArgumentParser(
@@ -18,6 +22,8 @@ def molecule_arg_parser():
     add_arg('--name', default='default_run')
     add_arg('--seed', help='RNG seed', type=int, default=666)
 
+    add_arg('--surrogate_model_url')
+
     # ENVIRONMENT PARAMETERS
     add_arg('--dataset', type=str, default='zinc',help='caveman; grid; ba; zinc; gdb')
     add_arg('--logp_ratio', type=float, default=1)
@@ -25,7 +31,7 @@ def molecule_arg_parser():
     add_arg('--sa_ratio', type=float, default=1)
     add_arg('--reward_step_total', type=float, default=0.5)
     add_arg('--normalize_adj', type=int, default=0)
-    add_arg('--reward_type', type=str, default='logppen',help='logppen;logp_target;qed;qedsa;qed_target;mw_target;gan')
+    add_arg('--reward_type', type=str, default='qed',help='logppen;logp_target;qed;qedsa;qed_target;mw_target;gan')
     add_arg('--reward_target', type=float, default=0.5,help='target reward value')
     add_arg('--has_feature', type=int, default=0)
     add_arg('--is_conditional', type=int, default=0) # default 0
@@ -83,12 +89,25 @@ def molecule_arg_parser():
 
     return parser
 
+def load_surrogate_model(artifact_path, surrogate_model_url):
+    surrogate_model_path = os.path.join(artifact_path, 'surrogate_model.pth')
+    maybe_download_file(surrogate_model_path,
+                        surrogate_model_url,
+                        'Surrogate model')
+    surrogate_model = torch.load(surrogate_model_path, map_location='cpu')
+    print("Surrogate model loaded")
+    return surrogate_model
+
 def main():
     args = molecule_arg_parser().parse_args()
     print("====args====", args)
     writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/'))
+    
+    surrogate_model = load_surrogate_model(args.artifact_path,
+                                           args.surrogate_model_url)
+    print(surrogate_model)
 
-    train(args,seed=args.seed,writer=writer)
+    train(args,surrogate_model, seed=args.seed,writer=writer)
 
 if __name__ == '__main__':
     main()

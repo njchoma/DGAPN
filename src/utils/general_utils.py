@@ -1,4 +1,5 @@
 import os
+import wget
 import logging
 
 
@@ -25,3 +26,12 @@ def close_logger(logger=None):
         h.close()
     for i in range(len(logger.handlers)):
         logger.handlers.pop()
+
+def maybe_download_file(file_path, url, file_descriptor):
+    print()
+    if not os.path.isfile(file_path):
+        print("{} not found. Downloading.".format(file_descriptor))
+        wget.download(url, file_path)
+    else:
+        print("{} found.".format(file_descriptor))
+    print()

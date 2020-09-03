@@ -84,3 +84,35 @@ def mol_to_pyg_graph(mol):
     
     g = construct_graph(nodes, edges)
     return g
+
+def add_reverse(orig_adj):
+    adj = orig_adj.transpose()
+    adj2 = np.array([adj[:,1], adj[:,0]]).transpose()
+    all_adj = np.concatenate((adj, adj2), axis=0)
+    all_adj = np.unique(all_adj, axis=0).transpose()
+    return all_adj
+
+def state_to_pyg(atoms, bonds):
+
+    # create empty editable mol object
+    mol = Chem.RWMol()
+
+    # add atoms to mol and keep track of index
+    for i, atom in enumerate(atoms):
+        a = Chem.Atom(atom)
+        molIdx = mol.AddAtom(a)
+
+    for b in bonds:
+        adj = b[0]
+        adj = add_reverse(adj).transpose().tolist()
+        bond_type = b[1]
+        for e in adj:
+            i = e[0]
+            j = e[1]
+            if i<=j:
+                continue
+            mol.AddBond(i, j, bond_type)
+
+    # Convert RWMol to Mol object
+    mol = mol.GetMol()            
+    return mol_to_pyg_graph(mol)

@@ -11,6 +11,8 @@ from torch_geometric.utils import dense_to_sparse
 
 from .gcpn_policy import GCPN
 
+from utils.graph_utils import state_to_pyg
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Memory:
@@ -220,10 +222,54 @@ class PPO_GCPN:
         return "{}\n{}".format(repr(self.policy), repr(self.optimizer))
 
 
+#####################################################
+#                   FINAL REWARDS                   #
+#####################################################
+
+def nodes_to_atom_labels(nodes, env, nb_nodes):
+    atom_types = env.possible_atom_types
+    atom_idx = np.argmax(nodes[:nb_nodes], axis=1)
+    node_labels = np.asarray(atom_types)[atom_idx]
+    return node_labels
+
+def dense_to_sparse_adj(adj):
+    sp = np.nonzero(adj)
+    sp = np.stack(sp)
+    return sp
+
+def state_to_surrogate_graph(state, env):
+    print(state.keys())
+    nodes = state['node'].squeeze()
+    print(nodes.shape)
+    nb_nodes = int(np.sum(nodes))
+    adj = state['adj'][:,:nb_nodes, :nb_nodes]
+    print(adj.shape)
+    print(nb_nodes)
+
+    atoms = nodes_to_atom_labels(nodes, env, nb_nodes)
+    bonds = []
+    for a,b in zip(adj, env.possible_bond_types):
+        sp = dense_to_sparse_adj(a)
+        bonds.append((sp, b))
+    g = state_to_pyg(atoms, bonds)
+    return g
+    
+
+def get_final_reward(state, env, surrogate_model):
+    g = state_to_surrogate_graph(state, env)
+    g = g.to(device)
+    with torch.autograd.no_grad():
+        pred_docking_score = surrogate_model(g, None)
+    reward = pred_docking_score * -1
+    return reward
 
 
 
-def train_ppo(args, env, writer=None):
+#####################################################
+#                   TRAINING LOOP                   #
+#####################################################
+
+def train_ppo(args, surrogate_model, env, writer=None):
     print("WARNING!!! Only using ONE input bond graph right now")
     print("INFO: Not training with entropy term in loss")
 
@@ -262,9 +308,11 @@ def train_ppo(args, env, writer=None):
                    args.mlp_num_layer,
                    args.mlp_num_hidden)
     
-    print(ppo)
+    # print(ppo)
     memory = Memory()
     print("lr:", lr, "beta:", betas)
+
+    surrogate_model = surrogate_model.to(device)
     
     # logging variables
     running_reward = 0
@@ -285,6 +333,11 @@ def train_ppo(args, env, writer=None):
             # Running policy_old:
             action = ppo.select_action(state, memory)
             state, reward, done, _ = env.step(action)
+
+            if done:
+                final_reward = get_final_reward(state, env, surrogate_model)
+                reward += final_reward
+            
             
             # Saving reward and is_terminals:
             memory.rewards.append(reward)
