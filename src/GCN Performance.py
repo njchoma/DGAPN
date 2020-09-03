@@ -89,6 +89,14 @@ def main():
     data_paths = args.data_path
     models = args.model_path
 
+    if len(data_paths) == 1:
+        # If only one data path specified, I will use that for all the models provided.
+        data_paths = data_paths * len(models)
+
+    # Storing MSE and R-squared
+    gcn_tail_mses = {}
+    top_corrs, corrs, top10, top100 = [], [], [], []
+
     # Forward pass
     for i, (data, model_path) in enumerate(zip(data_paths, models)):
 
@@ -112,9 +120,6 @@ def main():
         sort_idx = np.argsort(test_labels)
         test_labels_sorted = test_labels[sort_idx]
 
-        # Storing MSE and R-squared
-        gcn_tail_mses = np.empty((len(models), len(test_labels)))
-        top_corrs, corrs = [], []
 
         # Loading model
         logging.info(model_path)
@@ -157,6 +162,9 @@ def main():
         sample_pred_scores, sample_target_scores = pred_labels[shuff_idx], test_labels[shuff_idx]
 
         # Overlap of top 10 and top 100
+        intersection_10, intersection_100 = intersection_length(pred_labels_sorted[:10], test_labels_sorted[:10]), \
+                                            intersection_length(pred_labels_sorted[:100], test_labels_sorted[:100])
+        top10, top100 = np.append(top10, intersection_10), np.append(top100, intersection_100)
 
         fig, ax = plt.subplots(1, 2, figsize=(15, 7), sharey=True)
         plt.suptitle(str(plot_label))
@@ -173,8 +181,8 @@ def main():
     logging.info("Models " + str([model.split("/")[-3] for model in models]))
     logging.info("Top 5% r-squared: " + str(top_corrs))
     logging.info("Overall r-squared: " + str(corrs))
-    logging.info("Top 100 Intersection " + str(intersection_length(pred_labels_sorted[:100], test_labels_sorted[:100])))
-    logging.info("Top 10 Intersection " + str(intersection_length(pred_labels_sorted[:10], test_labels_sorted[:10])))
+    logging.info("Top 100 Intersection " + str(top100))
+    logging.info("Top 10 Intersection " + str(top10))
 
     # After looping through all models and calculating tail_mse, plot on one plot.
     fig = plt.figure(figsize=(12, 7))
