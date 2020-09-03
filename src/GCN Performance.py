@@ -81,10 +81,10 @@ def main():
         DEVICE = torch.device('cuda:' + str(args.gpu))
     else:
         DEVICE = 'cpu'
-    logging.info(DEVICE)
 
     # Initialize logger
     logging.basicConfig(filename=str(args.name) + "_log.txt", level=logging.INFO)
+    logging.info(DEVICE)
 
     data_paths = args.data_path
     models = args.model_path
