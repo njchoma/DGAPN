@@ -330,10 +330,11 @@ def main(artifact_path,
         # Percentiles used in dock score weights.
         # Reset randomness
         np.random.seed()
-        train_25 = np.percentile(train_data.logp, 25)
-        train_75 = np.percentile(train_data.logp, 75)
+        #train_25 = np.percentile(train_data.logp, 25)
+        #train_75 = np.percentile(train_data.logp, 75)
         upsampled_weight = np.random.uniform(0.5, 1, 1)[0]
-        split = np.random.uniform(train_25, train_75, 1)[0]
+        #split = np.random.uniform(train_25, train_75, 1)[0]
+        split = np.percentile(train_data.logp, 1)
         logging.info("Upsampling weights: {:3.2f}".format(upsampled_weight))
         logging.info("Upsampling split: {:3.2f}".format(split))
 
