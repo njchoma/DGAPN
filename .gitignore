@@ -6,6 +6,8 @@ test_run*
 /src/.idea/
 *.DS_Store
 num_check.py
+*.idea/
+*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
