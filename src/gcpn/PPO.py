@@ -13,8 +13,6 @@ from .gcpn_policy import GCPN
 
 from utils.graph_utils import state_to_pyg
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 class Memory:
     def __init__(self):
         self.actions = []
@@ -145,7 +143,7 @@ class PPO_GCPN:
                                       gnn_nb_hidden,
                                       gnn_nb_hidden_kernel,
                                       mlp_nb_layers,
-                                      mlp_nb_hidden).to(device)
+                                      mlp_nb_hidden).to(DEVICE)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
         
         self.policy_old = ActorCriticGCPN(input_dim,
@@ -155,12 +153,12 @@ class PPO_GCPN:
                                           gnn_nb_hidden,
                                           gnn_nb_hidden_kernel,
                                           mlp_nb_layers,
-                                          mlp_nb_hidden).to(device)
+                                          mlp_nb_hidden).to(DEVICE)
         self.policy_old.load_state_dict(self.policy.state_dict())
         
         self.MseLoss = nn.MSELoss()
 
-    
+
     def select_action(self, state, memory, env):
         g = state_to_surrogate_graph(state, env).to(device)
         # state = wrap_state(state).to(device)
@@ -178,13 +176,13 @@ class PPO_GCPN:
             rewards.insert(0, discounted_reward)
         
         # Normalizing the rewards:
-        rewards = torch.tensor(rewards).to(device)
+        rewards = torch.tensor(rewards).to(DEVICE)
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         
         # convert list to tensor
-        old_states = Batch().from_data_list(memory.states).to(device)
-        old_actions = torch.squeeze(torch.tensor(memory.actions).to(device), 1).detach()
-        old_logprobs = torch.squeeze(torch.stack(memory.logprobs), 1).to(device).detach()
+        old_states = Batch().from_data_list(memory.states).to(DEVICE)
+        old_actions = torch.squeeze(torch.tensor(memory.actions).to(DEVICE), 1).detach()
+        old_logprobs = torch.squeeze(torch.stack(memory.logprobs), 1).to(DEVICE).detach()
         
         # Optimize policy for K epochs:
         print("Optimizing...")
@@ -271,10 +269,10 @@ def state_to_surrogate_graph(state, env):
 
 def get_final_reward(state, env, surrogate_model):
     g = state_to_surrogate_graph(state, env)
-    g = g.to(device)
+    g = g.to(DEVICE)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
-    reward = pred_docking_score.item() * -1
+        reward = pred_docking_score * -1
     return reward
 
 
@@ -283,10 +281,14 @@ def get_final_reward(state, env, surrogate_model):
 #                   TRAINING LOOP                   #
 #####################################################
 
-def train_ppo(args, surrogate_model, env, writer=None):
+def train_ppo(args, surrogate_model, env, device, writer=None):
     print("INFO: Not training with entropy term in loss")
     print("{} episodes before surrogate model as final reward".format(
                 args.surrogate_reward_timestep_delay))
+
+    # Not the best use of global and capitalization, but should work for now.
+    global DEVICE
+    DEVICE = device
 
     ############## Hyperparameters ##############
     render = True
@@ -330,7 +332,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
     memory = Memory()
     print("lr:", lr, "beta:", betas)
 
-    surrogate_model = surrogate_model.to(device)
+    surrogate_model = surrogate_model.to(DEVICE)
     
     # logging variables
     running_reward = 0
@@ -350,13 +352,21 @@ def train_ppo(args, surrogate_model, env, writer=None):
         for t in range(max_timesteps):
             time_step +=1
             # Running policy_old:
+
             action = ppo.select_action(state, memory, env)
-            state, reward, done, _ = env.step(action)
+            state, reward, done, info = env.step(action)
 
-            if done and (i_episode > args.surrogate_reward_timestep_delay):
-                surr_reward = get_final_reward(state, env, surrogate_model)
-                reward += (-1*surr_reward) / 500
+            if done:
+                print(state)
+                final_reward = get_final_reward(state, env, surrogate_model)
+                reward += final_reward
 
+                # From rl-baselines/baselines/ppo1/pposgd_simple_gcn.py in rl_graph_generation
+                with open('molecule_gen/'+args.name_full+'.csv', 'a') as f:
+                    str = ''.join(['{},']*(len(info)))[:-1]+'\n'
+                    f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'],\
+                                       info['final_stat'], info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'],\
+                                       info['stop']))
             
             
             # Saving reward and is_terminals:
