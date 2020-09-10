@@ -103,7 +103,7 @@ class MyGATConv(MessagePassing):
                  negative_slope=0.2, dropout=0, bias=True, **kwargs):
         super(MyGATConv, self).__init__(aggr='add', **kwargs)
 
-        assert heads==1 # does NOT work with more than one head as of pytorch_geometric 1.6.1
+        # assert heads==1 # does NOT work with more than one head as of pytorch_geometric 1.6.1
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.heads = heads
@@ -160,15 +160,17 @@ class MyGATConv(MessagePassing):
             alpha = (edge_feats * self.att).sum(dim=-1)
 
         alpha = F.leaky_relu(alpha, self.negative_slope)
-        alpha = softmax(alpha, edge_index_i, num_nodes=size_i)
+        alpha = softmax(alpha, edge_index_i, size_i)
+        # alpha = softmax(alpha, edge_index_i, num_nodes=size_i)
 
         # Sample attention coefficients stochastically.
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
-        attended = x_j * alpha.view(-1, self.heads, 1)
+        # attended = x_j * alpha.view(-1, self.heads, 1)
 
         # NOTE: this does NOT work with multiple heads.
         # This is a quick hack to work with pytorch_geometric 1.6.1
-        return attended.squeeze(1)
+        # return attended.squeeze(1)
+        return x_j * alpha.view(-1, self.heads, 1)
 
     def update(self, aggr_out):
         if self.concat is True:
