@@ -390,7 +390,7 @@ def train_ppo(args, surrogate_model, env, device, writer=None):
         avg_length += t
 
         # write to Tensorboard
-        writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), episode_count)
+        writer.add_scalar("EpRewEnvMean", sum(rewbuffer_env)/100, episode_count)
         # writer.add_scalar("Average Length", avg_length, global_step=episode_count)
         # writer.add_scalar("Running Reward", running_reward, global_step=episode_count)
         episode_count += 1
