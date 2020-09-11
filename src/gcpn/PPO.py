@@ -360,14 +360,15 @@ def train_ppo(args, surrogate_model, env, device, writer=None):
                 print(state)
                 final_reward = get_final_reward(state, env, surrogate_model)
                 reward += final_reward
-                info['final_reward'] = final_reward
+                info['surrogate_reward'] = final_reward
+                info['final_reward'] = reward
 
                 # From rl-baselines/baselines/ppo1/pposgd_simple_gcn.py in rl_graph_generation
                 with open('molecule_gen/'+args.name+'.csv', 'a') as f:
-                    str = ''.join(['{},']*9)[:-1]+'\n'
-                    f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'],\
+                    str = ''.join(['{},']*11)[:-1]+'\n'
+                    f.write(str.format(info['start_smile'], info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'],\
                                        info['final_stat'], info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'],\
-                                       info['stop'], info['final_reward']))
+                                       info['stop'], info['surrogate_reward'], info['final_reward']))
             
             
             # Saving reward and is_terminals:

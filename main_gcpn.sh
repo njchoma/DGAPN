@@ -2,12 +2,15 @@
 
 eval "$(conda shell.bash hook)"
 conda activate my-rdkit-env
-
+echo $DATA
 PYARGS=""
-PYARGS="$PYARGS --name Ep0_rewFacNone"
+PYARGS="$PYARGS --name NSP15_6W01_A_2_F"
 PYARGS="$PYARGS --data_path $DATA/exaLearnMol"
-PYARGS="$PYARGS --artifact_path $ARTIFACTS/exaLearnMol/gcpn"
-PYARGS="$PYARGS --surrogate_model_path $ARTIFACTS/exaLearnMol/rdk3_dock_nsp15_6w01_a_1_with_exp/predict_logp/best_model.pth"
+PYARGS="$PYARGS --artifact_path log_dirs"
+PYARGS="$PYARGS --gpu 3"
+PYARGS="$PYARGS --surrogate_model_url https://portal.nersc.gov/project/m3623/docking_score_models/NSP15_6W01_A_2_F_neg_exp/predict_logp/best_model.pth"
+PYARGS="$PYARGS --is_conditional 1"
+PYARGS="$PYARGS --conditional /global/home/users/adchen/MD/2col/negative_only/neg_only_NSP15_6W01_A_2_F.Orderable_zinc_db_enaHLL.2col.csv"
 PYARGS="$PYARGS --surrogate_reward_timestep_delay 10"
 
 python src/main_gcpn.py $PYARGS
