@@ -322,7 +322,10 @@ class MoleculeEnv(gym.Env):
             info['flag_steric_strain_filter'] = flag_steric_strain_filter
             info['flag_zinc_molecule_filter'] = flag_zinc_molecule_filter
             info['stop'] = stop
-            info['start_smile'] = self.conditional[0]
+
+            if self.is_conditional:
+                info['start_smile'] = Chem.MolToSmiles(convert_radical_electrons_to_hydrogens(self.conditional[0]),\
+                                                       isomericSmiles=True)
 
         ### use stepwise reward
         else:

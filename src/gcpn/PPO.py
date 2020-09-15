@@ -276,7 +276,17 @@ def get_final_reward(state, env, surrogate_model):
     g = g.to(DEVICE)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
-        reward = pred_docking_score * -1
+
+        if torch.isnan(pred_docking_score):
+            print("Surrogate score is nan")
+            # If pred docking score is nan, return 0. Model will only train on default qed reward.
+            reward = 0
+        elif (pred_docking_score > -0.5) or (pred_docking_score < -15):
+            print("Surrogate score out of range: " + str(pred_docking_score))
+            reward = 0
+        else:
+            print("Surrogate score in range: " + str(pred_docking_score))
+            reward = pred_docking_score * -1
     return reward
 
 
