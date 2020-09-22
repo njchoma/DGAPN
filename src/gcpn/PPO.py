@@ -164,7 +164,7 @@ class PPO_GCPN:
 
 
     def select_action(self, state, memory, env):
-        g = state_to_surrogate_graph(state, env).to(device)
+        g = state_to_surrogate_graph(state, env).to(DEVICE)
         # state = wrap_state(state).to(device)
         action = self.policy_old.act(g, memory)
         return action

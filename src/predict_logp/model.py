@@ -74,8 +74,8 @@ class GNN_MyGAT(nn.Module):
         for l in self.layers:
             x = l(x, edge_index, edge_attr)
             x = self.act(x)
-        #x = pyg.nn.global_add_pool(x, g.batch)
-        x = torch.sum(x, dim=0)
+        x = pyg.nn.global_add_pool(x, g.batch)
+        #x = torch.sum(x, dim=0)
         y = self.final_layer(x).squeeze()
         return y
 
