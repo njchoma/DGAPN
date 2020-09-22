@@ -47,7 +47,8 @@ class GCPN(nn.Module):
                                     apply_softmax=False)
 
     def forward(self, graph):
-        mask = graph.x.sum(1)
+        nb_nodes = graph.x.shape[0]
+        mask = torch.ones(nb_nodes).to(graph.x.device)
         X = self.gnn_embed(graph)
 
         a_first,  p_first  = self.get_first(X, mask)
@@ -188,7 +189,7 @@ class GNN_Embed(nn.Module):
     emb = data.x
     # GNN Layers
     for i, layer in enumerate(self.layers):
-      emb = layer(emb, data.edge_index)
+      emb = layer(emb, data.edge_index, data.edge_attr)
 
     emb = self.final_emb(emb)
     return emb
@@ -243,13 +244,13 @@ def batched_softmax(logits, batch):
 #####################################################
 
 class MyGCNConv(MessagePassing):
-    def __init__(self, in_channels, out_channels, nb_hidden_kernel=0, apply_norm=False):
+    def __init__(self, in_channels, out_channels, nb_hidden_kernel=0, nb_edge_attr=1, apply_norm=False):
         super(MyGCNConv, self).__init__(aggr='add')  # "Add" aggregation.
         self.lin = torch.nn.Linear(2*in_channels, out_channels)
         self.act = nn.ReLU()
 
         if nb_hidden_kernel>0:
-            self.linA = torch.nn.Linear(in_channels*2, nb_hidden_kernel)
+            self.linA = torch.nn.Linear(in_channels*2+nb_edge_attr, nb_hidden_kernel)
             self.linB = torch.nn.Linear(nb_hidden_kernel, 1)
             self.sigmoid = nn.Sigmoid()
 
@@ -258,19 +259,28 @@ class MyGCNConv(MessagePassing):
             # self.norm = MyInstanceNorm(in_channels, track_running_stats=False)
             self.norm = MyBatchNorm(in_channels)
 
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index, edge_attr, size=None):
         # x has shape [N, in_channels]
         # edge_index has shape [2, E]
 
         if self.apply_norm:
             x = self.norm(x)
+
+        if size is None and torch.is_tensor(x):
+            edge_index, edge_attr = remove_self_loops(edge_index, edge_attr=edge_attr)
+            edge_index, edge_attr = add_self_loops(edge_index,
+                                           edge_weight=edge_attr,
+                                           fill_value=0.0,
+                                           num_nodes=x.size(self.node_dim))
         # edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
-        x_prop = self.propagate(edge_index, size=(x.size(0), x.size(0)), x=x)
+        x_prop = self.propagate(edge_index, size=(x.size(0), x.size(0)), edge_attr=edge_attr, x=x)
         x_new = self.act(self.lin(torch.cat([x,x_prop],dim=1)))
         return x_new
 
-    def message(self, x_i, x_j):
-        h = self.act(self.linA(torch.cat([x_i, x_j], dim=1)))
+    def message(self, x_i, x_j, edge_attr):
+        edge_attr = edge_attr.unsqueeze(1)
+        E = torch.cat([x_i, x_j, edge_attr], dim=1)
+        h = self.act(self.linA(E))
         w = self.sigmoid(self.linB(h))
 
         return w * x_j

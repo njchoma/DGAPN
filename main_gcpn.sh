@@ -1,7 +1,7 @@
 #!/bin/bash
 
 eval "$(conda shell.bash hook)"
-conda activate my-rdkit-env3
+conda activate my-rdkit-env
 
 PYARGS=""
 PYARGS="$PYARGS --name Ep0_rewFacNone"

@@ -83,7 +83,7 @@ class ActorCriticGCPN(nn.Module):
         action, probs = self.actor(state)
         action_logprob = torch.log(probs)
         
-        memory.states.append(state)
+        memory.states.append(state.to_data_list()[0])
         memory.actions.append(action)
         memory.logprobs.append(action_logprob)
         
@@ -156,9 +156,10 @@ class PPO_GCPN:
         self.MseLoss = nn.MSELoss()
 
     
-    def select_action(self, state, memory):
-        state = wrap_state(state).to(device)
-        action = self.policy_old.act(state, memory)
+    def select_action(self, state, memory, env):
+        g = state_to_surrogate_graph(state, env).to(device)
+        # state = wrap_state(state).to(device)
+        action = self.policy_old.act(g, memory)
         return action
     
     def update(self, memory, i_episode, writer=None):
@@ -248,12 +249,12 @@ def state_to_surrogate_graph(state, env):
         sp = dense_to_sparse_adj(a)
         bonds.append((sp, b))
     g = state_to_pyg(atoms, bonds)
+    g = Batch.from_data_list([g])
     return g
     
 
 def get_final_reward(state, env, surrogate_model):
     g = state_to_surrogate_graph(state, env)
-    g = Batch.from_data_list([g])
     g = g.to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
@@ -267,7 +268,6 @@ def get_final_reward(state, env, surrogate_model):
 #####################################################
 
 def train_ppo(args, surrogate_model, env, writer=None):
-    print("WARNING!!! Only using ONE input bond graph right now")
     print("INFO: Not training with entropy term in loss")
     print("{} episodes before surrogate model as final reward".format(
                 args.surrogate_reward_timestep_delay))
@@ -291,7 +291,8 @@ def train_ppo(args, surrogate_model, env, writer=None):
 
     ob = env.reset()
     nb_edge_types = ob['adj'].shape[0]
-    input_dim = ob['node'].shape[2]
+    ob = state_to_surrogate_graph(ob, env)
+    input_dim = ob.x.shape[1]
     
     ppo = PPO_GCPN(lr,
                    betas,
@@ -307,7 +308,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
                    args.mlp_num_layer,
                    args.mlp_num_hidden)
     
-    # print(ppo)
+    print(ppo)
     memory = Memory()
     print("lr:", lr, "beta:", betas)
 
@@ -331,7 +332,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
         for t in range(max_timesteps):
             time_step +=1
             # Running policy_old:
-            action = ppo.select_action(state, memory)
+            action = ppo.select_action(state, memory, env)
             state, reward, done, _ = env.step(action)
 
             if done and (i_episode > args.surrogate_reward_timestep_delay):
