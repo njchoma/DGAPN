@@ -238,13 +238,9 @@ def dense_to_sparse_adj(adj):
     return sp
 
 def state_to_surrogate_graph(state, env):
-    print(state.keys())
     nodes = state['node'].squeeze()
-    print(nodes.shape)
     nb_nodes = int(np.sum(nodes))
     adj = state['adj'][:,:nb_nodes, :nb_nodes]
-    print(adj.shape)
-    print(nb_nodes)
 
     atoms = nodes_to_atom_labels(nodes, env, nb_nodes)
     bonds = []
@@ -257,10 +253,11 @@ def state_to_surrogate_graph(state, env):
 
 def get_final_reward(state, env, surrogate_model):
     g = state_to_surrogate_graph(state, env)
+    g = Batch.from_data_list([g])
     g = g.to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
-    reward = pred_docking_score * -1
+    reward = pred_docking_score.item() * -1
     return reward
 
 
@@ -272,12 +269,14 @@ def get_final_reward(state, env, surrogate_model):
 def train_ppo(args, surrogate_model, env, writer=None):
     print("WARNING!!! Only using ONE input bond graph right now")
     print("INFO: Not training with entropy term in loss")
+    print("{} episodes before surrogate model as final reward".format(
+                args.surrogate_reward_timestep_delay))
 
     ############## Hyperparameters ##############
     render = True
-    solved_reward = 10          # stop training if avg_reward > solved_reward
+    solved_reward = 100          # stop training if avg_reward > solved_reward
     log_interval = 80           # print avg reward in the interval
-    max_episodes = 30000        # max training episodes
+    max_episodes = 50000        # max training episodes
     max_timesteps = 1500        # max timesteps in one episode
     
     update_timestep = 2000      # update policy every n timesteps
@@ -328,15 +327,17 @@ def train_ppo(args, surrogate_model, env, writer=None):
     for i_episode in range(1, max_episodes+1):
         cur_ep_ret_env = 0
         state = env.reset()
+        surr_reward=0.0
         for t in range(max_timesteps):
             time_step +=1
             # Running policy_old:
             action = ppo.select_action(state, memory)
             state, reward, done, _ = env.step(action)
 
-            if done:
-                final_reward = get_final_reward(state, env, surrogate_model)
-                reward += final_reward
+            if done and (i_episode > args.surrogate_reward_timestep_delay):
+                surr_reward = get_final_reward(state, env, surrogate_model)
+                reward += (-1*surr_reward) / 500
+
             
             
             # Saving reward and is_terminals:
@@ -355,6 +356,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
                 env.render()
             if done:
                 break
+        writer.add_scalar("EpRewSurrogate", surr_reward, episode_count)
         rewbuffer_env.append(cur_ep_ret_env)
         avg_length += t
 

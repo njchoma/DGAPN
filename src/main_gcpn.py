@@ -1,5 +1,7 @@
 import os
 import argparse
+from datetime import datetime
+
 from mpi4py import MPI
 import torch
 
@@ -22,7 +24,9 @@ def molecule_arg_parser():
     add_arg('--name', default='default_run')
     add_arg('--seed', help='RNG seed', type=int, default=666)
 
-    add_arg('--surrogate_model_url')
+    add_arg('--surrogate_model_url', default='')
+    add_arg('--surrogate_model_path', default='')
+    add_arg('--surrogate_reward_timestep_delay', type=int, default=0)
 
     # ENVIRONMENT PARAMETERS
     add_arg('--dataset', type=str, default='zinc',help='caveman; grid; ba; zinc; gdb')
@@ -89,11 +93,18 @@ def molecule_arg_parser():
 
     return parser
 
-def load_surrogate_model(artifact_path, surrogate_model_url):
-    surrogate_model_path = os.path.join(artifact_path, 'surrogate_model.pth')
-    maybe_download_file(surrogate_model_path,
-                        surrogate_model_url,
-                        'Surrogate model')
+def get_current_datetime():
+    now = datetime.now()
+    dt_string = now.strftime("%Y.%m.%d_%H:%M:%S")
+    return dt_string
+
+def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_path):
+    if surrogate_model_url != '':
+        surrogate_model_path = os.path.join(artifact_path, 'surrogate_model.pth')
+
+        maybe_download_file(surrogate_model_path,
+                            surrogate_model_url,
+                            'Surrogate model')
     surrogate_model = torch.load(surrogate_model_path, map_location='cpu')
     print("Surrogate model loaded")
     return surrogate_model
@@ -101,10 +112,12 @@ def load_surrogate_model(artifact_path, surrogate_model_url):
 def main():
     args = molecule_arg_parser().parse_args()
     print("====args====", args)
-    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/'))
+    dt = get_current_datetime()
+    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/'+dt))
     
     surrogate_model = load_surrogate_model(args.artifact_path,
-                                           args.surrogate_model_url)
+                                           args.surrogate_model_url,
+                                           args.surrogate_model_path)
     print(surrogate_model)
 
     train(args,surrogate_model, seed=args.seed,writer=writer)
