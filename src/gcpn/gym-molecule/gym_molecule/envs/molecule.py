@@ -324,7 +324,7 @@ class MoleculeEnv(gym.Env):
             info['stop'] = stop
 
             if self.is_conditional:
-                info['start_smile'] = Chem.MolToSmiles(convert_radical_electrons_to_hydrogens(self.conditional[0]),\
+                info['start_smile'] = Chem.MolToSmiles(convert_radical_electrons_to_hydrogens(Chem.MolFromSmiles(self.conditional[0])),\
                                                        isomericSmiles=True)
 
         ### use stepwise reward
