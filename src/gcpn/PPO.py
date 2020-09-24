@@ -5,6 +5,7 @@ from collections import deque
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
+from torch.utils.data import Dataset, DataLoader
 
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils import dense_to_sparse
@@ -16,6 +17,8 @@ from rdkit.Chem.Fingerprints import FingerprintMols
 from .gcpn_policy import GCPN
 
 from utils.graph_utils import state_to_pyg
+from predict_logp.predict_logp import MolData, my_collate
+
 
 class Memory:
     def __init__(self):
@@ -289,6 +292,21 @@ def get_final_reward(state, env, surrogate_model):
             reward = pred_docking_score * -1
     return reward
 
+def patchy_final_reward(smile, surrogate_model):
+    mol_data = MolData(np.zeros(1), smile)
+    mol_dataloader = DataLoader(mol_data, collate_fn=my_collate, batch_size=1, num_workers=1)
+    with torch.no_grad():
+        for (g1, y, g2) in mol_dataloader:
+            g1 = g1.to(DEVICE)
+            g2 = g2.to(DEVICE)
+            y_pred = surrogate_model(g1, g2.edge_index).cpu().numpy()
+            if (y_pred > -0.5) or (y_pred < -15):
+                print("Surrogate score out of range: " + str(y_pred))
+                y_pred = 0
+            else:
+                print("Surrogate score in range: " + str(y_pred))
+                reward = y_pred * -1
+    return y_pred
 
 
 #####################################################
@@ -372,7 +390,8 @@ def train_ppo(args, surrogate_model, env, device, writer=None):
 
             if done:
                 # print(state)
-                final_reward = get_final_reward(state, env, surrogate_model)
+                #final_reward = get_final_reward(state, env, surrogate_model)
+                final_reward = patchy_final_reward(info['smile'], surrogate_model)
                 reward += final_reward
                 info['surrogate_reward'] = final_reward
                 info['final_reward'] = reward
