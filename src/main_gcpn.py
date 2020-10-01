@@ -43,12 +43,16 @@ def molecule_arg_parser():
     add_arg('--max_action', type=int, default=128) # default 0
     add_arg('--min_action', type=int, default=20) # default 0
 
-    # POLICY PARAMETERS
+    # NETWORK PARAMETERS
     add_arg('--emb_size', type=int, default=128) # default 64
     add_arg('--layer_num_g', type=int, default=3)
     add_arg('--num_hidden_g', type=int, default=128)
     add_arg('--mlp_num_layer', type=int, default=3)
     add_arg('--mlp_num_hidden', type=int, default=128)
+
+    # LOSS PARAMETERS
+    add_arg('--eta', type=float, default=0.01, help='relative weight for entropy loss')
+    add_arg('--upsilon', type=float, default=0.5, help='relative weight for baseline loss')
 
 
     # add_arg('--env', type=str, help='environment name: molecule; graph',

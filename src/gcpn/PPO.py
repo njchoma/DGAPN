@@ -91,10 +91,11 @@ class ActorCriticGCPN(nn.Module):
     
     def evaluate(self, state, action):   
         probs, X_agg = self.actor.evaluate(state, action)
-        entropy = 0.0 # TODO get from distribution in gcpn policy
         
         action_logprobs = torch.log(probs)
         state_value = self.critic(X_agg)
+
+        entropy = (probs * action_logprobs).sum(1)
         
         return action_logprobs, state_value, entropy
 
@@ -117,6 +118,8 @@ class PPO_GCPN:
                  lr,
                  betas,
                  gamma,
+                 eta,
+                 upsilon,
                  K_epochs,
                  eps_clip,
                  input_dim,
@@ -130,6 +133,8 @@ class PPO_GCPN:
         self.lr = lr
         self.betas = betas
         self.gamma = gamma
+        self.eta = eta
+        self.upsilon = upsilon
         self.eps_clip = eps_clip
         self.K_epochs = K_epochs
         
@@ -186,19 +191,19 @@ class PPO_GCPN:
 
         for i in range(self.K_epochs):
             # Evaluating old actions and values :
-            logprobs, state_values, _ = self.policy.evaluate(old_states, old_actions)
+            logprobs, state_values, entropies = self.policy.evaluate(old_states, old_actions)
             
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach())
 
-            # Finding Surrogate Loss:
+            # Policy loss
             advantages = rewards - state_values.detach()   
             loss = []
             for j in range(ratios.shape[1]):
                 r = ratios[:,j]
                 surr1 = r * advantages
                 surr2 = torch.clamp(r, 1-self.eps_clip, 1+self.eps_clip) * advantages
-                l = -torch.min(surr1, surr2) + 0.5*self.MseLoss(state_values, rewards)
+                l = -torch.min(surr1, surr2)
                 if torch.isnan(l).any():
                     print("found nan in loss")
                     print(l)
@@ -207,14 +212,25 @@ class PPO_GCPN:
                     print(torch.isnan(advantages).any())
                     exit()
                 loss.append(l)
-            loss = torch.stack(loss)
-            
-            # take gradient step
+            loss = torch.stack(loss, 0).sum(0)
+            loss += self.eta*entropies
+
+            ## take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
             self.optimizer.step()
             if (i%10)==0:
-                print("  {:3d}: Loss: {:7.3f}".format(i, loss.mean()))
+                print("  {:3d}: Loss (Policy): {:7.3f}".format(i, loss.mean()))
+
+            # Baseline loss
+            baseline_loss = self.upsilon*self.MseLoss(state_values, rewards)
+
+            ## take gradient step
+            self.optimizer.zero_grad()
+            baseline_loss.backward()
+            self.optimizer.step()
+            if (i%10)==0:
+                print("  {:3d}: Loss (Baseline): {:7.3f}".format(i, baseline_loss))
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -297,6 +313,8 @@ def train_ppo(args, surrogate_model, env, writer=None):
     ppo = PPO_GCPN(lr,
                    betas,
                    gamma,
+                   args.eta,
+                   args.upsilon,
                    K_epochs,
                    eps_clip,
                    input_dim,

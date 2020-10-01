@@ -2,6 +2,10 @@
 *.pth
 *.swp
 run*
+test_run*
+/src/.idea/
+*.DS_Store
+num_check.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
