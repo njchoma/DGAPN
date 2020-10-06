@@ -17,7 +17,6 @@ from .gcpn_policy import GCPN
 
 from utils.graph_utils import state_to_pyg
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Memory:
     def __init__(self):
@@ -149,7 +148,7 @@ class PPO_GCPN:
                                       gnn_nb_hidden,
                                       gnn_nb_hidden_kernel,
                                       mlp_nb_layers,
-                                      mlp_nb_hidden).to(device)
+                                      mlp_nb_hidden).to(DEVICE)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
         
         self.policy_old = ActorCriticGCPN(input_dim,
@@ -159,15 +158,15 @@ class PPO_GCPN:
                                           gnn_nb_hidden,
                                           gnn_nb_hidden_kernel,
                                           mlp_nb_layers,
-                                          mlp_nb_hidden).to(device)
+                                          mlp_nb_hidden).to(DEVICE)
         self.policy_old.load_state_dict(self.policy.state_dict())
         
         self.MseLoss = nn.MSELoss()
 
     
     def select_action(self, state, memory, env):
-        g = state_to_surrogate_graph(state, env).to(device)
-        # state = wrap_state(state).to(device)
+        g = state_to_surrogate_graph(state, env).to(DEVICE)
+        # state = wrap_state(state).to(DEVICE)
         action = self.policy_old.act(g, memory)
         return action
     
@@ -182,13 +181,13 @@ class PPO_GCPN:
             rewards.insert(0, discounted_reward)
         
         # Normalizing the rewards:
-        rewards = torch.tensor(rewards).to(device)
+        rewards = torch.tensor(rewards).to(DEVICE)
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         
         # convert list to tensor
-        old_states = Batch().from_data_list(memory.states).to(device)
-        old_actions = torch.squeeze(torch.tensor(memory.actions).to(device), 1).detach()
-        old_logprobs = torch.squeeze(torch.stack(memory.logprobs), 1).to(device).detach()
+        old_states = Batch().from_data_list(memory.states).to(DEVICE)
+        old_actions = torch.squeeze(torch.tensor(memory.actions).to(DEVICE), 1).detach()
+        old_logprobs = torch.squeeze(torch.stack(memory.logprobs), 1).to(DEVICE).detach()
         
         # Optimize policy for K epochs:
         print("Optimizing...")
@@ -271,7 +270,7 @@ def state_to_surrogate_graph(state, env, keep_self_edges=True):
 
 def get_final_reward(state, env, surrogate_model):
     g = state_to_surrogate_graph(state, env, keep_self_edges=False)
-    g = g.to(device)
+    g = g.to(DEVICE)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
     reward = pred_docking_score.item() * -1
@@ -283,10 +282,13 @@ def get_final_reward(state, env, surrogate_model):
 #                   TRAINING LOOP                   #
 #####################################################
 
-def train_ppo(args, surrogate_model, env, writer=None):
+def train_ppo(args, surrogate_model, env, device, writer=None):
     print("INFO: Not training with entropy term in loss")
     print("{} episodes before surrogate model as final reward".format(
                 args.surrogate_reward_timestep_delay))
+
+    global DEVICE
+    DEVICE = device
 
     ############## Hyperparameters ##############
     render = True
@@ -330,7 +332,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
     memory = Memory()
     print("lr:", lr, "beta:", betas)
 
-    surrogate_model = surrogate_model.to(device)
+    surrogate_model = surrogate_model.to(DEVICE)
     
     # logging variables
     running_reward = 0
