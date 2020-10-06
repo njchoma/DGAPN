@@ -196,7 +196,7 @@ class PPO_GCPN:
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach())
 
-            # Policy loss
+            # loss
             advantages = rewards - state_values.detach()   
             loss = []
             for j in range(ratios.shape[1]):
@@ -213,24 +213,17 @@ class PPO_GCPN:
                     exit()
                 loss.append(l)
             loss = torch.stack(loss, 0).sum(0)
+            ## entropy
             loss += self.eta*entropies
+            ## baseline
+            loss = loss.mean() + self.upsilon*self.MseLoss(state_values, rewards)
 
             ## take gradient step
             self.optimizer.zero_grad()
-            loss.mean().backward()
+            loss.backward()
             self.optimizer.step()
             if (i%10)==0:
-                print("  {:3d}: Loss (Policy): {:7.3f}".format(i, loss.mean()))
-
-            # Baseline loss
-            baseline_loss = self.upsilon*self.MseLoss(state_values, rewards)
-
-            ## take gradient step
-            self.optimizer.zero_grad()
-            baseline_loss.backward()
-            self.optimizer.step()
-            if (i%10)==0:
-                print("  {:3d}: Loss (Baseline): {:7.3f}".format(i, baseline_loss))
+                print("  {:3d}: Loss: {:7.3f}".format(i, loss))
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
