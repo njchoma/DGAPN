@@ -9,6 +9,10 @@ from torch.distributions import MultivariateNormal
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils import dense_to_sparse
 
+from rdkit import Chem
+from rdkit import DataStructs
+from rdkit.Chem.Fingerprints import FingerprintMols
+
 from .gcpn_policy import GCPN
 
 from utils.graph_utils import state_to_pyg
@@ -347,12 +351,31 @@ def train_ppo(args, surrogate_model, env, writer=None):
             time_step +=1
             # Running policy_old:
             action = ppo.select_action(state, memory, env)
-            state, reward, done, _ = env.step(action)
+            state, reward, done, info = env.step(action)
 
             if done and (i_episode > args.surrogate_reward_timestep_delay):
                 surr_reward = get_final_reward(state, env, surrogate_model)
                 reward += surr_reward / 5
+                info['surrogate_reward'] = surr_reward
+                info['final_reward'] = reward
 
+                # From rl-baselines/baselines/ppo1/pposgd_simple_gcn.py in rl_graph_generation
+                with open('molecule_gen/'+args.name+'.csv', 'a') as f:
+                    if args.is_conditional:
+                        start_mol, end_mol = Chem.MolFromSmiles(info['start_smile']), Chem.MolFromSmiles(info['smile'])
+                        start_fingerprint, end_fingerprint = FingerprintMols.FingerprintMol(
+                            start_mol), FingerprintMols.FingerprintMol(end_mol)
+                        sim = DataStructs.TanimotoSimilarity(start_fingerprint, end_fingerprint)
+
+                        str = ''.join(['{},']*12)[:-1]+'\n'
+                        f.write(str.format(info['start_smile'], info['smile'], sim, info['reward_valid'], info['reward_qed'],\
+                                           info['reward_sa'],info['final_stat'], info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'],\
+                                           info['stop'], info['surrogate_reward'], info['final_reward']))
+                    else:
+                        str = ''.join(['{},']*10)[:-1]+'\n'
+                        f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'],\
+                                           info['final_stat'], info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'],\
+                                           info['stop'], info['surrogate_reward'], info['final_reward']))
             
             
             # Saving reward and is_terminals:
