@@ -242,12 +242,15 @@ def nodes_to_atom_labels(nodes, env, nb_nodes):
     node_labels = np.asarray(atom_types)[atom_idx]
     return node_labels
 
-def dense_to_sparse_adj(adj):
+def dense_to_sparse_adj(adj, keep_self_edges):
+    # Remove self-edges converting to surrogate input
+    if not keep_self_edges:
+        adj = adj - np.diag(np.diag(adj))
     sp = np.nonzero(adj)
     sp = np.stack(sp)
     return sp
 
-def state_to_surrogate_graph(state, env):
+def state_to_surrogate_graph(state, env, keep_self_edges=True):
     nodes = state['node'].squeeze()
     nb_nodes = int(np.sum(nodes))
     adj = state['adj'][:,:nb_nodes, :nb_nodes]
@@ -255,7 +258,7 @@ def state_to_surrogate_graph(state, env):
     atoms = nodes_to_atom_labels(nodes, env, nb_nodes)
     bonds = []
     for a,b in zip(adj, env.possible_bond_types):
-        sp = dense_to_sparse_adj(a)
+        sp = dense_to_sparse_adj(a, keep_self_edges)
         bonds.append((sp, b))
     g = state_to_pyg(atoms, bonds)
     g = Batch.from_data_list([g])
@@ -263,7 +266,7 @@ def state_to_surrogate_graph(state, env):
     
 
 def get_final_reward(state, env, surrogate_model):
-    g = state_to_surrogate_graph(state, env)
+    g = state_to_surrogate_graph(state, env, keep_self_edges=False)
     g = g.to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
@@ -348,7 +351,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
 
             if done and (i_episode > args.surrogate_reward_timestep_delay):
                 surr_reward = get_final_reward(state, env, surrogate_model)
-                reward += (-1*surr_reward) / 500
+                reward += surr_reward / 100
 
             
             
@@ -368,7 +371,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
                 env.render()
             if done:
                 break
-        writer.add_scalar("EpRewSurrogate", surr_reward, episode_count)
+        writer.add_scalar("EpSurrogate", -1*surr_reward, episode_count)
         rewbuffer_env.append(cur_ep_ret_env)
         avg_length += t
 
