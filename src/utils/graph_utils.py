@@ -132,4 +132,8 @@ def state_to_pyg(atoms, bonds):
 
     # Convert RWMol to Mol object
     mol = mol.GetMol()            
+
+    # Ensure uniform representation based off smile string alone
+    # Yes this really matters!
+    mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
     return mol_to_pyg_graph(mol)

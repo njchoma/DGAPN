@@ -351,7 +351,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
 
             if done and (i_episode > args.surrogate_reward_timestep_delay):
                 surr_reward = get_final_reward(state, env, surrogate_model)
-                reward += surr_reward / 100
+                reward += surr_reward / 5
 
             
             
