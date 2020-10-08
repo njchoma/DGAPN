@@ -17,6 +17,7 @@ from .gcpn_policy import GCPN
 
 from utils.general_utils import load_surrogate_model
 from utils.graph_utils import state_to_pyg
+from utils.state_utils import wrap_state, nodes_to_atom_labels, dense_to_sparse_adj, state_to_graph
 
 
 class Memory:
@@ -104,19 +105,6 @@ class ActorCriticGCPN(nn.Module):
         entropy = (probs * action_logprobs).sum(1)
         
         return action_logprobs, state_value, entropy
-
-
-def wrap_state(ob):
-    adj = ob['adj']
-    nodes = ob['node'].squeeze()
-
-    adj = torch.Tensor(adj)
-    nodes = torch.Tensor(nodes)
-
-
-    adj = [dense_to_sparse(a) for a in adj]
-    data = Data(x=nodes, edge_index=adj[0][0], edge_attr=adj[0][1])
-    return data
 
 
 class PPO_GCPN:
@@ -247,35 +235,6 @@ class PPO_GCPN:
 #                   FINAL REWARDS                   #
 #####################################################
 
-def nodes_to_atom_labels(nodes, env, nb_nodes):
-    atom_types = env.possible_atom_types
-    atom_idx = np.argmax(nodes[:nb_nodes], axis=1)
-    node_labels = np.asarray(atom_types)[atom_idx]
-    return node_labels
-
-def dense_to_sparse_adj(adj, keep_self_edges):
-    # Remove self-edges converting to surrogate input
-    if not keep_self_edges:
-        adj = adj - np.diag(np.diag(adj))
-    sp = np.nonzero(adj)
-    sp = np.stack(sp)
-    return sp
-
-def state_to_graph(state, env, keep_self_edges=True):
-    nodes = state['node'].squeeze()
-    nb_nodes = int(np.sum(nodes))
-    adj = state['adj'][:,:nb_nodes, :nb_nodes]
-
-    atoms = nodes_to_atom_labels(nodes, env, nb_nodes)
-    bonds = []
-    for a,b in zip(adj, env.possible_bond_types):
-        sp = dense_to_sparse_adj(a, keep_self_edges)
-        bonds.append((sp, b))
-    g = state_to_pyg(atoms, bonds)
-    g = Batch.from_data_list([g])
-    return g
-    
-
 def get_final_reward(state, env, surrogate_model, device):
     g = state_to_graph(state, env, keep_self_edges=False)
     g = g.to(device)
@@ -283,7 +242,6 @@ def get_final_reward(state, env, surrogate_model, device):
         pred_docking_score = surrogate_model(g, None)
     reward = pred_docking_score.item() * -1
     return reward
-
 
 
 #####################################################
