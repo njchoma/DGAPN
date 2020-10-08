@@ -133,7 +133,8 @@ class PPO_GCPN:
                  gnn_nb_hidden,
                  gnn_nb_hidden_kernel,
                  mlp_nb_layers,
-                 mlp_nb_hidden):
+                 mlp_nb_hidden,
+                 device):
         self.lr = lr
         self.betas = betas
         self.gamma = gamma
@@ -141,6 +142,7 @@ class PPO_GCPN:
         self.upsilon = upsilon
         self.eps_clip = eps_clip
         self.K_epochs = K_epochs
+        self.device = device
         
         self.policy = ActorCriticGCPN(input_dim,
                                       emb_dim,
@@ -149,7 +151,7 @@ class PPO_GCPN:
                                       gnn_nb_hidden,
                                       gnn_nb_hidden_kernel,
                                       mlp_nb_layers,
-                                      mlp_nb_hidden).to(DEVICE)
+                                      mlp_nb_hidden).to(self.device)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
         
         self.policy_old = ActorCriticGCPN(input_dim,
@@ -159,15 +161,15 @@ class PPO_GCPN:
                                           gnn_nb_hidden,
                                           gnn_nb_hidden_kernel,
                                           mlp_nb_layers,
-                                          mlp_nb_hidden).to(DEVICE)
+                                          mlp_nb_hidden).to(self.device)
         self.policy_old.load_state_dict(self.policy.state_dict())
         
         self.MseLoss = nn.MSELoss()
 
     
     def select_action(self, state, memory, env):
-        g = state_to_graph(state, env).to(DEVICE)
-        # state = wrap_state(state).to(DEVICE)
+        g = state_to_graph(state, env).to(self.device)
+        # state = wrap_state(state).to(self.device)
         action = self.policy_old.act(g, memory)
         return action
     
@@ -182,13 +184,13 @@ class PPO_GCPN:
             rewards.insert(0, discounted_reward)
         
         # Normalizing the rewards:
-        rewards = torch.tensor(rewards).to(DEVICE)
+        rewards = torch.tensor(rewards).to(self.device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         
         # convert list to tensor
-        old_states = Batch().from_data_list(memory.states).to(DEVICE)
-        old_actions = torch.squeeze(torch.tensor(memory.actions).to(DEVICE), 1).detach()
-        old_logprobs = torch.squeeze(torch.stack(memory.logprobs), 1).to(DEVICE).detach()
+        old_states = Batch().from_data_list(memory.states).to(self.device)
+        old_actions = torch.squeeze(torch.tensor(memory.actions).to(self.device), 1).detach()
+        old_logprobs = torch.squeeze(torch.stack(memory.logprobs), 1).to(self.device).detach()
         
         # Optimize policy for K epochs:
         print("Optimizing...")
@@ -269,9 +271,9 @@ def state_to_graph(state, env, keep_self_edges=True):
     return g
     
 
-def get_final_reward(state, env, surrogate_model):
+def get_final_reward(state, env, surrogate_model, device):
     g = state_to_graph(state, env, keep_self_edges=False)
-    g = g.to(DEVICE)
+    g = g.to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
     reward = pred_docking_score.item() * -1
@@ -283,9 +285,7 @@ def get_final_reward(state, env, surrogate_model):
 #                   TRAINING LOOP                   #
 #####################################################
 
-def train_ppo(args, env, device, writer=None):
-    global DEVICE
-    DEVICE = device
+def train_ppo(args, env, writer=None):
 
     ############## Hyperparameters ##############
     render = True
@@ -308,6 +308,7 @@ def train_ppo(args, env, device, writer=None):
     nb_edge_types = ob['adj'].shape[0]
     ob = state_to_graph(ob, env)
     input_dim = ob.x.shape[1]
+    device = torch.device("cpu") if args.cpu else torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
     
     ppo = PPO_GCPN(lr,
                    betas,
@@ -323,7 +324,8 @@ def train_ppo(args, env, device, writer=None):
                    args.num_hidden_g,
                    args.num_hidden_g,
                    args.mlp_num_layer,
-                   args.mlp_num_hidden)
+                   args.mlp_num_hidden,
+                   device)
     
     print(ppo)
     memory = Memory()
@@ -337,7 +339,7 @@ def train_ppo(args, env, device, writer=None):
                                                args.surrogate_model_path,
                                                device)
         print(surrogate_model)
-        surrogate_model = surrogate_model.to(DEVICE)
+        surrogate_model = surrogate_model.to(device)
     
     # logging variables
     running_reward = 0
@@ -362,7 +364,7 @@ def train_ppo(args, env, device, writer=None):
 
             if done:
                 if args.surrogate_reward and (i_episode > args.surrogate_reward_timestep_delay):
-                    surr_reward = get_final_reward(state, env, surrogate_model)
+                    surr_reward = get_final_reward(state, env, surrogate_model, device)
                     reward += surr_reward / 5
                     info['surrogate_reward'] = surr_reward
                     info['final_reward'] = reward

@@ -24,6 +24,7 @@ def molecule_arg_parser():
     add_arg('--artifact_path', required=True)
     add_arg('--name', default='default_run')
     add_arg('--seed', help='RNG seed', type=int, default=666)
+    add_arg('--cpu', action='store_true')
     add_arg('--gpu', default='0')
 
     # SURROGATE REWARD
@@ -113,14 +114,11 @@ def main():
     dt = get_current_datetime()
     writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + dt))
 
-    device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
-    device = "cpu"
-
     # From rl-baselines/baselines/ppo1/pposgd_simple_gcn.py in rl_graph_generation
     if not os.path.exists('molecule_gen'):
         os.makedirs('molecule_gen')
 
-    train(args, device, seed=args.seed, writer=writer)
+    train(args, seed=args.seed, writer=writer)
 
 
 if __name__ == '__main__':
