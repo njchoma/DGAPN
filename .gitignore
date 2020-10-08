@@ -6,7 +6,7 @@ test_run*
 molecule_gen*
 *.idea/
 *.DS_Store
-num_check.py
+module_check.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

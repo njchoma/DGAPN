@@ -389,8 +389,7 @@ def train_ppo(args, env, writer=None):
                         f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'],\
                                            info['final_stat'], info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'],\
                                            info['stop'], info['surrogate_reward'], info['final_reward']))
-            
-            
+
             # Saving reward and is_terminals:
             memory.rewards.append(reward)
             memory.is_terminals.append(done)
