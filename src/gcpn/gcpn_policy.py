@@ -259,10 +259,10 @@ class MyGCNConv(MessagePassing):
         self.batch_norm = batch_norm
         self.res = res
         self.use_attention = use_attention
+        self.nb_edge_attr = nb_edge_attr
 
         if self.use_attention:
             self.heads = heads
-            self.nb_edge_attr = nb_edge_attr
             self.concat = concat
             self.negative_slope = negative_slope
             self.dropout = dropout
