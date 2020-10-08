@@ -289,7 +289,7 @@ class MyGCNConv(MessagePassing):
         self.nb_edge_attr = nb_edge_attr
 
         if self.attr_type == "weight":
-            assert nb_edge_attr == 1
+            assert self.nb_edge_attr == 1
             self.use_attention = False
 
         if self.use_attention:
