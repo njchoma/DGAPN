@@ -2,6 +2,8 @@ import os
 import wget
 import logging
 
+import torch
+
 
 def initialize_logger(artifact_path, name=None, level='INFO'):
     logfile = os.path.join(artifact_path, 'log.txt')
@@ -35,3 +37,14 @@ def maybe_download_file(file_path, url, file_descriptor):
     else:
         print("{} found.".format(file_descriptor))
     print()
+
+def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_path, device):
+    if surrogate_model_url != '':
+        surrogate_model_path = os.path.join(artifact_path, 'surrogate_model.pth')
+
+        maybe_download_file(surrogate_model_path,
+                            surrogate_model_url,
+                            'Surrogate model')
+    surrogate_model = torch.load(surrogate_model_path, map_location=device)
+    print("Surrogate model loaded")
+    return surrogate_model

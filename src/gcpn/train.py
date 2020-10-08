@@ -4,7 +4,7 @@ from gym_molecule.envs.molecule import GraphEnv
 from .gcpn_policy import GCPN
 from .PPO import train_ppo
 
-def train(args, surrogate_model, device, seed, writer=None):
+def train(args, device, seed, writer=None):
     # MAKE ENVIRONMENT
     env = gym.make('molecule-v0')
     env.init(data_type=args.dataset,
@@ -41,7 +41,7 @@ def train(args, surrogate_model, device, seed, writer=None):
 
 
     # TRAIN
-    train_ppo(args, surrogate_model, env, device, writer=writer)
+    train_ppo(args, env, device, writer=writer)
 
     env.close()
     print("Environment successfully closed.")

@@ -15,6 +15,7 @@ from rdkit.Chem.Fingerprints import FingerprintMols
 
 from .gcpn_policy import GCPN
 
+from utils.general_utils import load_surrogate_model
 from utils.graph_utils import state_to_pyg
 
 
@@ -165,7 +166,7 @@ class PPO_GCPN:
 
     
     def select_action(self, state, memory, env):
-        g = state_to_surrogate_graph(state, env).to(DEVICE)
+        g = state_to_graph(state, env).to(DEVICE)
         # state = wrap_state(state).to(DEVICE)
         action = self.policy_old.act(g, memory)
         return action
@@ -253,7 +254,7 @@ def dense_to_sparse_adj(adj, keep_self_edges):
     sp = np.stack(sp)
     return sp
 
-def state_to_surrogate_graph(state, env, keep_self_edges=True):
+def state_to_graph(state, env, keep_self_edges=True):
     nodes = state['node'].squeeze()
     nb_nodes = int(np.sum(nodes))
     adj = state['adj'][:,:nb_nodes, :nb_nodes]
@@ -269,7 +270,7 @@ def state_to_surrogate_graph(state, env, keep_self_edges=True):
     
 
 def get_final_reward(state, env, surrogate_model):
-    g = state_to_surrogate_graph(state, env, keep_self_edges=False)
+    g = state_to_graph(state, env, keep_self_edges=False)
     g = g.to(DEVICE)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
@@ -282,11 +283,7 @@ def get_final_reward(state, env, surrogate_model):
 #                   TRAINING LOOP                   #
 #####################################################
 
-def train_ppo(args, surrogate_model, env, device, writer=None):
-    print("INFO: Not training with entropy term in loss")
-    print("{} episodes before surrogate model as final reward".format(
-                args.surrogate_reward_timestep_delay))
-
+def train_ppo(args, env, device, writer=None):
     global DEVICE
     DEVICE = device
 
@@ -309,7 +306,7 @@ def train_ppo(args, surrogate_model, env, device, writer=None):
 
     ob = env.reset()
     nb_edge_types = ob['adj'].shape[0]
-    ob = state_to_surrogate_graph(ob, env)
+    ob = state_to_graph(ob, env)
     input_dim = ob.x.shape[1]
     
     ppo = PPO_GCPN(lr,
@@ -332,7 +329,15 @@ def train_ppo(args, surrogate_model, env, device, writer=None):
     memory = Memory()
     print("lr:", lr, "beta:", betas)
 
-    surrogate_model = surrogate_model.to(DEVICE)
+    if args.surrogate_reward:
+        print("{} episodes before surrogate model as final reward".format(
+                args.surrogate_reward_timestep_delay))
+        surrogate_model = load_surrogate_model(args.artifact_path,
+                                               args.surrogate_model_url,
+                                               args.surrogate_model_path,
+                                               device)
+        print(surrogate_model)
+        surrogate_model = surrogate_model.to(DEVICE)
     
     # logging variables
     running_reward = 0
@@ -355,11 +360,15 @@ def train_ppo(args, surrogate_model, env, device, writer=None):
             action = ppo.select_action(state, memory, env)
             state, reward, done, info = env.step(action)
 
-            if done and (i_episode > args.surrogate_reward_timestep_delay):
-                surr_reward = get_final_reward(state, env, surrogate_model)
-                reward += surr_reward / 5
-                info['surrogate_reward'] = surr_reward
-                info['final_reward'] = reward
+            if done:
+                if args.surrogate_reward and (i_episode > args.surrogate_reward_timestep_delay):
+                    surr_reward = get_final_reward(state, env, surrogate_model)
+                    reward += surr_reward / 5
+                    info['surrogate_reward'] = surr_reward
+                    info['final_reward'] = reward
+                else:
+                    info['surrogate_reward'] = None
+                    info['final_reward'] = None
 
                 # From rl-baselines/baselines/ppo1/pposgd_simple_gcn.py in rl_graph_generation
                 with open('molecule_gen/'+args.name+'.csv', 'a') as f:

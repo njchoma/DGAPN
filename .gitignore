@@ -3,7 +3,8 @@
 *.swp
 run*
 test_run*
-/src/.idea/
+molecule_gen*
+*.idea/
 *.DS_Store
 num_check.py
 

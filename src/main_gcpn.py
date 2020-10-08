@@ -24,11 +24,13 @@ def molecule_arg_parser():
     add_arg('--artifact_path', required=True)
     add_arg('--name', default='default_run')
     add_arg('--seed', help='RNG seed', type=int, default=666)
+    add_arg('--gpu', default='0')
 
+    # SURROGATE REWARD
+    add_arg('--surrogate_reward', '-sur', action='store_true')
+    add_arg('--surrogate_reward_timestep_delay', type=int, default=0)
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_model_path', default='')
-    add_arg('--surrogate_reward_timestep_delay', type=int, default=0)
-    add_arg('--gpu', default='0')
 
     # ENVIRONMENT PARAMETERS
     add_arg('--dataset', type=str, default='zinc', help='caveman; grid; ba; zinc; gdb')
@@ -105,18 +107,6 @@ def get_current_datetime():
     return dt_string
 
 
-def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_path, device):
-    if surrogate_model_url != '':
-        surrogate_model_path = os.path.join(artifact_path, 'surrogate_model.pth')
-
-        maybe_download_file(surrogate_model_path,
-                            surrogate_model_url,
-                            'Surrogate model')
-    surrogate_model = torch.load(surrogate_model_path, map_location=device)
-    print("Surrogate model loaded")
-    return surrogate_model
-
-
 def main():
     args = molecule_arg_parser().parse_args()
     print("====args====", args)
@@ -124,18 +114,13 @@ def main():
     writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + dt))
 
     device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
-
-    surrogate_model = load_surrogate_model(args.artifact_path,
-                                           args.surrogate_model_url,
-                                           args.surrogate_model_path,
-                                           device)
-    print(surrogate_model)
+    device = "cpu"
 
     # From rl-baselines/baselines/ppo1/pposgd_simple_gcn.py in rl_graph_generation
     if not os.path.exists('molecule_gen'):
         os.makedirs('molecule_gen')
 
-    train(args, surrogate_model, device, seed=args.seed, writer=writer)
+    train(args, device, seed=args.seed, writer=writer)
 
 
 if __name__ == '__main__':
