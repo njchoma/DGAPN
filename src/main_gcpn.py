@@ -52,6 +52,7 @@ def molecule_arg_parser():
     add_arg('--emb_size', type=int, default=128)  # default 64
     add_arg('--layer_num_g', type=int, default=3)
     add_arg('--num_hidden_g', type=int, default=128)
+    add_arg('--heads_g', type=int, default=2, help='attention heads for gnn')
     add_arg('--mlp_num_layer', type=int, default=3)
     add_arg('--mlp_num_hidden', type=int, default=128)
 

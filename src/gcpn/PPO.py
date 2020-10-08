@@ -64,19 +64,21 @@ class ActorCriticGCPN(nn.Module):
                  gnn_nb_layers,
                  gnn_nb_hidden,
                  gnn_nb_hidden_kernel,
+                 gnn_heads,
                  mlp_nb_layers,
                  mlp_nb_hidden):
         super(ActorCriticGCPN, self).__init__()
 
         # action mean range -1 to 1
         self.actor = GCPN(input_dim,
-                           emb_dim,
-                           nb_edge_types,
-                           gnn_nb_layers,
-                           gnn_nb_hidden,
-                           gnn_nb_hidden_kernel,
-                           mlp_nb_layers,
-                           mlp_nb_hidden)
+                          emb_dim,
+                          nb_edge_types,
+                          gnn_nb_layers,
+                          gnn_nb_hidden,
+                          gnn_nb_hidden_kernel,
+                          gnn_heads,
+                          mlp_nb_layers,
+                          mlp_nb_hidden)
         # critic
         self.critic = GCPN_Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
         
@@ -132,6 +134,7 @@ class PPO_GCPN:
                  gnn_nb_layers,
                  gnn_nb_hidden,
                  gnn_nb_hidden_kernel,
+                 gnn_heads,
                  mlp_nb_layers,
                  mlp_nb_hidden,
                  device):
@@ -150,6 +153,7 @@ class PPO_GCPN:
                                       gnn_nb_layers,
                                       gnn_nb_hidden,
                                       gnn_nb_hidden_kernel,
+                                      gnn_heads,
                                       mlp_nb_layers,
                                       mlp_nb_hidden).to(self.device)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
@@ -160,6 +164,7 @@ class PPO_GCPN:
                                           gnn_nb_layers,
                                           gnn_nb_hidden,
                                           gnn_nb_hidden_kernel,
+                                          gnn_heads,
                                           mlp_nb_layers,
                                           mlp_nb_hidden).to(self.device)
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -323,6 +328,7 @@ def train_ppo(args, env, writer=None):
                    args.layer_num_g,
                    args.num_hidden_g,
                    args.num_hidden_g,
+                   args.heads_g,
                    args.mlp_num_layer,
                    args.mlp_num_hidden,
                    device)
