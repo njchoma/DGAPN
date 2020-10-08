@@ -295,7 +295,7 @@ def train_ppo(args, env, writer=None):
     memory = Memory()
     print("lr:", lr, "beta:", betas)
 
-    if args.surrogate_reward:
+    if args.use_surrogate:
         print("{} episodes before surrogate model as final reward".format(
                 args.surrogate_reward_timestep_delay))
         surrogate_model = load_surrogate_model(args.artifact_path,
@@ -327,14 +327,13 @@ def train_ppo(args, env, writer=None):
             state, reward, done, info = env.step(action)
 
             if done:
-                if args.surrogate_reward and (i_episode > args.surrogate_reward_timestep_delay):
+                if args.use_surrogate and (i_episode > args.surrogate_reward_timestep_delay):
                     surr_reward = get_final_reward(state, env, surrogate_model, device)
                     reward += surr_reward / 5
                     info['surrogate_reward'] = surr_reward
-                    info['final_reward'] = reward
                 else:
                     info['surrogate_reward'] = None
-                    info['final_reward'] = None
+                info['final_reward'] = reward
 
                 # From rl-baselines/baselines/ppo1/pposgd_simple_gcn.py in rl_graph_generation
                 with open('molecule_gen/'+args.name+'.csv', 'a') as f:

@@ -28,7 +28,7 @@ def molecule_arg_parser():
     add_arg('--gpu', default='0')
 
     # SURROGATE REWARD
-    add_arg('--surrogate_reward', '-sur', action='store_true')
+    add_arg('--use_surrogate', '-sur', action='store_true')
     add_arg('--surrogate_reward_timestep_delay', type=int, default=0)
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_model_path', default='')
