@@ -61,12 +61,12 @@ class MolData(Dataset):
         smiles = self.smiles[index]
 
         mol = Chem.MolFromSmiles(smiles)
-        g = graph_utils.mol_to_pyg_graph(mol)
+        g = graph_utils.mol_to_pyg_graph(mol)[0]
 
         nb_nodes = len(g.x)
         dense_edges = get_dense_edges(len(g.x))
         g2 = pyg.data.Data(edge_index=dense_edges)
-        g2.num_nodes=nb_nodes
+        g2.num_nodes = nb_nodes
 
         return g, torch.FloatTensor([logp]), g2
 

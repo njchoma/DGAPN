@@ -50,8 +50,8 @@ class GCPN(nn.Module):
                                     apply_softmax=False)
 
     def forward(self, graph):
-        nb_nodes = graph.x.shape[0]
-        mask = torch.ones(nb_nodes).to(graph.x.device)
+        nb_nodes = graph[0].x.shape[0]
+        mask = torch.ones(nb_nodes).to(graph[0].x.device)
         X = self.gnn_embed(graph)
 
         a_first,  p_first  = self.get_first(X, mask)
@@ -138,7 +138,7 @@ class GCPN(nn.Module):
         return prob
 
     def evaluate(self, orig_states, actions):
-        batch = orig_states.batch
+        batch = orig_states[0].batch
         X = self.gnn_embed(orig_states)
 
         a_first, a_second, batch_num_nodes, = get_batch_idx(batch, actions)
@@ -171,31 +171,57 @@ class GNN_Embed(nn.Module):
                  nb_hidden_kernel,
                  heads,
                  input_dim,
-                 emb_dim):
+                 emb_dim,
+                 attr_types=("feature", "weight"),
+                 hypergraph=False,
+                 aggr='add'):
         super(GNN_Embed, self).__init__()
+        self.aggr = aggr
 
-        gnn_layers = [MyGCNConv(input_dim,
-                                nb_hidden_gnn,
-                                use_attention=True,
-                                heads=heads,
-                                nb_edge_attr=1)]
-        for _ in range(nb_layer-1):
-            gnn_layers.append(MyGCNConv(nb_hidden_gnn,
+        gnn_modules = []
+        for attr_type in attr_types:
+            if hypergraph:
+                #TODO(Yulun): edge_attr for hypergraph
+                gnn_layers = [MyHGCN(input_dim,
+                                     nb_hidden_gnn)]
+                for _ in range(nb_layer-1):
+                    gnn_layers.append(MyHGCN(nb_hidden_gnn,
+                                             nb_hidden_gnn,
+                                             batch_norm=True))
+            else:
+                gnn_layers = [MyGCNConv(input_dim,
                                         nb_hidden_gnn,
-                                        batch_norm=True,
+                                        attr_type=attr_type,
                                         use_attention=True,
                                         heads=heads,
-                                        nb_edge_attr=1))
+                                        nb_edge_attr=1)]
+                for _ in range(nb_layer-1):
+                    gnn_layers.append(MyGCNConv(nb_hidden_gnn,
+                                                nb_hidden_gnn,
+                                                batch_norm=True,
+                                                attr_type=attr_type,
+                                                use_attention=True,
+                                                heads=heads,
+                                                nb_edge_attr=1))
+            gnn_modules.append(nn.ModuleList(gnn_layers))
 
-        self.layers = nn.ModuleList(gnn_layers)
+        self.module_list = nn.ModuleList(gnn_modules)
         self.final_emb = nn.Linear(nb_hidden_gnn, emb_dim)
 
     def forward(self, data):
 
-        emb = data.x
+        emb = [data[0].x] * len(self.module_list)
+
         # GNN Layers
-        for i, layer in enumerate(self.layers):
-            emb = layer(emb, data.edge_index, data.edge_attr)
+        for i, module in enumerate(self.module_list):
+            for j, layer in enumerate(module):
+                emb[i] = layer(emb[i], data[i].edge_index, data[i].edge_attr)
+
+        if self.aggr == 'add':
+            emb = sum(emb)
+        else:
+            #TODO(Yulun)
+            emb = None
 
         emb = self.final_emb(emb)
         return emb
@@ -250,7 +276,7 @@ def batched_softmax(logits, batch):
 #####################################################
 
 class MyGCNConv(MessagePassing):
-    def __init__(self, in_channels, out_channels, batch_norm=False, res=True,
+    def __init__(self, in_channels, out_channels, batch_norm=False, res=True, attr_type="feature",
                  use_attention=True, heads=1, nb_edge_attr=1, concat=False, negative_slope=0.2, dropout=0, bias=True,
                  **kwargs):
         super(MyGCNConv, self).__init__(aggr='add', node_dim=0, **kwargs)  # "Add" aggregation.
@@ -258,11 +284,16 @@ class MyGCNConv(MessagePassing):
         self.out_channels = out_channels
         self.batch_norm = batch_norm
         self.res = res
+        self.attr_type = attr_type
         self.use_attention = use_attention
+        self.nb_edge_attr = nb_edge_attr
+
+        if self.attr_type == "weight":
+            assert nb_edge_attr == 1
+            self.use_attention = False
 
         if self.use_attention:
             self.heads = heads
-            self.nb_edge_attr = nb_edge_attr
             self.concat = concat
             self.negative_slope = negative_slope
             self.dropout = dropout
@@ -292,7 +323,7 @@ class MyGCNConv(MessagePassing):
 
         #TODO(Yulun): reset params
 
-    def forward(self, x, edge_index, edge_attr=None, size=None):
+    def forward(self, x, edge_index, edge_attr, size=None):
         # x has shape [N, in_channels]
         # edge_index has shape [2, E]
 
@@ -322,7 +353,7 @@ class MyGCNConv(MessagePassing):
             alpha = softmax(alpha, edge_index[1], num_nodes=x.size(0))
             alpha = F.dropout(alpha, p=self.dropout, training=self.training)
 
-        out = self.propagate(edge_index, x=x, alpha=alpha)
+        out = self.propagate(edge_index, edge_attr=edge_attr, x=x, alpha=alpha)
 
         if self.concat is True:
             x = x.view(-1, self.heads * self.out_channels)
@@ -340,8 +371,10 @@ class MyGCNConv(MessagePassing):
         out = self.act(out)
         return out
 
-    def message(self, x_j, alpha):
+    def message(self, x_j, edge_attr, alpha):
         out = x_j
+        if self.attr_type == "weight":
+            out = edge_attr.view(-1, 1, 1) * out
         if alpha is not None:
             out = alpha.view(-1, self.heads, 1) * out
         return out

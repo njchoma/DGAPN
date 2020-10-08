@@ -551,6 +551,17 @@ class MoleculeEnv(gym.Env):
                 print('error', bond_type)
             E[:, begin_idx, end_idx] = float_array
             E[:, end_idx, begin_idx] = float_array
+
+        ### Moved to graph_utils ###
+        ## inverse distance weighting matrix
+        ## mol = Chem.AddHs(mol)
+        # if AllChem.EmbedMolecule(mol, randomSeed=0xf00d) == -1:  # optional random seed for reproducibility)
+        #    AllChem.Compute2DCoords(mol)
+        ## mol = Chem.RemoveHs(mol)
+        # W = np.zeros((1, self.max_atom, self.max_atom))
+        # W[:,:n,:n] = 1./Chem.rdmolops.Get3DDistanceMatrix(mol)
+        # W[np.isinf(W)] = 0
+
         ob = {}
         if self.is_normalize:
             E = self.normalize_adj(E)

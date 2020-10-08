@@ -2,11 +2,13 @@ import numpy as np
 import networkx as nx
 
 from rdkit import Chem
+from rdkit.Chem import AllChem
 from rdkit.Chem import GraphDescriptors
 
 import torch
 import torch_geometric as pyg
 from torch_geometric.data import Data
+from torch_geometric.utils import dense_to_sparse
 
 HIGHEST_ATOMIC_NUMBER=118
 
@@ -29,13 +31,13 @@ def mol_to_nx(mol):
 
 def atom_to_node(atom):
     idx = atom.GetIdx()
-    symbol=atom.GetSymbol()
-    atom_nb=atom.GetAtomicNum()
-    formal_charge=atom.GetFormalCharge()
-    implicit_valence=atom.GetImplicitValence()
-    ring_atom=atom.IsInRing()
-    degree=atom.GetDegree()
-    hybridization=atom.GetHybridization()
+    symbol = atom.GetSymbol()
+    atom_nb = atom.GetAtomicNum()
+    formal_charge = atom.GetFormalCharge()
+    implicit_valence = atom.GetImplicitValence()
+    ring_atom = atom.IsInRing()
+    degree = atom.GetDegree()
+    hybridization = atom.GetHybridization()
     # print(idx, symbol, atom_nb)
     # print(ring_atom)
     # print(degree)
@@ -44,9 +46,9 @@ def atom_to_node(atom):
     return node
 
 def bond_to_edge(bond):
-    src=bond.GetBeginAtomIdx()
-    dst=bond.GetEndAtomIdx()
-    bond_type=bond.GetBondTypeAsDouble()
+    src = bond.GetBeginAtomIdx()
+    dst = bond.GetEndAtomIdx()
+    bond_type = bond.GetBondTypeAsDouble()
     edge = [src, dst, bond_type]
     return edge
 
@@ -71,7 +73,7 @@ def construct_graph(nodes, edges):
     g = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
     return g
 
-def mol_to_pyg_graph(mol):
+def mol_to_pyg_graph(mol, idm=True):
     nodes = []
     for atom in mol.GetAtoms():
         nodes.append(atom_to_node(atom))
@@ -81,9 +83,23 @@ def mol_to_pyg_graph(mol):
     edges = []
     for bond in mol.GetBonds():
         edges.append(bond_to_edge(bond))
-    
-    g = construct_graph(nodes, edges)
-    return g
+
+    g_adj = construct_graph(nodes, edges)
+
+    if idm:
+        # inverse distance weighting matrix
+        # mol = Chem.AddHs(mol)
+        if AllChem.EmbedMolecule(mol, randomSeed=0xf00d) == -1:  # optional random seed for reproducibility)
+            AllChem.Compute2DCoords(mol)
+        # mol = Chem.RemoveHs(mol)
+        W = 1. / Chem.rdmolops.Get3DDistanceMatrix(mol)
+        W[np.isinf(W)] = 0
+        W_spr = dense_to_sparse(torch.FloatTensor(W))
+        g_idm = Data(x=g_adj.x, edge_index=W_spr[0], edge_attr=W_spr[1])
+
+        return [g_adj, g_idm]
+
+    return [g_adj]
 
 def add_reverse(orig_adj):
     adj = orig_adj.transpose()
