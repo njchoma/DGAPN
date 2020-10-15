@@ -118,7 +118,8 @@ def state_to_pyg(atoms, bonds):
 
             atom_reindex[i] = atom_count
             atom_count += 1
-
+    #print(atom_count)
+    #print(bonds)
     for b in bonds:
         adj = b[0]
         # If molecule has no bonds of that type, continue.
