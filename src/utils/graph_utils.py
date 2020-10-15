@@ -121,6 +121,9 @@ def state_to_pyg(atoms, bonds):
 
     for b in bonds:
         adj = b[0]
+        # If molecule has no bonds of that type, continue.
+        if adj.shape[1] == 0:
+            continue
         adj = add_reverse(adj).transpose().tolist()
         bond_type = b[1]
         for e in adj:
