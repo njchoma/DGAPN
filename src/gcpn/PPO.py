@@ -343,13 +343,13 @@ def train_ppo(args, env, writer=None):
                             start_mol), FingerprintMols.FingerprintMol(end_mol)
                         sim = DataStructs.TanimotoSimilarity(start_fingerprint, end_fingerprint)
 
-                        str = ''.join(['{},']*12)[:-1]+'\n'
-                        f.write(str.format(info['start_smile'], info['smile'], sim, info['reward_valid'], info['reward_qed'],\
+                        row = ''.join(['{},']*12)[:-1]+'\n'
+                        f.write(row.format(info['start_smile'], info['smile'], sim, info['reward_valid'], info['reward_qed'],\
                                            info['reward_sa'],info['final_stat'], info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'],\
                                            info['stop'], info['surrogate_reward'], info['final_reward']))
                     else:
-                        str = ''.join(['{},']*10)[:-1]+'\n'
-                        f.write(str.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'],\
+                        row = ''.join(['{},']*10)[:-1]+'\n'
+                        f.write(row.format(info['smile'], info['reward_valid'], info['reward_qed'], info['reward_sa'],\
                                            info['final_stat'], info['flag_steric_strain_filter'], info['flag_zinc_molecule_filter'],\
                                            info['stop'], info['surrogate_reward'], info['final_reward']))
 
