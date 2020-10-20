@@ -16,6 +16,7 @@ import time
 import matplotlib.pyplot as plt
 import csv
 
+from crem.crem import mutate_mol, grow_mol, link_mols
 from contextlib import contextmanager
 import sys, os
 
@@ -207,17 +208,31 @@ class MoleculeEnv(gym.Env):
         self.mol_old = copy.deepcopy(self.mol)  # keep old mol
         total_atoms = self.mol.GetNumAtoms()
 
-        ### take action
-        if action[0, 3] == 0 or self.counter < self.min_action:  # not stop
+        db_fname = 'replacements02_sc2.db'
+        if action[2] == 0 or self.counter < self.min_action:
             stop = False
-            if action[0, 1] >= total_atoms:
-                self._add_atom(action[0, 1] - total_atoms)  # add new node
-                action[0, 1] = total_atoms  # new node id
-                self._add_bond(action)  # add new edge
+            temp_smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
+            new_mols = list(mutate_mol(Chem.MolFromSmiles(temp_smile), db_fname, return_mol=True))
+            #smiles = [i[0] for i in mols]
+            new_mols = [Chem.RemoveHs(i[1]) for i in new_mols]
+            if len(new_mols) == 0:
+                print("CReM could not find anything.")
+                stop = True
             else:
-                self._add_bond(action)  # add new edge
-        else:  # stop
+                self.mol = np.random.choice(new_mols)
+        else:
             stop = True
+        # ### take action
+        # if action[0, 3] == 0 or self.counter < self.min_action:  # not stop
+        #     stop = False
+        #     if action[0, 1] >= total_atoms:
+        #         self._add_atom(action[0, 1] - total_atoms)  # add new node
+        #         action[0, 1] = total_atoms  # new node id
+        #         self._add_bond(action)  # add new edge
+        #     else:
+        #         self._add_bond(action)  # add new edge
+        # else:  # stop
+        #     stop = True
 
         ### calculate intermediate rewards
         if self.check_valency():

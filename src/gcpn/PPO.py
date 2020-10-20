@@ -307,7 +307,8 @@ def train_ppo(args, env, writer=None):
         for t in range(max_timesteps):
             time_step +=1
             # Running policy_old:
-            action = ppo.select_action(state, memory, env)
+            #action = ppo.select_action(state, memory, env)
+            action = (3, 1, 0)
             state, reward, done, info = env.step(action)
 
             if done:
