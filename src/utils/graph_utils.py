@@ -139,4 +139,6 @@ def state_to_pyg(atoms, bonds):
     # Ensure uniform representation based off smile string alone
     # Yes this really matters!
     mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
+    if mol is None:
+        raise TypeError("Mol is None.")
     return mol_to_pyg_graph(mol)

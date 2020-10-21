@@ -328,9 +328,14 @@ def train_ppo(args, env, writer=None):
 
             if done:
                 if args.use_surrogate and (i_episode > args.surrogate_reward_timestep_delay):
-                    surr_reward = get_final_reward(state, env, surrogate_model, device)
-                    reward += surr_reward / 5
-                    info['surrogate_reward'] = surr_reward
+                    try:
+                        surr_reward = get_final_reward(state, env, surrogate_model, device)
+                        reward += surr_reward / 5
+                        info['surrogate_reward'] = surr_reward
+                    except Exception as e:
+                        print(e)
+                        info['surrogate_reward'] = None
+                        pass
                 else:
                     info['surrogate_reward'] = None
                 info['final_reward'] = reward
