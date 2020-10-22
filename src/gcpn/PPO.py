@@ -100,7 +100,9 @@ class ActorCriticGCPN(nn.Module):
                           mlp_nb_hidden)
         # critic
         self.critic = Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
-        
+        # discriminator
+        self.discriminator = Discriminator(emb_dim, mlp_nb_layers, mlp_nb_hidden)
+
     def forward(self):
         raise NotImplementedError
     
@@ -116,13 +118,14 @@ class ActorCriticGCPN(nn.Module):
     
     def evaluate(self, state, action):   
         probs, X_agg = self.actor.evaluate(state, action)
-        
+
         action_logprobs = torch.log(probs)
         state_value = self.critic(X_agg)
+        fidelity = self.discriminator(X_agg)
 
         entropy = (probs * action_logprobs).sum(1)
-        
-        return action_logprobs, state_value, entropy
+
+        return action_logprobs, state_value, entropy, fidelity
 
 
 class PPO_GCPN:
@@ -132,6 +135,7 @@ class PPO_GCPN:
                  gamma,
                  eta,
                  upsilon,
+                 alpha,
                  K_epochs,
                  eps_clip,
                  input_dim,
@@ -149,6 +153,7 @@ class PPO_GCPN:
         self.gamma = gamma
         self.eta = eta
         self.upsilon = upsilon
+        self.alpha = alpha
         self.eps_clip = eps_clip
         self.K_epochs = K_epochs
         self.device = device
@@ -177,7 +182,6 @@ class PPO_GCPN:
         
         self.MseLoss = nn.MSELoss()
 
-    
     def select_action(self, state, memory, env):
         g = state_to_graph(state, env).to(self.device)
         # state = wrap_state(state).to(self.device)
@@ -208,12 +212,13 @@ class PPO_GCPN:
 
         for i in range(self.K_epochs):
             # Evaluating old actions and values :
-            logprobs, state_values, entropies = self.policy.evaluate(old_states, old_actions)
+            logprobs, state_values, entropies, fidelity = self.policy.evaluate(old_states, old_actions)
             
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach())
 
             # loss
+            ## policy
             advantages = rewards - state_values.detach()
             loss = []
             for j in range(ratios.shape[1]):
@@ -232,15 +237,40 @@ class PPO_GCPN:
             loss = torch.stack(loss, 0).sum(0)
             ## entropy
             loss += self.eta*entropies
+
+            loss = loss.mean()
             ## baseline
-            loss = loss.mean() + self.upsilon * self.MseLoss(state_values, rewards)
+            loss += self.upsilon * self.MseLoss(state_values, rewards)
+            if (i % 10) == 0:
+                print("  {:3d}: Loss: {:7.3f}".format(i, loss))
+            ## adversarial
+            if (i + 1) == self.K_epochs:
+                adversarial_loss = self.alpha * torch.mean(torch.log(fidelity))
+                print("  {:3d}: Adversarial Loss (Fake): {:7.3f}".format(i, adversarial_loss))
+                loss -= adversarial_loss
 
             ## take gradient step
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            if (i % 10) == 0:
-                print("  {:3d}: Loss: {:7.3f}".format(i, loss))
+
+        # Copy new weights into old policy:
+        self.policy_old.load_state_dict(self.policy.state_dict())
+
+    def update_disc(self, truth, i_episode, writer=None):
+        states = Batch().from_data_list(truth).to(self.device)
+
+        _, X_agg = self.policy.actor.evaluate(states)
+        fidelity = self.policy.discriminator(X_agg)
+
+        ## adversarial
+        adversarial_loss = self.alpha * torch.mean(torch.log(fidelity))
+        print("  Adversarial Loss (Real): {:7.3f}".format(adversarial_loss))
+
+        ## take gradient step
+        self.optimizer.zero_grad()
+        adversarial_loss.backward()
+        self.optimizer.step()
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -270,12 +300,13 @@ def train_ppo(args, env, writer=None):
 
     ############## Hyperparameters ##############
     render = True
-    solved_reward = 100          # stop training if avg_reward > solved_reward
+    solved_reward = 100         # stop training if avg_reward > solved_reward
     log_interval = 80           # print avg reward in the interval
     max_episodes = 50000        # max training episodes
     max_timesteps = 1500        # max timesteps in one episode
     
     update_timestep = 2000      # update policy every n timesteps
+    truth_frequency = 5         # frequency of feeding truth to discriminator
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
     gamma = 0.99                # discount factor
@@ -289,13 +320,15 @@ def train_ppo(args, env, writer=None):
     nb_edge_types = ob['adj'].shape[0]
     ob = state_to_graph(ob, env)
     input_dim = ob.x.shape[1]
-    device = torch.device("cpu") if args.cpu else torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu") if args.cpu else \
+        torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
     
     ppo = PPO_GCPN(lr,
                    betas,
                    gamma,
                    args.eta,
                    args.upsilon,
+                   args.alpha,
                    K_epochs,
                    eps_clip,
                    input_dim,
@@ -337,9 +370,9 @@ def train_ppo(args, env, writer=None):
     for i_episode in range(1, max_episodes+1):
         cur_ep_ret_env = 0
         state = env.reset()
-        surr_reward=0.0
+        surr_reward = 0.0
         for t in range(max_timesteps):
-            time_step +=1
+            time_step += 1
             # Running policy_old:
             action = ppo.select_action(state, memory, env)
             state, reward, done, info = env.step(action)
@@ -385,7 +418,11 @@ def train_ppo(args, env, writer=None):
                 print("updating ppo")
                 ppo.update(memory, i_episode, writer)
                 memory.clear_memory()
-                time_step = 0
+                if time_step % (update_timestep*truth_frequency) == 0:
+                    # TODO for Nick: import a batch of true molecules here.
+                    #   The structure of `truth` should be the same as `memory`.
+                    truth = None
+                    ppo.update_disc(truth, i_episode, writer)
             running_reward += reward
             cur_ep_ret_env += reward
             if (((i_episode+1)%20)==0) and render:
@@ -394,7 +431,7 @@ def train_ppo(args, env, writer=None):
                 break
         writer.add_scalar("EpSurrogate", -1*surr_reward, episode_count)
         rewbuffer_env.append(cur_ep_ret_env)
-        avg_length += t
+        avg_length += time_step
 
         # write to Tensorboard
         writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), episode_count)

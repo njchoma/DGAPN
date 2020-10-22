@@ -59,6 +59,7 @@ def molecule_arg_parser():
     # LOSS PARAMETERS
     add_arg('--eta', type=float, default=0.01, help='relative weight for entropy loss')
     add_arg('--upsilon', type=float, default=0.5, help='relative weight for baseline loss')
+    add_arg('--alpha', type=float, default=0.1, help='relative weight for adversarial loss')
 
     # add_arg('--env', type=str, help='environment name: molecule; graph',
     #                     default='molecule')
