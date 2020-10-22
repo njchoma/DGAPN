@@ -40,9 +40,9 @@ class Memory:
 #                   GCPN PPO                    #
 #################################################
 
-class GCPN_Critic(nn.Module):
+class Critic(nn.Module):
     def __init__(self, emb_dim, nb_layers, nb_hidden):
-        super(GCPN_Critic, self).__init__()
+        super(Critic, self).__init__()
         layers = [nn.Linear(emb_dim, nb_hidden)]
         for _ in range(nb_layers-1):
             layers.append(nn.Linear(nb_hidden, nb_hidden))
@@ -55,6 +55,24 @@ class GCPN_Critic(nn.Module):
         for i, l in enumerate(self.layers):
             X = self.act(l(X))
         return self.final_layer(X).squeeze(1)
+
+
+class Discriminator(nn.Module):
+    def __init__(self, emb_dim, nb_layers, nb_hidden):
+        super(Discriminator, self).__init__()
+        layers = [nn.Linear(emb_dim, nb_hidden)]
+        for _ in range(nb_layers-1):
+            layers.append(nn.Linear(nb_hidden, nb_hidden))
+
+        self.layers = nn.ModuleList(layers)
+        self.final_layer = nn.Linear(nb_hidden, 1)
+        self.act = nn.ReLU()
+        self.final_act = nn.Sigmoid()
+
+    def forward(self, X):
+        for i, l in enumerate(self.layers):
+            X = self.act(l(X))
+        return self.final_act(self.final_layer(X)).squeeze(1)
 
 
 class ActorCriticGCPN(nn.Module):
@@ -81,7 +99,7 @@ class ActorCriticGCPN(nn.Module):
                           mlp_nb_layers,
                           mlp_nb_hidden)
         # critic
-        self.critic = GCPN_Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
+        self.critic = Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
         
     def forward(self):
         raise NotImplementedError
@@ -196,7 +214,7 @@ class PPO_GCPN:
             ratios = torch.exp(logprobs - old_logprobs.detach())
 
             # loss
-            advantages = rewards - state_values.detach()   
+            advantages = rewards - state_values.detach()
             loss = []
             for j in range(ratios.shape[1]):
                 r = ratios[:,j]
@@ -215,13 +233,13 @@ class PPO_GCPN:
             ## entropy
             loss += self.eta*entropies
             ## baseline
-            loss = loss.mean() + self.upsilon*self.MseLoss(state_values, rewards)
+            loss = loss.mean() + self.upsilon * self.MseLoss(state_values, rewards)
 
             ## take gradient step
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            if (i%10)==0:
+            if (i % 10) == 0:
                 print("  {:3d}: Loss: {:7.3f}".format(i, loss))
 
         # Copy new weights into old policy:

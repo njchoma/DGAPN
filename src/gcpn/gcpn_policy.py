@@ -162,7 +162,7 @@ def get_batch_idx(batch, actions):
     a_first  = cumsum + actions[:,0]
     a_second = cumsum + actions[:,1]
     return a_first, a_second, batch_num_nodes
-    
+
 
 class GNN_Embed(nn.Module):
     def __init__(self,

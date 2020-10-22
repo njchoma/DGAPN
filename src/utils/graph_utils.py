@@ -29,13 +29,13 @@ def mol_to_nx(mol):
 
 def atom_to_node(atom):
     idx = atom.GetIdx()
-    symbol=atom.GetSymbol()
-    atom_nb=atom.GetAtomicNum()
-    formal_charge=atom.GetFormalCharge()
-    implicit_valence=atom.GetImplicitValence()
-    ring_atom=atom.IsInRing()
-    degree=atom.GetDegree()
-    hybridization=atom.GetHybridization()
+    symbol = atom.GetSymbol()
+    atom_nb = atom.GetAtomicNum()
+    formal_charge = atom.GetFormalCharge()
+    implicit_valence = atom.GetImplicitValence()
+    ring_atom = atom.IsInRing()
+    degree = atom.GetDegree()
+    hybridization = atom.GetHybridization()
     # print(idx, symbol, atom_nb)
     # print(ring_atom)
     # print(degree)
@@ -44,9 +44,9 @@ def atom_to_node(atom):
     return node
 
 def bond_to_edge(bond):
-    src=bond.GetBeginAtomIdx()
-    dst=bond.GetEndAtomIdx()
-    bond_type=bond.GetBondTypeAsDouble()
+    src = bond.GetBeginAtomIdx()
+    dst = bond.GetEndAtomIdx()
+    bond_type = bond.GetBondTypeAsDouble()
     edge = [src, dst, bond_type]
     return edge
 
