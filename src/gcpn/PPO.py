@@ -357,7 +357,7 @@ def train_ppo(args, env, writer=None):
 
     if args.use_surrogate:
         print("{} episodes before surrogate model as final reward".format(
-                args.surrogate_reward_timestep_delay))
+                args.surrogate_reward_episode_delay))
         surrogate_model = load_surrogate_model(args.artifact_path,
                                                args.surrogate_model_url,
                                                args.surrogate_model_path,
@@ -387,7 +387,8 @@ def train_ppo(args, env, writer=None):
             state, reward, done, info = env.step(action)
 
             if done:
-                if args.use_surrogate and (i_episode > args.surrogate_reward_timestep_delay):
+                # surrogate
+                if args.use_surrogate and (i_episode > args.surrogate_reward_episode_delay):
                     try:
                         surr_reward = get_final_reward(state, env, surrogate_model, device)
                         reward += surr_reward / 5
@@ -398,6 +399,21 @@ def train_ppo(args, env, writer=None):
                         pass
                 else:
                     info['surrogate_reward'] = None
+                # adversarial
+                if i_episode > args.adversarial_reward_episode_delay:
+                    try:
+                        surr_reward = get_final_reward(state, env, surrogate_model, device)
+                        # TODO for Nick: Rescale this reward.
+                        #  Currently a randomly scale.
+                        reward += torch.mean(ppo.eval_disc(state)) * 0.5
+                        info['adversarial_reward'] = surr_reward
+                    except Exception as e:
+                        print(e)
+                        info['adversarial_reward'] = None
+                        pass
+                else:
+                    info['adversarial_reward'] = None
+                # final
                 info['final_reward'] = reward
 
                 # From rl-baselines/baselines/ppo1/pposgd_simple_gcn.py in rl_graph_generation
@@ -425,13 +441,13 @@ def train_ppo(args, env, writer=None):
             # update if its time
             if time_step % update_timestep == 0:
                 print("updating ppo")
-                # TODO for Nick/Andrew: import a batch of true molecules here.
+                # TODO for Andrew: import a batch of true molecules here.
                 #   The structure of `truth` should be the same as `memory`.
                 truth = None
                 ppo.update(memory, truth, i_episode, writer)
                 memory.clear_memory()
                 if time_step % (update_timestep*truth_frequency) == 0:
-                    # TODO for Nick/Andrew: import a batch of true molecules here.
+                    # TODO for Andrew: import a batch of true molecules here.
                     #   The structure of `truth` should be the same as `memory`.
                     truth = None
                     ppo.update_disc(truth, i_episode, writer)
