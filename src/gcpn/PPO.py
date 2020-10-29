@@ -67,12 +67,11 @@ class Discriminator(nn.Module):
         self.layers = nn.ModuleList(layers)
         self.final_layer = nn.Linear(nb_hidden, 1)
         self.act = nn.ReLU()
-        self.final_act = nn.Sigmoid()
 
     def forward(self, X):
         for i, l in enumerate(self.layers):
             X = self.act(l(X))
-        return self.final_act(self.final_layer(X)).squeeze(1)
+        return self.final_layer(X).squeeze(1)
 
 
 class ActorCriticGCPN(nn.Module):
@@ -181,6 +180,7 @@ class PPO_GCPN:
         self.policy_old.load_state_dict(self.policy.state_dict())
         
         self.MseLoss = nn.MSELoss()
+        self.BCEWithLogitsLoss = nn.BCEWithLogitsLoss() # combine operation for numerical stability
 
     def select_action(self, state, memory, env):
         g = state_to_graph(state, env).to(self.device)
@@ -188,7 +188,7 @@ class PPO_GCPN:
         action = self.policy_old.act(g, memory)
         return action
     
-    def update(self, memory, i_episode, writer=None):
+    def update(self, memory, truth, i_episode, writer=None):
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
@@ -245,9 +245,13 @@ class PPO_GCPN:
                 print("  {:3d}: Loss: {:7.3f}".format(i, loss))
             ## adversarial
             if (i + 1) == self.K_epochs:
-                adversarial_loss = self.alpha * torch.mean(torch.log(fidelity))
-                print("  {:3d}: Adversarial Loss (Fake): {:7.3f}".format(i, adversarial_loss))
-                loss -= adversarial_loss
+                truth_fidelity = self.eval_disc(truth)
+                score = torch.cat((truth_fidelity, fidelity))
+                objective = torch.cat((torch.ones_like(truth_fidelity), torch.zeros_like(fidelity)))
+
+                adversarial_loss = self.alpha * self.BCEWithLogitsLoss(score, objective)
+                print("  {:3d}: Adversarial Loss: {:7.3f}".format(i, adversarial_loss))
+                loss += adversarial_loss
 
             ## take gradient step
             self.optimizer.zero_grad()
@@ -257,14 +261,19 @@ class PPO_GCPN:
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
 
-    def update_disc(self, truth, i_episode, writer=None):
-        states = Batch().from_data_list(truth).to(self.device)
+    def eval_disc(self, batch):
+        states = Batch().from_data_list(batch).to(self.device)
 
         _, X_agg = self.policy.actor.evaluate(states)
         fidelity = self.policy.discriminator(X_agg)
 
+        return fidelity
+
+    def update_disc(self, truth, i_episode, writer=None):
+        fidelity = self.eval_disc(truth)
+
         ## adversarial
-        adversarial_loss = self.alpha * torch.mean(torch.log(fidelity))
+        adversarial_loss = self.alpha * self.BCEWithLogitsLoss(fidelity, torch.ones_like(fidelity))
         print("  Adversarial Loss (Real): {:7.3f}".format(adversarial_loss))
 
         ## take gradient step
@@ -416,10 +425,13 @@ def train_ppo(args, env, writer=None):
             # update if its time
             if time_step % update_timestep == 0:
                 print("updating ppo")
-                ppo.update(memory, i_episode, writer)
+                # TODO for Nick/Andrew: import a batch of true molecules here.
+                #   The structure of `truth` should be the same as `memory`.
+                truth = None
+                ppo.update(memory, truth, i_episode, writer)
                 memory.clear_memory()
                 if time_step % (update_timestep*truth_frequency) == 0:
-                    # TODO for Nick: import a batch of true molecules here.
+                    # TODO for Nick/Andrew: import a batch of true molecules here.
                     #   The structure of `truth` should be the same as `memory`.
                     truth = None
                     ppo.update_disc(truth, i_episode, writer)
