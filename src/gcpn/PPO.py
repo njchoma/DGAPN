@@ -14,6 +14,7 @@ from rdkit import DataStructs
 from rdkit.Chem.Fingerprints import FingerprintMols
 
 from .gcpn_policy import GCPN
+from .MLP import Critic, Discriminator
 
 from utils.general_utils import load_surrogate_model
 from utils.graph_utils import state_to_pyg
@@ -39,40 +40,6 @@ class Memory:
 #################################################
 #                   GCPN PPO                    #
 #################################################
-
-class Critic(nn.Module):
-    def __init__(self, emb_dim, nb_layers, nb_hidden):
-        super(Critic, self).__init__()
-        layers = [nn.Linear(emb_dim, nb_hidden)]
-        for _ in range(nb_layers-1):
-            layers.append(nn.Linear(nb_hidden, nb_hidden))
-
-        self.layers = nn.ModuleList(layers)
-        self.final_layer = nn.Linear(nb_hidden, 1)
-        self.act = nn.ReLU()
-
-    def forward(self, X):
-        for i, l in enumerate(self.layers):
-            X = self.act(l(X))
-        return self.final_layer(X).squeeze(1)
-
-
-class Discriminator(nn.Module):
-    def __init__(self, emb_dim, nb_layers, nb_hidden):
-        super(Discriminator, self).__init__()
-        layers = [nn.Linear(emb_dim, nb_hidden)]
-        for _ in range(nb_layers-1):
-            layers.append(nn.Linear(nb_hidden, nb_hidden))
-
-        self.layers = nn.ModuleList(layers)
-        self.final_layer = nn.Linear(nb_hidden, 1)
-        self.act = nn.ReLU()
-
-    def forward(self, X):
-        for i, l in enumerate(self.layers):
-            X = self.act(l(X))
-        return self.final_layer(X).squeeze(1)
-
 
 class ActorCriticGCPN(nn.Module):
     def __init__(self,
