@@ -93,6 +93,12 @@ class ActorCriticGCPN(nn.Module):
 
         return action_logprobs, state_value, entropy, fidelity
 
+    def evaluate_disc(self, state):
+        _, X_agg = self.actor.evaluate(state)
+        fidelity = self.discriminator(X_agg)
+
+        return fidelity
+
 
 class PPO_GCPN:
     def __init__(self,
@@ -212,7 +218,7 @@ class PPO_GCPN:
                 print("  {:3d}: Loss: {:7.3f}".format(i, loss))
             ## adversarial
             if (i + 1) == self.K_epochs:
-                truth_fidelity = self.eval_disc(truth)
+                truth_fidelity = self.policy.evaluate_disc(truth)
                 score = torch.cat((truth_fidelity, fidelity))
                 objective = torch.cat((torch.ones_like(truth_fidelity), torch.zeros_like(fidelity)))
 
@@ -228,16 +234,8 @@ class PPO_GCPN:
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
 
-    def eval_disc(self, batch):
-        states = Batch().from_data_list(batch).to(self.device)
-
-        _, X_agg = self.policy.actor.evaluate(states)
-        fidelity = self.policy.discriminator(X_agg)
-
-        return fidelity
-
     def update_disc(self, truth, i_episode, writer=None):
-        fidelity = self.eval_disc(truth)
+        fidelity = self.policy.evaluate_disc(truth)
 
         ## adversarial
         adversarial_loss = self.alpha * self.BCEWithLogitsLoss(fidelity, torch.ones_like(fidelity))
@@ -259,12 +257,19 @@ class PPO_GCPN:
 #                   FINAL REWARDS                   #
 #####################################################
 
-def get_final_reward(state, env, surrogate_model, device):
+def get_surrogate_reward(state, env, surrogate_model, device):
     g = state_to_graph(state, env, keep_self_edges=False)
     g = g.to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
     reward = pred_docking_score.item() * -1
+    return reward
+
+def get_adversarial_reward(state, env, policy_model, device):
+    g = state_to_graph(state, env, keep_self_edges=False)
+    g = g.to(device)
+    with torch.autograd.no_grad():
+        reward = torch.mean(policy_model.evaluate_disc(g))
     return reward
 
 
@@ -357,7 +362,7 @@ def train_ppo(args, env, writer=None):
                 # surrogate
                 if args.use_surrogate and (i_episode > args.surrogate_reward_episode_delay):
                     try:
-                        surr_reward = get_final_reward(state, env, surrogate_model, device)
+                        surr_reward = get_surrogate_reward(state, env, surrogate_model, device)
                         reward += surr_reward / 5
                         info['surrogate_reward'] = surr_reward
                     except Exception as e:
@@ -369,11 +374,11 @@ def train_ppo(args, env, writer=None):
                 # adversarial
                 if i_episode > args.adversarial_reward_episode_delay:
                     try:
-                        surr_reward = get_final_reward(state, env, surrogate_model, device)
+                        advers_reward = get_adversarial_reward(state, env, ppo.policy, device)
                         # TODO for Nick: Rescale this reward.
-                        #  Currently a randomly scale.
-                        reward += torch.mean(ppo.eval_disc(state)) * 0.5
-                        info['adversarial_reward'] = surr_reward
+                        #  Currently a random scale.
+                        reward += advers_reward * 0.5
+                        info['adversarial_reward'] = advers_reward
                     except Exception as e:
                         print(e)
                         info['adversarial_reward'] = None
