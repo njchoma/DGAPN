@@ -413,14 +413,16 @@ def train_ppo(args, env, writer=None):
             # update if its time
             if time_step % update_timestep == 0:
                 print("updating ppo")
-                # TODO for Andrew: import a batch of true molecules here.
-                #   The structure of `truth` should be the same as `memory`.
+                # TODO: import a batch of true molecules here.
+                #   The data type of `truth` should be `Batch`.
+                #   `MyDataset` in `load_data.py` might be useful.
                 truth = None
                 ppo.update(memory, truth, i_episode, writer)
                 memory.clear_memory()
                 if time_step % (update_timestep*truth_frequency) == 0:
-                    # TODO for Andrew: import a batch of true molecules here.
-                    #   The structure of `truth` should be the same as `memory`.
+                    # TODO: import a batch of true molecules here.
+                    #   The data type of `truth` should be `Batch`.
+                    #   `MyDataset` in `load_data.py` might be useful.
                     truth = None
                     ppo.update_disc(truth, i_episode, writer)
             running_reward += reward
