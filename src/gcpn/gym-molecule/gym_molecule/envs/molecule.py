@@ -195,11 +195,12 @@ class MoleculeEnv(gym.Env):
 
     # TODO(Bowen): The top try, except clause allows error messages from step
     # to be printed when running run_molecules.py. For debugging only
-    def step(self, action):
+    def step(self, action, memory, crem=False):
         """
         Perform a given action
         :param action:
-        :param action_type:
+        :param memory:
+        :param crem:
         :return: reward of 1 if resulting molecule graph does not exceed valency,
         -1 if otherwise
         """
@@ -208,31 +209,28 @@ class MoleculeEnv(gym.Env):
         self.mol_old = copy.deepcopy(self.mol)  # keep old mol
         total_atoms = self.mol.GetNumAtoms()
 
-        db_fname = 'replacements02_sc2.db'
-        if action[2] == 0 or self.counter < self.min_action:
-            stop = False
-            temp_smile = Chem.MolToSmiles(self.mol, isomericSmiles=True)
-            new_mols = list(mutate_mol(Chem.MolFromSmiles(temp_smile), db_fname, return_mol=True))
-            #smiles = [i[0] for i in mols]
-            new_mols = [Chem.RemoveHs(i[1]) for i in new_mols]
-            if len(new_mols) == 0:
-                print("CReM could not find anything.")
+        if crem:
+            if action == -1:
                 stop = True
             else:
-                self.mol = np.random.choice(new_mols)
-        else:
+                print(len(memory.states))
+                print(len(memory.states[-1]))
+                print(action)
+                self.mol = memory.states[-1][action]
+                Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+                stop = False
+
+        ### take non crem action
+        elif action[0, 3] == 0 or self.counter < self.min_action:  # not stop
+            stop = False
+            if action[0, 1] >= total_atoms:
+                self._add_atom(action[0, 1] - total_atoms)  # add new node
+                action[0, 1] = total_atoms  # new node id
+                self._add_bond(action)  # add new edge
+            else:
+                self._add_bond(action)  # add new edge
+        else:  # stop
             stop = True
-        # ### take action
-        # if action[0, 3] == 0 or self.counter < self.min_action:  # not stop
-        #     stop = False
-        #     if action[0, 1] >= total_atoms:
-        #         self._add_atom(action[0, 1] - total_atoms)  # add new node
-        #         action[0, 1] = total_atoms  # new node id
-        #         self._add_bond(action)  # add new edge
-        #     else:
-        #         self._add_bond(action)  # add new edge
-        # else:  # stop
-        #     stop = True
 
         ### calculate intermediate rewards
         if self.check_valency():

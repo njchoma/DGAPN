@@ -1,11 +1,7 @@
 import numpy as np
 import networkx as nx
 
-from rdkit import Chem
-from rdkit.Chem import GraphDescriptors
-
 import torch
-import torch_geometric as pyg
 from torch_geometric.data import Data
 
 HIGHEST_ATOMIC_NUMBER = 118

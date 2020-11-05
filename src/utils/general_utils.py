@@ -14,11 +14,12 @@ def initialize_logger(artifact_path, name=None, level='INFO'):
     logger.setLevel(level)
 
     handler_console = logging.StreamHandler()
-    handler_file    = logging.FileHandler(logfile)
+    handler_file = logging.FileHandler(logfile)
 
     logger.addHandler(handler_console)
     logger.addHandler(handler_file)
     return logger
+
 
 def close_logger(logger=None):
     if logger is None:
@@ -29,6 +30,7 @@ def close_logger(logger=None):
     for i in range(len(logger.handlers)):
         logger.handlers.pop()
 
+
 def maybe_download_file(file_path, url, file_descriptor):
     print()
     if not os.path.isfile(file_path):
@@ -37,6 +39,7 @@ def maybe_download_file(file_path, url, file_descriptor):
     else:
         print("{} found.".format(file_descriptor))
     print()
+
 
 def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_path, device):
     if surrogate_model_url != '':

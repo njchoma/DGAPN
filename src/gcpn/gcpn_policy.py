@@ -8,9 +8,102 @@ from torch.distributions.bernoulli import Bernoulli
 from torch.distributions.categorical import Categorical
 
 import torch_geometric as pyg
+from torch_geometric.data import Batch
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
 from torch_scatter import scatter_add
+from utils.graph_utils import mol_to_pyg_graph
+from rdkit import Chem
+from rdkit.Chem.rdmolops import FastFindRings
+from crem.crem import mutate_mol
+
+
+class GCPN_crem(nn.Module):
+    def __init__(self,
+                 input_dim,
+                 gnn_nb_layers,
+                 gnn_nb_hidden,
+                 gnn_heads,
+                 emb_dim,
+                 mlp_nb_layers,
+                 mlp_nb_hidden,
+                 device):
+        super(GCPN_crem, self).__init__()
+
+        # TODO: Normalization of probabilities is inconsistent between possible crem states, and evaluating states.
+        self.gnn_embed = GNN_Embed(gnn_nb_hidden,
+                                   gnn_nb_layers,
+                                   gnn_heads,
+                                   input_dim,
+                                   emb_dim,
+                                   True)
+        self.mc = Action_Prediction(mlp_nb_layers,
+                                    mlp_nb_hidden,
+                                    emb_dim)
+        self.emb_dim = emb_dim
+        self.device = device
+
+    def forward(self, mol, eval_action=None):
+        """Find's list of molecule mutations with CReM, then feeds them to a GNN_embedding network, then a MLP.
+        Need to return action, prob, and list of states."""
+
+        # Adhoc rdkit fixes for mol representation
+        mol.UpdatePropertyCache(strict=False)
+        Chem.SanitizeMol(mol,
+                         Chem.SanitizeFlags.SANITIZE_FINDRADICALS | Chem.SanitizeFlags.SANITIZE_KEKULIZE |\
+                         Chem.SanitizeFlags.SANITIZE_SETAROMATICITY | Chem.SanitizeFlags.SANITIZE_SETCONJUGATION |\
+                         Chem.SanitizeFlags.SANITIZE_SETHYBRIDIZATION | Chem.SanitizeFlags.SANITIZE_SYMMRINGS,
+                         catchErrors=True)
+
+        # CReM
+        db_fname = 'replacements02_sc2.db'
+
+        try:
+            new_mols = list(mutate_mol(mol, db_fname, return_mol=True))
+            print("CReM options:" + str(len(new_mols)))
+            new_mols = [Chem.RemoveHs(i[1]) for i in new_mols]
+        except Exception as e:
+            print(e)
+            new_mols = []
+        new_mols.append(mol)  # Also consider the molecule by itself, if chosen stop is implied.
+        new_pygs = Batch().from_data_list([mol_to_pyg_graph(i) for i in new_mols]).to(self.device)
+
+        with torch.autograd.no_grad():
+            # Policy
+            if len(new_mols) == 1:
+                action, prob = -1, torch.tensor(1.0)
+            else:
+                X = self.gnn_embed(new_pygs)
+                #print(X.shape)
+                f_probs = self.mc(X)  # Mask is not needed since each row is a molecule.
+                #print(f_probs.shape)
+                action, prob = sample_from_probs(f_probs, eval_action)
+
+            if action == (len(new_mols) - 1):
+                action = -1  # Token for stop.
+        return action, prob, new_mols
+
+    def get_crem_opt(self, X, eval_actions):
+        f_probs = self.mc(X)
+        probs = f_probs[eval_actions]
+        return probs
+
+    # TODO (Andrew): Need to change how things are evaluated
+    def evaluate(self, orig_states, actions):
+        # batches = [torch.tensor(step.batch) for step in orig_states]
+        n_steps = len(orig_states)
+        p_agg = torch.empty(n_steps).to(self.device)
+        X_agg = torch.empty((n_steps, self.emb_dim)).to(self.device)
+        for i, batch in enumerate(orig_states):
+            X = self.gnn_embed(batch)  # (n_crem, 128)
+            p_all = self.mc(X)
+            if p_all.ndim == 0:
+                #When there's only one molecule, need to unsqueeze so indexing works
+                p_all = torch.unsqueeze(p_all, 0)
+            p_crem = p_all[actions[i].item()]
+            p_agg[i] = p_crem
+            X_agg[i] = X.sum(0)
+        return p_agg, X_agg
 
 
 class GCPN(nn.Module):
@@ -20,7 +113,6 @@ class GCPN(nn.Module):
                  nb_edge_types,
                  gnn_nb_layers,
                  gnn_nb_hidden,
-                 gnn_nb_hidden_kernel,
                  gnn_heads,
                  mlp_nb_layers,
                  mlp_nb_hidden):
@@ -28,20 +120,18 @@ class GCPN(nn.Module):
 
         self.gnn_embed = GNN_Embed(gnn_nb_hidden,
                                    gnn_nb_layers,
-                                   gnn_nb_hidden_kernel,
                                    gnn_heads,
                                    input_dim,
                                    emb_dim)
-
         self.mf = Action_Prediction(mlp_nb_layers,
                                     mlp_nb_hidden,
                                     emb_dim)
         self.ms = Action_Prediction(mlp_nb_layers,
                                     mlp_nb_hidden,
-                                    2*emb_dim)
+                                    2 * emb_dim)
         self.me = Action_Prediction(mlp_nb_layers,
                                     mlp_nb_hidden,
-                                    2*emb_dim,
+                                    2 * emb_dim,
                                     nb_edge_types=nb_edge_types,
                                     apply_softmax=False)
         self.mt = Action_Prediction(mlp_nb_layers,
@@ -54,10 +144,10 @@ class GCPN(nn.Module):
         mask = torch.ones(nb_nodes).to(graph.x.device)
         X = self.gnn_embed(graph)
 
-        a_first,  p_first  = self.get_first(X, mask)
+        a_first, p_first = self.get_first(X, mask)
         a_second, p_second = self.get_second(X, a_first, mask)
-        a_edge,   p_edge   = self.get_edge(X, a_first, a_second)
-        a_stop,   p_stop   = self.get_stop(X)
+        a_edge, p_edge = self.get_edge(X, a_first, a_second)
+        a_stop, p_stop = self.get_stop(X)
 
         actions = np.array([[a_first, a_second, a_edge, a_stop]])
         probs = torch.stack((p_first, p_second, p_edge, p_stop))
@@ -66,27 +156,27 @@ class GCPN(nn.Module):
     def get_first(self, X, mask=None, eval_action=None):
         f_probs = self.mf(X)
         if mask is not None:
-            nb_true_nodes = int(sum(mask))-9
+            nb_true_nodes = int(sum(mask)) - 9
             true_node_mask = mask.clone()
             true_node_mask[nb_true_nodes:] = 0.0
-            f_probs = f_probs*true_node_mask # UNSURE, CHECK
+            f_probs = f_probs * true_node_mask  # UNSURE, CHECK
         return sample_from_probs(f_probs, eval_action)
 
     def get_second(self, X, a_first, mask=None, eval_action=None):
         nb_nodes = X.shape[0]
         X_first = X[a_first].unsqueeze(0).repeat(nb_nodes, 1)
-        X_cat = torch.cat((X_first, X),dim=1)
+        X_cat = torch.cat((X_first, X), dim=1)
 
         f_probs = self.ms(X_cat)
         if mask is not None:
-            f_probs = f_probs*mask # UNSURE, CHECK
+            f_probs = f_probs * mask  # UNSURE, CHECK
             f_probs[a_first] = 0.0
         return sample_from_probs(f_probs, eval_action)
 
     def get_edge(self, X, a_first, a_second, eval_action=None):
-        X_first  = X[a_first]
+        X_first = X[a_first]
         X_second = X[a_second]
-        X_cat = torch.cat((X_first, X_second),dim=0)
+        X_cat = torch.cat((X_first, X_second), dim=0)
 
         f_logits = self.me(X_cat)
         f_probs = nn.functional.softmax(f_logits, dim=0)
@@ -99,9 +189,8 @@ class GCPN(nn.Module):
 
         m = Bernoulli(f_prob)
         a = (m.sample().item()) if eval_action is None else eval_action
-        f_prob = 1-f_prob if a==0 else f_prob # probability of choosing 0
+        f_prob = 1 - f_prob if a == 0 else f_prob  # probability of choosing 0
         return int(a), f_prob
-        
 
     def get_first_opt(self, X, eval_actions, batch):
         f_probs = self.mf(X, batch)
@@ -116,9 +205,9 @@ class GCPN(nn.Module):
         f_probs = self.ms(X_cat, batch)
         p_second = f_probs[a_second]
         return p_second
-        
+
     def get_edge_opt(self, X, a_first, a_second, a_edge):
-        X_first  = X[a_first]
+        X_first = X[a_first]
         X_second = X[a_second]
         X_cat = torch.cat((X_first, X_second), dim=1)
 
@@ -131,7 +220,7 @@ class GCPN(nn.Module):
         X_agg = pyg.nn.global_mean_pool(X, batch)
 
         prob_stop = torch.sigmoid(self.mt(X_agg))
-        prob_not_stop = 1-prob_stop
+        prob_not_stop = 1 - prob_stop
         f_prob = torch.cat((prob_not_stop, prob_stop), dim=1)
 
         prob = torch.gather(f_prob, 1, a_stop.unsqueeze(1)).squeeze()
@@ -142,10 +231,11 @@ class GCPN(nn.Module):
         X = self.gnn_embed(orig_states)
 
         a_first, a_second, batch_num_nodes, = get_batch_idx(batch, actions)
-        p_first_agg  = self.get_first_opt(X, a_first, batch)
+        # Each of these is (2000,1)
+        p_first_agg = self.get_first_opt(X, a_first, batch)
         p_second_agg = self.get_second_opt(X, a_first, a_second, batch)
-        p_edge_agg   = self.get_edge_opt(X, a_first, a_second, actions[:,2])
-        p_stop_agg   = self.get_stop_opt(X, batch, actions[:,3])
+        p_edge_agg = self.get_edge_opt(X, a_first, a_second, actions[:, 2])
+        p_stop_agg = self.get_stop_opt(X, batch, actions[:, 3])
         probs_agg = torch.stack((p_first_agg,
                                  p_second_agg,
                                  p_edge_agg,
@@ -154,14 +244,16 @@ class GCPN(nn.Module):
         X_agg = pyg.nn.global_add_pool(X, batch)
         return probs_agg, X_agg
 
+
 def get_batch_idx(batch, actions):
+    """Finds row index of X according to what action was taken at each time step"""
     batch_num_nodes = torch.bincount(batch)
-    batch_size = batch_num_nodes.shape[0]
     cumsum = torch.cumsum(batch_num_nodes, dim=0) - batch_num_nodes[0]
 
-    a_first  = cumsum + actions[:,0]
-    a_second = cumsum + actions[:,1]
+    a_first = cumsum + actions[:, 0]
+    a_second = cumsum + actions[:, 1]
     return a_first, a_second, batch_num_nodes
+
 
 def sample_from_probs(p, action):
     m = Categorical(p)
@@ -173,10 +265,10 @@ class GNN_Embed(nn.Module):
     def __init__(self,
                  nb_hidden_gnn,
                  nb_layer,
-                 nb_hidden_kernel,
                  heads,
                  input_dim,
-                 emb_dim):
+                 emb_dim,
+                 crem=False):
         super(GNN_Embed, self).__init__()
 
         gnn_layers = [MyGCNConv(input_dim,
@@ -184,7 +276,7 @@ class GNN_Embed(nn.Module):
                                 use_attention=True,
                                 heads=heads,
                                 nb_edge_attr=1)]
-        for _ in range(nb_layer-1):
+        for _ in range(nb_layer - 1):
             gnn_layers.append(MyGCNConv(nb_hidden_gnn,
                                         nb_hidden_gnn,
                                         batch_norm=True,
@@ -194,6 +286,7 @@ class GNN_Embed(nn.Module):
 
         self.layers = nn.ModuleList(gnn_layers)
         self.final_emb = nn.Linear(nb_hidden_gnn, emb_dim)
+        self.crem = crem
 
     def forward(self, data):
 
@@ -203,11 +296,15 @@ class GNN_Embed(nn.Module):
             emb = layer(emb, data.edge_index, data.edge_attr)
 
         emb = self.final_emb(emb)
+
+        # If using crem, we need to pool node representations.
+        if self.crem:
+            emb = pyg.nn.global_mean_pool(emb, data.batch).squeeze()
         return emb
 
 
 class Action_Prediction(nn.Module):
-    def __init__(self, 
+    def __init__(self,
                  nb_layers,
                  nb_hidden,
                  input_dim,
@@ -216,7 +313,7 @@ class Action_Prediction(nn.Module):
         super(Action_Prediction, self).__init__()
 
         layers = [nn.Linear(input_dim, nb_hidden)]
-        for _ in range(nb_layers-1):
+        for _ in range(nb_layers - 1):
             layers.append(nn.Linear(nb_hidden, nb_hidden))
 
         self.layers = nn.ModuleList(layers)
@@ -240,6 +337,7 @@ class Action_Prediction(nn.Module):
             return probs
         else:
             return logits
+
 
 def batched_softmax(logits, batch):
     logits = torch.exp(logits)
@@ -272,15 +370,15 @@ class MyGCNConv(MessagePassing):
             self.negative_slope = negative_slope
             self.dropout = dropout
             self.linN = Parameter(
-                torch.randn(in_channels, heads*out_channels) * (heads*out_channels)**(-0.5))
+                torch.randn(in_channels, heads * out_channels) * (heads * out_channels) ** (-0.5))
             self.linE = Parameter(
-                torch.randn(nb_edge_attr, heads*nb_edge_attr) * (heads*nb_edge_attr)**(-0.5))
+                torch.randn(nb_edge_attr, heads * nb_edge_attr) * (heads * nb_edge_attr) ** (-0.5))
             self.att = Parameter(torch.randn(
-                1, heads, 2*out_channels+nb_edge_attr) * (2*out_channels+nb_edge_attr)**(-0.5))
+                1, heads, 2 * out_channels + nb_edge_attr) * (2 * out_channels + nb_edge_attr) ** (-0.5))
         else:
             self.heads = 1
             self.concat = True
-            self.linN = Parameter(torch.randn(in_channels, out_channels) * out_channels**(-0.5))
+            self.linN = Parameter(torch.randn(in_channels, out_channels) * out_channels ** (-0.5))
 
         if self.batch_norm:
             # self.norm = MyInstanceNorm(in_channels, track_running_stats=False)
@@ -295,7 +393,7 @@ class MyGCNConv(MessagePassing):
 
         self.act = nn.ReLU()
 
-        #TODO(Yulun): reset params
+        # TODO(Yulun): reset params
 
     def forward(self, x, edge_index, edge_attr=None, size=None):
         # x has shape [N, in_channels]
@@ -373,12 +471,12 @@ class MyHGCN(MessagePassing):
             self.negative_slope = negative_slope
             self.dropout = dropout
             self.weight = Parameter(
-                torch.randn(in_channels, heads*out_channels) * (heads*out_channels)**(-0.5))
-            self.att = Parameter(torch.randn(1, heads, 2*out_channels) * (2*out_channels)**(-0.5))
+                torch.randn(in_channels, heads * out_channels) * (heads * out_channels) ** (-0.5))
+            self.att = Parameter(torch.randn(1, heads, 2 * out_channels) * (2 * out_channels) ** (-0.5))
         else:
             self.heads = 1
             self.concat = True
-            self.weight = Parameter(torch.randn(in_channels, out_channels) * out_channels**(-0.5))
+            self.weight = Parameter(torch.randn(in_channels, out_channels) * out_channels ** (-0.5))
 
         if self.batch_norm:
             # self.norm = MyInstanceNorm(in_channels, track_running_stats=False)
@@ -393,7 +491,7 @@ class MyHGCN(MessagePassing):
 
         self.act = nn.ReLU()
 
-        #TODO(Yulun): reset params
+        # TODO(Yulun): reset params
 
     def forward(self, x, hyperedge_index, hyperedge_weight=None):
 
@@ -435,12 +533,12 @@ class MyHGCN(MessagePassing):
             out = self.propagate(hyperedge_index, x=out, norm=D, alpha=alpha)
         elif self.norm_mode is "col":
             self.flow = 'source_to_target'
-            out = self.propagate(hyperedge_index, x=D.view(-1, 1, 1)*x, norm=B, alpha=alpha)
+            out = self.propagate(hyperedge_index, x=D.view(-1, 1, 1) * x, norm=B, alpha=alpha)
             self.flow = 'target_to_source'
             out = self.propagate(hyperedge_index, x=out, alpha=alpha)
         else:
             self.flow = 'source_to_target'
-            out = self.propagate(hyperedge_index, x=D.pow(0.5).view(-1, 1, 1)*x, norm=B, alpha=alpha)
+            out = self.propagate(hyperedge_index, x=D.pow(0.5).view(-1, 1, 1) * x, norm=B, alpha=alpha)
             self.flow = 'target_to_source'
             out = self.propagate(hyperedge_index, x=out, norm=D.pow(0.5), alpha=alpha)
 
@@ -448,7 +546,7 @@ class MyHGCN(MessagePassing):
             x = x.view(-1, self.heads * self.out_channels)
             out = out.view(-1, self.heads * self.out_channels)
         else:
-            x = x.mean(dim=1) #TODO(Yulun): simply extract one entry of dim 1.
+            x = x.mean(dim=1)  # TODO(Yulun): simply extract one entry of dim 1.
             out = out.mean(dim=1)
 
         if self.bias is not None:
@@ -467,16 +565,15 @@ class MyHGCN(MessagePassing):
         return out
 
 
-
-
 from torch.nn.modules.instancenorm import _InstanceNorm
 from .MLP import MyBatchNorm
+
 
 class MyInstanceNorm(_InstanceNorm):
     def __init__(self, in_channels, eps=1e-5, momentum=0.1, affine=False,
                  track_running_stats=False):
         super(MyInstanceNorm, self).__init__(in_channels, eps, momentum, affine,
-                                           track_running_stats)
+                                             track_running_stats)
 
     def forward(self, x, batch=None):
         if batch is None:
@@ -497,10 +594,10 @@ class MyInstanceNorm(_InstanceNorm):
         if self.training and self.track_running_stats:
             momentum = self.momentum
             self.running_mean = (
-                1 - momentum) * self.running_mean + momentum * mean.mean(dim=0)
+                                        1 - momentum) * self.running_mean + momentum * mean.mean(dim=0)
             self.running_var = (
-                1 - momentum
-            ) * self.running_var + momentum * unbiased_var.mean(dim=0)
+                                       1 - momentum
+                               ) * self.running_var + momentum * unbiased_var.mean(dim=0)
 
         if not self.training and self.track_running_stats:
             mean = self.running_mean.view(1, -1).expand(batch_size, -1)
@@ -512,4 +609,3 @@ class MyInstanceNorm(_InstanceNorm):
             out = out * self.weight.view(1, -1) + self.bias.view(1, -1)
 
         return out
-

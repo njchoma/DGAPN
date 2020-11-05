@@ -4,7 +4,9 @@ import torch
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils import dense_to_sparse
 
-from utils.graph_utils import mol_to_pyg_graph
+from rdkit import Chem
+
+from utils.graph_utils import *
 
 
 def wrap_state(ob):
@@ -81,14 +83,14 @@ def state_to_mol(state, env, keep_self_edges=True):
 
     # Ensure uniform representation based off smile string alone
     # Yes this really matters!
-    mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
+    #mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
     if mol is None:
         raise TypeError("Mol is None.")
     return mol
 
 
 def state_to_graph(state, env, keep_self_edges=True):
-    mol = state_to_mol(state, env, keep_self_edges=True)
+    mol = state_to_mol(state, env, keep_self_edges)
     g = mol_to_pyg_graph(mol)
     g = Batch.from_data_list([g])
     return g
