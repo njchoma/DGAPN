@@ -52,6 +52,7 @@ class ActorCriticGCPN(nn.Module):
                  mlp_nb_layers,
                  mlp_nb_hidden,
                  crem,
+                 sample_crem,
                  device):
         super(ActorCriticGCPN, self).__init__()
 
@@ -65,6 +66,7 @@ class ActorCriticGCPN(nn.Module):
                                    emb_dim,
                                    mlp_nb_layers,
                                    mlp_nb_hidden,
+                                   sample_crem,
                                    device)
         else:
             self.actor = GCPN(input_dim,
@@ -131,6 +133,7 @@ class PPO_GCPN:
                  mlp_nb_layers,
                  mlp_nb_hidden,
                  crem,
+                 sample_crem,
                  device):
         self.lr = lr
         self.betas = betas
@@ -151,6 +154,7 @@ class PPO_GCPN:
                                       mlp_nb_layers,
                                       mlp_nb_hidden,
                                       crem,
+                                      sample_crem,
                                       device).to(self.device)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
 
@@ -163,6 +167,7 @@ class PPO_GCPN:
                                           mlp_nb_layers,
                                           mlp_nb_hidden,
                                           crem,
+                                          sample_crem,
                                           device).to(self.device)
         self.policy_old.load_state_dict(self.policy.state_dict())
 
@@ -274,7 +279,7 @@ def train_ppo(args, env, writer=None):
     max_episodes = 50000  # max training episodes
     max_timesteps = 1500  # max timesteps in one episode
 
-    update_timestep = 2000  # update policy every n timesteps
+    update_timestep = 500  # update policy every n timesteps
     K_epochs = 80  # update policy for K epochs
     eps_clip = 0.2  # clip parameter for PPO
     gamma = 0.99  # discount factor
@@ -307,6 +312,7 @@ def train_ppo(args, env, writer=None):
                    args.mlp_num_layer,
                    args.mlp_num_hidden,
                    args.use_crem,
+                   args.sample_crem,
                    device)
 
     print(ppo)

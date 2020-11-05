@@ -4,6 +4,7 @@ from gym_molecule.envs.molecule import GraphEnv
 from .gcpn_policy import GCPN
 from .PPO import train_ppo
 
+
 def train(args, seed, writer=None):
     # MAKE ENVIRONMENT
     env = gym.make('molecule-v0')
@@ -19,7 +20,7 @@ def train(args, seed, writer=None):
              is_conditional=bool(args.is_conditional),
              conditional=args.conditional,
              max_action=args.max_action,
-             min_action=args.min_action) # remember call this after gym.make!!
+             min_action=args.min_action)  # remember call this after gym.make!!
     print(env.observation_space)
 
     env.seed(seed)
@@ -38,7 +39,6 @@ def train(args, seed, writer=None):
     #               args.mlp_num_hidden)
 
     # print(policy)
-
 
     # TRAIN
     train_ppo(args, env, writer=writer)

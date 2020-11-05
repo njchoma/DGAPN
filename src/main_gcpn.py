@@ -44,7 +44,8 @@ def molecule_arg_parser():
     add_arg('--conditional', type=str, default='')  # default 0
     add_arg('--max_action', type=int, default=128)  # default 0
     add_arg('--min_action', type=int, default=20)  # default 0
-    add_arg('--use_crem', type=int, default=0)
+    add_arg('--use_crem', action='store_true')
+    add_arg('--sample_crem', type=int, default=20)
 
     # NETWORK PARAMETERS
     add_arg('--emb_size', type=int, default=128)  # default 64

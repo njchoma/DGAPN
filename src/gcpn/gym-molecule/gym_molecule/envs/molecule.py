@@ -213,9 +213,6 @@ class MoleculeEnv(gym.Env):
             if action == -1:
                 stop = True
             else:
-                print(len(memory.states))
-                print(len(memory.states[-1]))
-                print(action)
                 self.mol = memory.states[-1][action]
                 Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
                 stop = False
