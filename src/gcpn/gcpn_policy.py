@@ -1,4 +1,3 @@
-import time
 import numpy as np
 
 import torch
@@ -11,6 +10,7 @@ from torch.distributions.categorical import Categorical
 import torch_geometric as pyg
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
+from torch_scatter import scatter_add
 
 
 class GCPN(nn.Module):
@@ -166,6 +166,11 @@ def get_batch_idx(batch, actions):
     a_first  = cumsum + actions[:,0]
     a_second = cumsum + actions[:,1]
     return a_first, a_second, batch_num_nodes
+
+def sample_from_probs(p, action):
+    m = Categorical(p)
+    a = m.sample() if action is None else action
+    return a.item(), p[a]
 
 
 class GNN_Embed(nn.Module):
@@ -469,7 +474,7 @@ class MyHGCN(MessagePassing):
 
 
 from torch.nn.modules.instancenorm import _InstanceNorm
-from torch_scatter import scatter_add
+from .MLP import MyBatchNorm
 
 class MyInstanceNorm(_InstanceNorm):
     def __init__(self, in_channels, eps=1e-5, momentum=0.1, affine=False,
@@ -512,27 +517,3 @@ class MyInstanceNorm(_InstanceNorm):
 
         return out
 
-from torch.nn import BatchNorm1d
-
-
-class MyBatchNorm(BatchNorm1d):
-    def __init__(self, in_channels, eps=1e-5, momentum=0.1, affine=True,
-                 track_running_stats=True):
-        super(MyBatchNorm, self).__init__(in_channels, eps, momentum, affine,
-                                        track_running_stats)
-
-    def forward(self, x):
-        return super(MyBatchNorm, self).forward(x)
-
-
-    def __repr__(self):
-        return ('{}({}, eps={}, momentum={}, affine={}, '
-                'track_running_stats={})').format(self.__class__.__name__,
-                                                  self.num_features, self.eps,
-                                                  self.momentum, self.affine,
-                                                  self.track_running_stats)
-
-def sample_from_probs(p, action):
-    m = Categorical(p)
-    a = m.sample() if action is None else action
-    return a.item(), p[a]
