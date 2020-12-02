@@ -1,5 +1,5 @@
 import gym
-from gym_molecule.envs.molecule import GraphEnv
+from gym_molecule.envs.molecule import MoleculeEnv
 
 from .gcpn_policy import GCPN
 from .PPO import train_ppo
