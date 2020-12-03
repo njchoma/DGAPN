@@ -58,7 +58,7 @@ class GNN_Dense(nn.Module):
 
 
 class GNN_MyGAT(nn.Module):
-    def __init__(self, input_dim, nb_hidden, nb_layer):
+    def __init__(self, input_dim, nb_hidden, nb_layer, use_3d=False):
         super(GNN_MyGAT, self).__init__()
         layers = [MyGATConv(input_dim, nb_hidden)]
         for _ in range(nb_layer-1):

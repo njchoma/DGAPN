@@ -16,6 +16,7 @@ def read_args():
     add_arg('--exp_loss', default=False)
     add_arg('--hidden', type=int, default=512)
     add_arg('--layers', type=int, default=4)
+    add_arg('--use_3d', action='store_true')
 
     return parser.parse_args()
 
@@ -28,9 +29,14 @@ def main():
 
     scores, smiles = preprocess.main(args.data_path)
 
-    predict_logp.main(artifact_path, scores, smiles,\
-                      gpu_num=args.gpu, upsample=args.upsample, exp_loss=args.exp_loss,\
-                      nb_hidden=args.hidden, nb_layer=args.layers)
+    predict_logp.main(artifact_path,
+                      scores, smiles,
+                      gpu_num=args.gpu,
+                      upsample=args.upsample,
+                      exp_loss=args.exp_loss,
+                      nb_hidden=args.hidden,
+                      nb_layer=args.layers,
+                      use_3d=args.use_3d)
 
 
 if __name__ == "__main__":

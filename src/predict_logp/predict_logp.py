@@ -75,10 +75,12 @@ def get_dense_edges(n):
 
 
 class MolData(Dataset):
-    def __init__(self, logp, smiles):
+    def __init__(self, logp, smiles, use_3d):
         super(MolData, self).__init__()
         self.logp = logp
         self.smiles = smiles
+        self.use_3d = use_3d
+        print("WARNING: USING 3D GRAPH ONLY")
 
     def __getitem__(self, index):
         logp = self.logp[index]
@@ -92,7 +94,8 @@ class MolData(Dataset):
             mol = Chem.MolFromSmiles(smiles)
             print("Invalid SMILE encountered. Using first row instead.")
 
-        g = graph_utils.mol_to_pyg_graph(mol)
+        g = graph_utils.mol_to_pyg_graph(mol, self.use_3d)
+        g = g[1]
 
         nb_nodes = len(g.x)
         dense_edges = get_dense_edges(len(g.x))
@@ -116,7 +119,7 @@ class MolData(Dataset):
         logging.info("{:5.3f} baseline L2 loss\n".format(sq_sum))
 
 
-def create_datasets(logp, smiles, np_seed=0):
+def create_datasets(logp, smiles, use_3d, np_seed=0):
     nb_samples = len(logp)
     assert nb_samples > 10
 
@@ -129,10 +132,13 @@ def create_datasets(logp, smiles, np_seed=0):
     logp = np.asarray(logp)[sample_order].tolist()
     smiles = np.asarray(smiles)[sample_order].tolist()
 
-    train_data = MolData(logp[:nb_train], smiles[:nb_train])
+    train_data = MolData(logp[:nb_train], smiles[:nb_train], use_3d)
     valid_data = MolData(logp[nb_train:nb_train + nb_valid],
-                         smiles[nb_train:nb_train + nb_valid])
-    test_data = MolData(logp[nb_train + nb_valid:], smiles[nb_train + nb_valid:])
+                         smiles[nb_train:nb_train + nb_valid],
+                         use_3d)
+    test_data = MolData(logp[nb_train + nb_valid:],
+                        smiles[nb_train + nb_valid:],
+                        use_3d)
     return train_data, valid_data, test_data
 
 
@@ -300,7 +306,8 @@ def main(artifact_path,
          gpu_num=0,
          upsample=False,
          exp_loss=False,
-         batch_size=512,
+         use_3d=False,
+         batch_size=32,
          num_workers=6,
          nb_hidden=512,
          nb_layer=7,
@@ -326,7 +333,7 @@ def main(artifact_path,
     writer = SummaryWriter(log_dir=os.path.join(artifact_path, 'runs'))
     print("Writer initialized")
 
-    train_data, valid_data, test_data = create_datasets(logp, smiles)
+    train_data, valid_data, test_data = create_datasets(logp, smiles, use_3d)
     print("Dataset created")
 
     if upsample:
@@ -379,7 +386,8 @@ def main(artifact_path,
     except Exception as e:
         net = model.GNN_MyGAT(input_dim=train_data.get_input_dim(),
                               nb_hidden=nb_hidden,
-                              nb_layer=nb_layer)
+                              nb_layer=nb_layer,
+                              use_3d=use_3d)
         logging.info(net)
         logging.info("New model created")
     net = net.to(DEVICE)
