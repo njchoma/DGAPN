@@ -201,7 +201,7 @@ class PPO_GCPN:
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach())
 
-            # Policy loss
+            # loss
             advantages = rewards - state_values.detach()   
             loss = []
             for j in range(ratios.shape[1]):
@@ -218,24 +218,17 @@ class PPO_GCPN:
                     exit()
                 loss.append(l)
             loss = torch.stack(loss, 0).sum(0)
+            ## entropy
             loss += self.eta*entropies
+            ## baseline
+            loss = loss.mean() + self.upsilon*self.MseLoss(state_values, rewards)
 
             ## take gradient step
             self.optimizer.zero_grad()
-            loss.mean().backward()
+            loss.backward()
             self.optimizer.step()
             if (i%10)==0:
-                print("  {:3d}: Loss (Policy): {:7.3f}".format(i, loss.mean()))
-
-            # Baseline loss
-            baseline_loss = self.upsilon*self.MseLoss(state_values, rewards)
-
-            ## take gradient step
-            self.optimizer.zero_grad()
-            baseline_loss.backward()
-            self.optimizer.step()
-            if (i%10)==0:
-                print("  {:3d}: Loss (Baseline): {:7.3f}".format(i, baseline_loss))
+                print("  {:3d}: Loss: {:7.3f}".format(i, loss))
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -254,12 +247,15 @@ def nodes_to_atom_labels(nodes, env, nb_nodes):
     node_labels = np.asarray(atom_types)[atom_idx]
     return node_labels
 
-def dense_to_sparse_adj(adj):
+def dense_to_sparse_adj(adj, keep_self_edges):
+    # Remove self-edges converting to surrogate input
+    if not keep_self_edges:
+        adj = adj - np.diag(np.diag(adj))
     sp = np.nonzero(adj)
     sp = np.stack(sp)
     return sp
 
-def state_to_surrogate_graph(state, env):
+def state_to_surrogate_graph(state, env, keep_self_edges=True):
     nodes = state['node'].squeeze()
     nb_nodes = int(np.sum(nodes))
     adj = state['adj'][:,:nb_nodes, :nb_nodes]
@@ -267,7 +263,7 @@ def state_to_surrogate_graph(state, env):
     atoms = nodes_to_atom_labels(nodes, env, nb_nodes)
     bonds = []
     for a,b in zip(adj, env.possible_bond_types):
-        sp = dense_to_sparse_adj(a)
+        sp = dense_to_sparse_adj(a, keep_self_edges)
         bonds.append((sp, b))
     g = state_to_pyg(atoms, bonds)
     g = Batch.from_data_list([g])
@@ -275,8 +271,13 @@ def state_to_surrogate_graph(state, env):
     
 
 def get_final_reward(state, env, surrogate_model):
-    g = state_to_surrogate_graph(state, env)
+# <<<<<<< HEAD
+#     g = state_to_surrogate_graph(state, env)
+#     g = g.to(DEVICE)
+# =======
+    g = state_to_surrogate_graph(state, env, keep_self_edges=False)
     g = g.to(DEVICE)
+# >>>>>>> njc_current_working
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
 
@@ -390,8 +391,8 @@ def train_ppo(args, surrogate_model, env, device, writer=None):
 
             if done:
                 # print(state)
-                #final_reward = get_final_reward(state, env, surrogate_model)
-                final_reward = patchy_final_reward(info['smile'], surrogate_model)
+                final_reward = get_final_reward(state, env, surrogate_model)
+                # final_reward = patchy_final_reward(info['smile'], surrogate_model)
                 reward += final_reward
                 info['surrogate_reward'] = final_reward
                 info['final_reward'] = reward
@@ -431,7 +432,7 @@ def train_ppo(args, surrogate_model, env, device, writer=None):
                 env.render()
             if done:
                 break
-        writer.add_scalar("EpRewSurrogate", surr_reward, episode_count)
+        writer.add_scalar("EpSurrogate", -1*surr_reward, episode_count)
         rewbuffer_env.append(cur_ep_ret_env)
         avg_length += t
 

@@ -94,27 +94,48 @@ def add_reverse(orig_adj):
     all_adj = np.unique(all_adj, axis=0).transpose()
     return all_adj
 
+def get_active_atoms(bonds):
+    '''
+    Atom 0 is always active. Only include other atoms if there is a bond connected to them.
+    '''
+    active_atoms = np.array([0])
+    for (b, bond_type) in bonds:
+        active_atoms = np.append(active_atoms, b.flatten())
+    return np.unique(active_atoms)
+
 def state_to_pyg(atoms, bonds):
 
     # create empty editable mol object
     mol = Chem.RWMol()
 
+    active_atoms = get_active_atoms(bonds)
+
     # add atoms to mol and keep track of index
+    atom_reindex = [-1 for _ in range(len(atoms))]
+    atom_count = 0
     for i, atom in enumerate(atoms):
-        a = Chem.Atom(atom)
-        molIdx = mol.AddAtom(a)
+        if i in active_atoms:
+            a = Chem.Atom(atom)
+            molIdx = mol.AddAtom(a)
+
+            atom_reindex[i] = atom_count
+            atom_count += 1
 
     for b in bonds:
         adj = b[0]
         adj = add_reverse(adj).transpose().tolist()
         bond_type = b[1]
         for e in adj:
-            i = e[0]
-            j = e[1]
+            i = atom_reindex[e[0]]
+            j = atom_reindex[e[1]]
             if i<=j:
                 continue
             mol.AddBond(i, j, bond_type)
 
     # Convert RWMol to Mol object
     mol = mol.GetMol()            
+
+    # Ensure uniform representation based off smile string alone
+    # Yes this really matters!
+    mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
     return mol_to_pyg_graph(mol)
