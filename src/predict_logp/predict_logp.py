@@ -179,7 +179,6 @@ def proc_one_epoch(net,
         G1 = G1.to(DEVICE)
         G2 = G2.to(DEVICE)
 
-        print("got this far")
         y_pred = net(G1, G2.edge_index)
 
         loss = criterion(y_pred, y)
@@ -301,8 +300,8 @@ def main(artifact_path,
          gpu_num=0,
          upsample=False,
          exp_loss=False,
-         batch_size=16,
-         num_workers=0,
+         batch_size=512,
+         num_workers=6,
          nb_hidden=512,
          nb_layer=7,
          lr=0.001):

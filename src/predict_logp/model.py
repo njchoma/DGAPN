@@ -72,9 +72,7 @@ class GNN_MyGAT(nn.Module):
         edge_index = g.edge_index
         edge_attr  = g.edge_attr
         for i, l in enumerate(self.layers):
-            print("\n    layer {}".format(i))
             x = l(x, edge_index, edge_attr)
-            print("    got x")
             x = self.act(x)
         x = pyg.nn.global_add_pool(x, g.batch)
         #x = torch.sum(x, dim=0)
@@ -147,7 +145,6 @@ class MyGATConv(MessagePassing):
             x = (None if x[0] is None else torch.matmul(x[0], self.weight),
                  None if x[1] is None else torch.matmul(x[1], self.weight))
 
-        print("    about to propagate")
         return self.propagate(edge_index, size=size, edge_attr=edge_attr, x=x)
 
 
