@@ -71,8 +71,10 @@ class GNN_MyGAT(nn.Module):
         x = g.x
         edge_index = g.edge_index
         edge_attr  = g.edge_attr
-        for l in self.layers:
+        for i, l in enumerate(self.layers):
+            print("\n    layer {}".format(i))
             x = l(x, edge_index, edge_attr)
+            print("    got x")
             x = self.act(x)
         x = pyg.nn.global_add_pool(x, g.batch)
         #x = torch.sum(x, dim=0)
@@ -145,6 +147,7 @@ class MyGATConv(MessagePassing):
             x = (None if x[0] is None else torch.matmul(x[0], self.weight),
                  None if x[1] is None else torch.matmul(x[1], self.weight))
 
+        print("    about to propagate")
         return self.propagate(edge_index, size=size, edge_attr=edge_attr, x=x)
 
 
@@ -160,17 +163,17 @@ class MyGATConv(MessagePassing):
             alpha = (edge_feats * self.att).sum(dim=-1)
 
         alpha = F.leaky_relu(alpha, self.negative_slope)
-        alpha = softmax(alpha, edge_index_i, size_i)
-        # alpha = softmax(alpha, edge_index_i, num_nodes=size_i)
+        # alpha = softmax(alpha, edge_index_i, size_i)
+        alpha = softmax(alpha, edge_index_i, num_nodes=size_i)
 
         # Sample attention coefficients stochastically.
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
-        # attended = x_j * alpha.view(-1, self.heads, 1)
+        attended = x_j * alpha.view(-1, self.heads, 1)
 
         # NOTE: this does NOT work with multiple heads.
         # This is a quick hack to work with pytorch_geometric 1.6.1
-        # return attended.squeeze(1)
-        return x_j * alpha.view(-1, self.heads, 1)
+        return attended.squeeze(1)
+        # return x_j * alpha.view(-1, self.heads, 1)
 
     def update(self, aggr_out):
         if self.concat is True:

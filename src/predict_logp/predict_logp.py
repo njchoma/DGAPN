@@ -178,6 +178,8 @@ def proc_one_epoch(net,
         y = y.to(DEVICE, non_blocking=True)
         G1 = G1.to(DEVICE)
         G2 = G2.to(DEVICE)
+
+        print("got this far")
         y_pred = net(G1, G2.edge_index)
 
         loss = criterion(y_pred, y)
@@ -299,8 +301,8 @@ def main(artifact_path,
          gpu_num=0,
          upsample=False,
          exp_loss=False,
-         batch_size=512,
-         num_workers=6,
+         batch_size=16,
+         num_workers=0,
          nb_hidden=512,
          nb_layer=7,
          lr=0.001):
@@ -323,8 +325,10 @@ def main(artifact_path,
     arg_handler = ArgumentHandler(artifact_path, lr)
 
     writer = SummaryWriter(log_dir=os.path.join(artifact_path, 'runs'))
+    print("Writer initialized")
 
     train_data, valid_data, test_data = create_datasets(logp, smiles)
+    print("Dataset created")
 
     if upsample:
         # Percentiles used in dock score weights.
