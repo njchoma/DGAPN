@@ -15,7 +15,7 @@ def read_args():
     add_arg('--upsample', default=False)
     add_arg('--exp_loss', default=False)
     add_arg('--hidden', type=int, default=512)
-    add_arg('--layers', type=int, default=7)
+    add_arg('--layers', type=int, default=4)
 
     return parser.parse_args()
 

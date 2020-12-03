@@ -8,7 +8,7 @@ def main(dataset_path):
             scores, smiles = read_2col(reader)
         elif nb_col ==4:
             scores, smiles = read_4col(reader)
-    return all_logp, all_smiles
+    return scores, smiles
 
 def read_2col(reader):
     all_score = []
