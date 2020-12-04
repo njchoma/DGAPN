@@ -1,24 +1,20 @@
-import gym
 import numpy as np
 from collections import deque
 
 import torch
 import torch.nn as nn
-from torch.distributions import MultivariateNormal
 
 from torch_geometric.data import Data, Batch
-from torch_geometric.utils import dense_to_sparse
 
 from rdkit import Chem
 from rdkit import DataStructs
-from rdkit.Chem.Fingerprints import FingerprintMols
+from rdkit.Chem import rdMolDescriptors
 
 from .gcpn_policy import GCPN
 from .MLP import Critic, Discriminator
 
 from utils.general_utils import load_surrogate_model
-from utils.graph_utils import state_to_pyg
-from utils.state_utils import wrap_state, nodes_to_atom_labels, dense_to_sparse_adj, state_to_graph
+from utils.graph_utils import state_to_pyg, mol_to_pyg_graph
 
 
 class Memory:
@@ -73,8 +69,7 @@ class ActorCriticGCPN(nn.Module):
     def act(self, state, memory):
         action, probs = self.actor(state)
         action_logprob = torch.log(probs)
-        
-        memory.states.append(state.to_data_list()[0])
+        memory.states.append(state)
         memory.actions.append(action)
         memory.logprobs.append(action_logprob)
         
@@ -143,10 +138,8 @@ class PPO_GCPN:
         
         self.MseLoss = nn.MSELoss()
 
-    
-    def select_action(self, state, memory, env):
-        g = state_to_graph(state, env).to(self.device)
-        # state = wrap_state(state).to(self.device)
+    def select_action(self, state, memory):
+        g = state.to(self.device)
         action = self.policy_old.act(g, memory)
         return action
     
@@ -165,7 +158,7 @@ class PPO_GCPN:
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         
         # convert list to tensor
-        old_states = Batch().from_data_list(memory.states).to(self.device)
+        old_states = Batch.from_data_list(memory.states).to(self.device)
         old_actions = torch.squeeze(torch.tensor(memory.actions).to(self.device), 1).detach()
         old_logprobs = torch.squeeze(torch.stack(memory.logprobs), 1).to(self.device).detach()
         
@@ -219,9 +212,8 @@ class PPO_GCPN:
 #                   FINAL REWARDS                   #
 #####################################################
 
-def get_final_reward(state, env, surrogate_model, device):
-    g = state_to_graph(state, env, keep_self_edges=False)
-    g = g.to(device)
+def get_surrogate_reward(state, surrogate_model, device):
+    g = Batch.from_data_list([state]).to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
     reward = pred_docking_score.item() * -1
@@ -251,12 +243,10 @@ def train_ppo(args, env, writer=None):
     
     #############################################
 
-    ob = env.reset()
-    nb_edge_types = ob['adj'].shape[0]
-    ob = state_to_graph(ob, env)
-    input_dim = ob.x.shape[1]
-    device = torch.device("cpu") if args.cpu else torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
-    
+    nb_edge_types = 3
+    input_dim = 121
+    device = torch.device("cpu") if args.cpu else \
+        torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
     ppo = PPO_GCPN(lr,
                    betas,
                    gamma,
@@ -302,18 +292,19 @@ def train_ppo(args, env, writer=None):
     # training loop
     for i_episode in range(1, max_episodes+1):
         cur_ep_ret_env = 0
+        # Now state is a pyg graph.
         state = env.reset()
         surr_reward=0.0
         for t in range(max_timesteps):
             time_step +=1
             # Running policy_old:
-            action = ppo.select_action(state, memory, env)
+            action = ppo.select_action(state, memory)
             state, reward, done, info = env.step(action)
 
             if done:
                 if args.use_surrogate and (i_episode > args.surrogate_reward_timestep_delay):
                     try:
-                        surr_reward = get_final_reward(state, env, surrogate_model, device)
+                        surr_reward = get_surrogate_reward(state, surrogate_model, device)
                         reward += surr_reward / 5
                         info['surrogate_reward'] = surr_reward
                     except Exception as e:
@@ -328,8 +319,8 @@ def train_ppo(args, env, writer=None):
                 with open('molecule_gen/'+args.name+'.csv', 'a') as f:
                     if args.is_conditional:
                         start_mol, end_mol = Chem.MolFromSmiles(info['start_smile']), Chem.MolFromSmiles(info['smile'])
-                        start_fingerprint, end_fingerprint = FingerprintMols.FingerprintMol(
-                            start_mol), FingerprintMols.FingerprintMol(end_mol)
+                        start_fingerprint, end_fingerprint = rdMolDescriptors.GetMorganFingerprintAsBitVect(start_mol, radius=2, nBits=2048, useChirality=True),\
+                                                             rdMolDescriptors.GetMorganFingerprintAsBitVect(end_mol, radius=2, nBits=2048, useChirality=True)
                         sim = DataStructs.TanimotoSimilarity(start_fingerprint, end_fingerprint)
 
                         row = ''.join(['{},']*12)[:-1]+'\n'
@@ -352,6 +343,7 @@ def train_ppo(args, env, writer=None):
                 ppo.update(memory, i_episode, writer)
                 memory.clear_memory()
                 time_step = 0
+
             running_reward += reward
             cur_ep_ret_env += reward
             if (((i_episode+1)%20)==0) and render:
@@ -363,7 +355,7 @@ def train_ppo(args, env, writer=None):
         avg_length += t
 
         # write to Tensorboard
-        writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), episode_count)
+        writer.add_scalar("EpRewEnvMean", sum(list(rewbuffer_env))/len(rewbuffer_env), episode_count)
         # writer.add_scalar("Average Length", avg_length, global_step=episode_count)
         # writer.add_scalar("Running Reward", running_reward, global_step=episode_count)
         episode_count += 1
