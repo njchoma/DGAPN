@@ -82,7 +82,8 @@ class MolData(Dataset):
         self.logp = logp
         self.smiles = smiles
         self.use_3d = use_3d
-        print("WARNING: USING 3D GRAPH ONLY")
+        if use_3d:
+            print("WARNING: USING 3D GRAPH ONLY")
 
     def __getitem__(self, index):
         logp = self.logp[index]
@@ -97,7 +98,7 @@ class MolData(Dataset):
             print("Invalid SMILE encountered. Using first row instead.")
 
         g = graph_utils.mol_to_pyg_graph(mol, self.use_3d)
-        g = g[1]
+        g = g[1] if self.use_3d else g[0]
 
         # nb_nodes = len(g.x)
         # dense_edges = get_dense_edges(len(g.x))
@@ -111,7 +112,7 @@ class MolData(Dataset):
         return len(self.logp)
 
     def get_input_dim(self):
-        g, y, g2 = self[0]
+        g, y = self[0]
         input_dim = g.x.shape[1]
         return input_dim
 
@@ -371,6 +372,7 @@ def main(artifact_path,
          nb_hidden=512,
          nb_layer=7,
          lr=0.001,
+         store_preprocessed=False,
          data_path=None):
     # Global variables: GPU Device, random splits for upsampling, loc and scale parameter for exp weighted loss.
     global DEVICE
@@ -397,7 +399,7 @@ def main(artifact_path,
     valid_data.compute_baseline_error()
     print("Dataset created")
 
-    if data_path is not None:
+    if (data_path is not None) and store_preprocessed:
         print("Using stored dataset. Preprocessing if necessary.")
         storage_path = parse_data_path(data_path, use_3d)
         train_data = preprocess_data(train_data, storage_path, 'train')
