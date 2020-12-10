@@ -2,7 +2,6 @@ import os
 import argparse
 from datetime import datetime
 
-from mpi4py import MPI
 import torch
 
 from gcpn.train import train
