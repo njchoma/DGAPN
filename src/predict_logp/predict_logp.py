@@ -1,6 +1,7 @@
 import os
 import yaml
 import logging
+import pickle
 import numpy as np
 
 import time
@@ -18,6 +19,7 @@ import utils.general_utils as general_utils
 from . import model
 from .model import GNN, GNN_Dense
 
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 #####################################################
 #                   MODEL HANDLING                  #
@@ -97,12 +99,13 @@ class MolData(Dataset):
         g = graph_utils.mol_to_pyg_graph(mol, self.use_3d)
         g = g[1]
 
-        nb_nodes = len(g.x)
-        dense_edges = get_dense_edges(len(g.x))
-        g2 = pyg.data.Data(edge_index=dense_edges)
-        g2.num_nodes = nb_nodes
+        # nb_nodes = len(g.x)
+        # dense_edges = get_dense_edges(len(g.x))
+        # g2 = pyg.data.Data(edge_index=dense_edges)
+        # g2.num_nodes = nb_nodes
 
-        return g, torch.FloatTensor([logp]), g2
+        # return g, torch.FloatTensor([logp]), g2
+        return g, torch.FloatTensor([logp])
 
     def __len__(self):
         return len(self.logp)
@@ -145,12 +148,67 @@ def create_datasets(logp, smiles, use_3d, np_seed=0):
 def my_collate(samples):
     g1 = [s[0] for s in samples]
     y = [s[1] for s in samples]
-    g2 = [s[2] for s in samples]
+    # g2 = [s[2] for s in samples]
 
     G1 = pyg.data.Batch().from_data_list(g1)
-    G2 = pyg.data.Batch().from_data_list(g2)
+    # G2 = pyg.data.Batch().from_data_list(g2)
     y = torch.cat(y, dim=0)
-    return G1, y, G2
+    # return G1, y, G2
+    return G1, y
+
+
+
+
+def parse_raw_data(raw_dataset):
+    batch_size = 32
+    loader = DataLoader(raw_dataset,
+                        shuffle=False,
+                        collate_fn=my_collate,
+                        batch_size=batch_size,
+                        num_workers=16)
+    all_data = []
+    print("\nPreprocessing {} samples".format(len(raw_dataset)))
+    for i, d in enumerate(loader):
+        if (i % 3)==0:
+            print("{:7d}".format(i*batch_size))
+            print(len(all_data))
+        all_data.append(d)
+        if i==20:
+            break
+    return all_data
+
+
+def parse_data_path(data_path, use_3d):
+    path_split = data_path.split('/')
+    parent_path = '/'.join(path_split[:-1])
+    data_name = path_split[-1].split('.')[0]
+    storage_path = os.path.join(parent_path, data_name)
+
+    if use_3d:
+        storage_path += '_with_3d'
+    else:
+        storage_path += '_no_3d'
+
+    os.makedirs(storage_path, exist_ok=True)
+    return storage_path
+    
+def preprocess_data(raw_dataset, storage_path, dataset_name):
+    dataset_path = os.path.join(storage_path, dataset_name+'.pkl')
+    print(dataset_path)
+    try:
+        with open(dataset_path, 'rb') as f:
+            parsed_data = pickle.load(f)
+        print("Preprocessed {} set loaded".format(dataset_name))
+    except Exception as e:
+        print("Preprocessed {} set not found. Parsing...".format(dataset_name))
+        t0 = time.time()
+        parsed_data = parse_raw_data(raw_dataset)
+        print("{:5.2f}s for {} samples".format(time.time()-t0, len(parsed_data)))
+        with open(dataset_path, 'wb') as f:
+            pickle.dump(parsed_data, f)
+        print("Done.")
+    exit()
+    return parsed_data
 
 
 #################################################
@@ -177,15 +235,16 @@ def proc_one_epoch(net,
 
     t0 = time.time()
     logging.info("  {} batches, {} samples".format(nb_batch, nb_samples))
-    for i, (G1, y, G2) in enumerate(loader):
+    for i, (G1, y) in enumerate(loader):
         t1 = time.time()
         if train:
             optim.zero_grad()
         y = y.to(DEVICE, non_blocking=True)
         G1 = G1.to(DEVICE)
-        G2 = G2.to(DEVICE)
+        # G2 = G2.to(DEVICE)
 
-        y_pred = net(G1, G2.edge_index)
+        # y_pred = net(G1, G2.edge_index)
+        y_pred = net(G1)
 
         loss = criterion(y_pred, y)
         with torch.autograd.set_detect_anomaly(True):
@@ -311,7 +370,8 @@ def main(artifact_path,
          num_workers=6,
          nb_hidden=512,
          nb_layer=7,
-         lr=0.001):
+         lr=0.001,
+         data_path=None):
     # Global variables: GPU Device, random splits for upsampling, loc and scale parameter for exp weighted loss.
     global DEVICE
     global split
@@ -334,7 +394,15 @@ def main(artifact_path,
     print("Writer initialized")
 
     train_data, valid_data, test_data = create_datasets(logp, smiles, use_3d)
+    valid_data.compute_baseline_error()
     print("Dataset created")
+
+    if data_path is not None:
+        print("Using stored dataset. Preprocessing if necessary.")
+        storage_path = parse_data_path(data_path, use_3d)
+        train_data = preprocess_data(train_data, storage_path, 'train')
+        valid_data = preprocess_data(valid_data, storage_path, 'valid')
+        test_data  = preprocess_data(test_data, storage_path, 'test')
 
     if upsample:
         # Percentiles used in dock score weights.
@@ -378,7 +446,6 @@ def main(artifact_path,
                                   batch_size=batch_size,
                                   num_workers=num_workers)
 
-    valid_data.compute_baseline_error()
 
     try:
         net = load_current_model(artifact_path)

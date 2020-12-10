@@ -30,13 +30,15 @@ def main():
     scores, smiles = preprocess.main(args.data_path)
 
     predict_logp.main(artifact_path,
-                      scores, smiles,
+                      scores,
+                      smiles,
                       gpu_num=args.gpu,
                       upsample=args.upsample,
                       exp_loss=args.exp_loss,
                       nb_hidden=args.hidden,
                       nb_layer=args.layers,
-                      use_3d=args.use_3d)
+                      use_3d=args.use_3d,
+                      data_path = args.data_path)
 
 
 if __name__ == "__main__":
