@@ -15,8 +15,7 @@ import random
 import time
 import matplotlib.pyplot as plt
 import csv
-
-from crem.crem import mutate_mol, grow_mol, link_mols
+from utils.graph_utils import mol_to_pyg_graph
 from contextlib import contextmanager
 import sys, os
 
@@ -903,7 +902,7 @@ class GraphEnv(gym.Env):
             reward = reward_step
 
         # get observation
-        ob = self.get_observation()
+        ob = mol_to_pyg_graph(self.mol)
 
         self.counter += 1
         if new:
