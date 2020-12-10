@@ -4,6 +4,8 @@ from collections import deque
 import gzip
 import shutil
 import os
+import random
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
@@ -16,9 +18,11 @@ from rdkit.Chem.Fingerprints import FingerprintMols
 
 from .gcpn_policy import GCPN, GCPN_crem
 from .MLP import Critic, Discriminator
+
 from utils.general_utils import load_surrogate_model, maybe_download_file
-from utils.state_utils import wrap_state, state_to_graph, state_to_mol
-from utils.graph_utils import mol_to_pyg_graph
+from utils.graph_utils import state_to_pyg, mol_to_pyg_graph
+from utils.state_utils import wrap_state, nodes_to_atom_labels, dense_to_sparse_adj, state_to_graph, state_to_mol
+
 
 
 class Memory:
@@ -40,6 +44,41 @@ class Memory:
 #################################################
 #                   GCPN PPO                    #
 #################################################
+
+class Critic(nn.Module):
+    def __init__(self, emb_dim, nb_layers, nb_hidden):
+        super(Critic, self).__init__()
+        layers = [nn.Linear(emb_dim, nb_hidden)]
+        for _ in range(nb_layers - 1):
+            layers.append(nn.Linear(nb_hidden, nb_hidden))
+
+        self.layers = nn.ModuleList(layers)
+        self.final_layer = nn.Linear(nb_hidden, 1)
+        self.act = nn.ReLU()
+
+    def forward(self, X):
+        for i, l in enumerate(self.layers):
+            X = self.act(l(X))
+        return self.final_layer(X).squeeze(1)
+
+
+class Discriminator(nn.Module):
+    def __init__(self, emb_dim, nb_layers, nb_hidden):
+        super(Discriminator, self).__init__()
+        layers = [nn.Linear(emb_dim, nb_hidden)]
+        for _ in range(nb_layers - 1):
+            layers.append(nn.Linear(nb_hidden, nb_hidden))
+
+        self.layers = nn.ModuleList(layers)
+        self.final_layer = nn.Linear(nb_hidden, 1)
+        self.act = nn.ReLU()
+        self.final_act = nn.Sigmoid()
+
+    def forward(self, X):
+        for i, l in enumerate(self.layers):
+            X = self.act(l(X))
+        return self.final_act(self.final_layer(X)).squeeze(1)
+
 
 class ActorCriticGCPN(nn.Module):
     def __init__(self,
@@ -80,8 +119,13 @@ class ActorCriticGCPN(nn.Module):
         # critic
         self.critic = Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
 
+        # discriminator
+        self.discriminator = Discriminator(emb_dim, mlp_nb_layers, mlp_nb_hidden)
+
+
     def forward(self):
         raise NotImplementedError
+
 
     # TODO: Change what action is, does it need to be a mol? Do I need to return a list of mols?
     def act(self, state, memory):
@@ -106,13 +150,21 @@ class ActorCriticGCPN(nn.Module):
 
         action_logprobs = torch.log(probs)
         state_value = self.critic(X_agg)
+        fidelity = self.discriminator(X_agg)
 
         if self.crem:
             entropy = probs * action_logprobs.sum()
         else:
             entropy = (probs * action_logprobs).sum(1)
+        entropy = (probs * action_logprobs).sum(1)
 
-        return action_logprobs, state_value, entropy
+        return action_logprobs, state_value, entropy, fidelity
+
+    def evaluate_disc(self, state):
+        _, X_agg = self.actor.evaluate(state)
+        fidelity = self.discriminator(X_agg)
+
+        return fidelity
 
 
 class PPO_GCPN:
@@ -122,6 +174,7 @@ class PPO_GCPN:
                  gamma,
                  eta,
                  upsilon,
+                 alpha,
                  K_epochs,
                  eps_clip,
                  input_dim,
@@ -140,10 +193,12 @@ class PPO_GCPN:
         self.gamma = gamma
         self.eta = eta
         self.upsilon = upsilon
+        self.alpha = alpha
         self.eps_clip = eps_clip
         self.K_epochs = K_epochs
         self.device = device
         self.crem = crem
+
 
         self.policy = ActorCriticGCPN(input_dim,
                                       emb_dim,
@@ -172,8 +227,9 @@ class PPO_GCPN:
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.MseLoss = nn.MSELoss()
+        self.BCEWithLogitsLoss = nn.BCEWithLogitsLoss() # combine operation for numerical stability
 
-    # TODO (Andrew): Change this for CReM
+
     def select_action(self, state, memory, env):
         if self.crem:
             g = state_to_mol(state, env, False)
@@ -183,7 +239,8 @@ class PPO_GCPN:
         action = self.policy_old.act(g, memory)
         return action
 
-    def update(self, memory, i_episode, writer=None):
+
+    def update(self, memory, truth, i_episode, writer=None):
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
@@ -213,16 +270,19 @@ class PPO_GCPN:
 
         for i in range(self.K_epochs):
             # Evaluating old actions and values :
-            logprobs, state_values, entropies = self.policy.evaluate(old_states, old_actions)
+            logprobs, state_values, entropies, fidelity = self.policy.evaluate(old_states, old_actions)
+
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach())
 
             # loss
+            ## policy
             advantages = rewards - state_values.detach()
             loss = []
-            #TODO: FIX this for crem
-            for r in ratios.T:
+
+            for j in range(ratios.shape[1]):
+                r = ratios[:, j]
                 surr1 = r * advantages
                 surr2 = torch.clamp(r, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
                 l = -torch.min(surr1, surr2)
@@ -237,15 +297,41 @@ class PPO_GCPN:
             loss = torch.stack(loss, 0).sum(0)
             ## entropy
             loss += self.eta * entropies
+
+            loss = loss.mean()
             ## baseline
-            loss = loss.mean() + self.upsilon * self.MseLoss(state_values, rewards)
+            loss += self.upsilon * self.MseLoss(state_values, rewards)
+            if (i % 10) == 0:
+                print("  {:3d}: Loss: {:7.3f}".format(i, loss))
+            ## adversarial
+            if (i + 1) == self.K_epochs:
+                truth_fidelity = self.policy.evaluate_disc(truth)
+                score = torch.cat((truth_fidelity, fidelity))
+                objective = torch.cat((torch.ones_like(truth_fidelity), torch.zeros_like(fidelity)))
+
+                adversarial_loss = self.alpha * self.BCEWithLogitsLoss(score, objective)
+                print("  {:3d}: Adversarial Loss: {:7.3f}".format(i, adversarial_loss))
+                loss += adversarial_loss
 
             ## take gradient step
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            if (i % 10) == 0:
-                print("  {:3d}: Loss: {:7.3f}".format(i, loss))
+
+        # Copy new weights into old policy:
+        self.policy_old.load_state_dict(self.policy.state_dict())
+
+    def update_disc(self, truth, i_episode, writer=None):
+        fidelity = self.policy.evaluate_disc(truth)
+
+        ## adversarial
+        adversarial_loss = self.alpha * self.BCEWithLogitsLoss(fidelity, torch.ones_like(fidelity))
+        print("  Adversarial Loss (Real): {:7.3f}".format(adversarial_loss))
+
+        ## take gradient step
+        self.optimizer.zero_grad()
+        adversarial_loss.backward()
+        self.optimizer.step()
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -258,12 +344,19 @@ class PPO_GCPN:
 #                   FINAL REWARDS                   #
 #####################################################
 
-def get_final_reward(state, env, surrogate_model, device):
+def get_surrogate_reward(state, env, surrogate_model, device):
     g = state_to_graph(state, env, keep_self_edges=False)
     g = g.to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
     reward = pred_docking_score.item() * -1
+    return reward
+
+def get_adversarial_reward(state, env, policy_model, device):
+    g = state_to_graph(state, env, keep_self_edges=False)
+    g = g.to(device)
+    with torch.autograd.no_grad():
+        reward = torch.mean(policy_model.evaluate_disc(g))
     return reward
 
 
@@ -279,7 +372,9 @@ def train_ppo(args, env, writer=None):
     max_episodes = 50000  # max training episodes
     max_timesteps = 1500  # max timesteps in one episode
 
-    update_timestep = 500  # update policy every n timesteps
+    update_timestep = 2000  # update policy every n timesteps
+    truth_frequency = 5  # frequency of feeding truth to discriminator
+
     K_epochs = 80  # update policy for K epochs
     eps_clip = 0.2  # clip parameter for PPO
     gamma = 0.99  # discount factor
@@ -293,14 +388,17 @@ def train_ppo(args, env, writer=None):
     nb_edge_types = ob['adj'].shape[0]
     ob = state_to_graph(ob, env)
     input_dim = ob.x.shape[1]
-    device = torch.device("cpu") if args.cpu else torch.device(
-        'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
+
+    device = torch.device("cpu") if args.cpu else \
+        torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
+    ground_truth = pd.read_csv(args.conditional, header=None)
 
     ppo = PPO_GCPN(lr,
                    betas,
                    gamma,
                    args.eta,
                    args.upsilon,
+                   args.alpha,
                    K_epochs,
                    eps_clip,
                    input_dim,
@@ -330,8 +428,9 @@ def train_ppo(args, env, writer=None):
                 shutil.copyfileobj(f_in, f_out)
 
     if args.use_surrogate:
-        print("{} episodes before surrogate model as final reward".format(
-            args.surrogate_reward_timestep_delay))
+
+        print("{} episodes before surrogate model as final reward".format(args.surrogate_reward_episode_delay))
+
         surrogate_model = load_surrogate_model(args.artifact_path,
                                                args.surrogate_model_url,
                                                args.surrogate_model_path,
@@ -361,9 +460,10 @@ def train_ppo(args, env, writer=None):
             state, reward, done, info = env.step(action, memory, crem=args.use_crem)
 
             if done:
-                if args.use_surrogate and (i_episode > args.surrogate_reward_timestep_delay):
+                # surrogate
+                if args.use_surrogate and (i_episode > args.surrogate_reward_episode_delay):
                     try:
-                        surr_reward = get_final_reward(state, env, surrogate_model, device)
+                        surr_reward = get_surrogate_reward(state, env, surrogate_model, device)
                         reward += surr_reward / 5
                         info['surrogate_reward'] = surr_reward
                     except Exception as e:
@@ -372,6 +472,21 @@ def train_ppo(args, env, writer=None):
                         pass
                 else:
                     info['surrogate_reward'] = None
+                # adversarial
+                if i_episode > args.adversarial_reward_episode_delay:
+                    try:
+                        advers_reward = get_adversarial_reward(state, env, ppo.policy, device)
+                        # TODO for Nick: Rescale this reward.
+                        #  Currently a random scale.
+                        reward += advers_reward * 0.5
+                        info['adversarial_reward'] = advers_reward
+                    except Exception as e:
+                        print(e)
+                        info['adversarial_reward'] = None
+                        pass
+                else:
+                    info['adversarial_reward'] = None
+                # final
                 info['final_reward'] = reward
 
                 # From rl-baselines/baselines/ppo1/pposgd_simple_gcn.py in rl_graph_generation
@@ -402,9 +517,22 @@ def train_ppo(args, env, writer=None):
             # update if its time
             if time_step % update_timestep == 0:
                 print("updating ppo")
-                ppo.update(memory, i_episode, writer)
+                # TODO: import a batch of true molecules here.
+                #   The data type of `truth` should be `Batch`.
+                #   `MyDataset` in `load_data.py` might be useful.
+                truth_smi = random.sample(ground_truth, 100)
+                truth = [mol_to_pyg_graph(Chem.MolFromSmiles(smi)) for smi in truth_smi]
+                ppo.update(memory, truth, i_episode, writer)
                 memory.clear_memory()
-                time_step = 0
+
+                if time_step % (update_timestep * truth_frequency) == 0:
+                    # TODO for Nick: import a batch of true molecules here.
+                    #   The structure of `truth` should be the same as `memory`.
+
+                    truth_smi = random.sample(ground_truth, 100)
+                    truth = [mol_to_pyg_graph(Chem.MolFromSmiles(smi)) for smi in truth_smi]
+                    ppo.update_disc(truth, i_episode, writer)
+
             running_reward += reward
             cur_ep_ret_env += reward
             if (((i_episode + 1) % 20) == 0) and render:
@@ -413,7 +541,7 @@ def train_ppo(args, env, writer=None):
                 break
         writer.add_scalar("EpSurrogate", -1 * surr_reward, episode_count)
         rewbuffer_env.append(cur_ep_ret_env)
-        avg_length += t
+        avg_length += time_step
 
         # write to Tensorboard
         writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), episode_count)

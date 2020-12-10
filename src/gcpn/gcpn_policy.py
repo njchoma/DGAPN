@@ -252,21 +252,24 @@ class GCPN(nn.Module):
         prob = torch.gather(f_prob, 1, a_stop.unsqueeze(1)).squeeze()
         return prob
 
-    def evaluate(self, orig_states, actions):
+    def evaluate(self, orig_states, actions=None):
         batch = orig_states.batch
         X = self.gnn_embed(orig_states)
 
-        a_first, a_second, batch_num_nodes, = get_batch_idx(batch, actions)
-        # Each of these is (2000,1)
-        p_first_agg = self.get_first_opt(X, a_first, batch)
-        p_second_agg = self.get_second_opt(X, a_first, a_second, batch)
-        p_edge_agg = self.get_edge_opt(X, a_first, a_second, actions[:, 2])
-        p_stop_agg = self.get_stop_opt(X, batch, actions[:, 3])
-        probs_agg = torch.stack((p_first_agg,
-                                 p_second_agg,
-                                 p_edge_agg,
-                                 p_stop_agg),
-                                dim=1)
+        if actions is not None:
+            a_first, a_second, batch_num_nodes, = get_batch_idx(batch, actions)
+            p_first_agg  = self.get_first_opt(X, a_first, batch)
+            p_second_agg = self.get_second_opt(X, a_first, a_second, batch)
+            p_edge_agg   = self.get_edge_opt(X, a_first, a_second, actions[:,2])
+            p_stop_agg   = self.get_stop_opt(X, batch, actions[:,3])
+            probs_agg = torch.stack((p_first_agg,
+                                     p_second_agg,
+                                     p_edge_agg,
+                                     p_stop_agg),
+                                    dim=1)
+        else:
+            probs_agg = None
+
         X_agg = pyg.nn.global_add_pool(X, batch)
         return probs_agg, X_agg
 

@@ -26,7 +26,7 @@ def molecule_arg_parser():
 
     # SURROGATE REWARD
     add_arg('--use_surrogate', '-sur', action='store_true')
-    add_arg('--surrogate_reward_timestep_delay', type=int, default=0)
+    add_arg('--surrogate_reward_episode_delay', type=int, default=0)
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_model_path', default='')
 
@@ -39,6 +39,7 @@ def molecule_arg_parser():
     add_arg('--normalize_adj', type=int, default=0)
     add_arg('--reward_type', type=str, default='qed', help='logppen;logp_target;qed;qedsa;qed_target;mw_target;gan')
     add_arg('--reward_target', type=float, default=0.5, help='target reward value')
+    add_arg('--adversarial_reward_episode_delay', type=int, default=20)
     add_arg('--has_feature', type=int, default=0)
     add_arg('--is_conditional', type=int, default=0)  # default 0
     add_arg('--conditional', type=str, default='')  # default 0
@@ -58,6 +59,7 @@ def molecule_arg_parser():
     # LOSS PARAMETERS
     add_arg('--eta', type=float, default=0.01, help='relative weight for entropy loss')
     add_arg('--upsilon', type=float, default=0.5, help='relative weight for baseline loss')
+    add_arg('--alpha', type=float, default=0.1, help='relative weight for adversarial loss')
 
     # add_arg('--env', type=str, help='environment name: molecule; graph',
     #                     default='molecule')
