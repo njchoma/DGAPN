@@ -13,9 +13,31 @@ from torch_geometric.data import Batch
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
 from torch_scatter import scatter_add
+
 from utils.graph_utils import mol_to_pyg_graph
+import copy
+
 from rdkit import Chem
 from crem.crem import mutate_mol
+
+
+def convert_radical_electrons_to_hydrogens(mol):
+    """
+    Converts radical electrons in a molecule into bonds to hydrogens. Only
+    use this if molecule is valid. Results a new mol object
+    :param mol: rdkit mol object
+    :return: rdkit mol object
+    """
+    m = copy.deepcopy(mol)
+    if Chem.Descriptors.NumRadicalElectrons(m) == 0:  # not a radical
+        return m
+    else:  # a radical
+        for a in m.GetAtoms():
+            num_radical_e = a.GetNumRadicalElectrons()
+            if num_radical_e > 0:
+                a.SetNumRadicalElectrons(0)
+                a.SetNumExplicitHs(num_radical_e)
+    return m
 
 
 class GCPN_crem(nn.Module):
@@ -51,9 +73,10 @@ class GCPN_crem(nn.Module):
 
         # Adhoc rdkit fixes for mol representation
         mol.UpdatePropertyCache(strict=False)
+        mol = convert_radical_electrons_to_hydrogens(mol)
         Chem.SanitizeMol(mol,
-                         Chem.SanitizeFlags.SANITIZE_FINDRADICALS | Chem.SanitizeFlags.SANITIZE_KEKULIZE |\
-                         Chem.SanitizeFlags.SANITIZE_SETAROMATICITY | Chem.SanitizeFlags.SANITIZE_SETCONJUGATION |\
+                         Chem.SanitizeFlags.SANITIZE_FINDRADICALS | Chem.SanitizeFlags.SANITIZE_KEKULIZE | \
+                         Chem.SanitizeFlags.SANITIZE_SETAROMATICITY | Chem.SanitizeFlags.SANITIZE_SETCONJUGATION | \
                          Chem.SanitizeFlags.SANITIZE_SETHYBRIDIZATION | Chem.SanitizeFlags.SANITIZE_SYMMRINGS,
                          catchErrors=True)
 
@@ -101,7 +124,7 @@ class GCPN_crem(nn.Module):
             X = self.gnn_embed(batch)  # (n_crem, 128)
             p_all = self.mc(X)
             if p_all.ndim == 0:
-                #When there's only one molecule, need to unsqueeze so indexing works
+                # When there's only one molecule, need to unsqueeze so indexing works
                 p_all = torch.unsqueeze(p_all, 0)
             p_crem = p_all[actions[i].item()]
             p_agg[i] = p_crem
