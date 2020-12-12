@@ -40,7 +40,7 @@ class GCPN_crem(nn.Module):
                                    True)
         self.mc = Action_Prediction(mlp_nb_layers,
                                     mlp_nb_hidden,
-                                    emb_dim)
+                                    2 * emb_dim)
         self.emb_dim = emb_dim
         self.device = device
         self.sample_crem = sample_crem
@@ -50,12 +50,11 @@ class GCPN_crem(nn.Module):
         Need to return action, prob, and list of states."""
 
         # Adhoc rdkit fixes for mol representation
-        mol.UpdatePropertyCache(strict=False)
+        #mol.UpdatePropertyCache(strict=False)
         Chem.SanitizeMol(mol,
                          Chem.SanitizeFlags.SANITIZE_FINDRADICALS | Chem.SanitizeFlags.SANITIZE_KEKULIZE |\
                          Chem.SanitizeFlags.SANITIZE_SETAROMATICITY | Chem.SanitizeFlags.SANITIZE_SETCONJUGATION |\
-                         Chem.SanitizeFlags.SANITIZE_SETHYBRIDIZATION | Chem.SanitizeFlags.SANITIZE_SYMMRINGS,
-                         catchErrors=True)
+                         Chem.SanitizeFlags.SANITIZE_SETHYBRIDIZATION | Chem.SanitizeFlags.SANITIZE_SYMMRINGS)
 
         # CReM
         db_fname = 'replacements02_sc2.db'
@@ -68,6 +67,7 @@ class GCPN_crem(nn.Module):
                 print("Downsampling to 20 options.")
                 new_mols = choices(new_mols, k=self.sample_crem)
         except Exception as e:
+            print("I'm in forward")
             print(e)
             new_mols = []
         new_mols.append(mol)  # Also consider the molecule by itself, if chosen stop is implied.
@@ -79,7 +79,9 @@ class GCPN_crem(nn.Module):
                 action, prob = -1, torch.tensor(1.0)
             else:
                 X = self.gnn_embed(new_pygs)
-                f_probs = self.mc(X)  # Mask is not needed since each row is a molecule.
+                X_last = X[-1].repeat(len(X), 1)
+                X_cat = torch.cat((X, X_last), dim=1)
+                f_probs = self.mc(X_cat)  # Mask is not needed since each row is a molecule.
                 action, prob = sample_from_probs(f_probs, eval_action)
 
             if action == (len(new_mols) - 1):
@@ -98,14 +100,22 @@ class GCPN_crem(nn.Module):
         p_agg = torch.empty(n_steps).to(self.device)
         X_agg = torch.empty((n_steps, self.emb_dim)).to(self.device)
         for i, batch in enumerate(orig_states):
-            X = self.gnn_embed(batch)  # (n_crem, 128)
-            p_all = self.mc(X)
+            X = self.gnn_embed(batch)  # (sample_n_crem, 128)
+
+            if X.ndim == 1:
+                #When there's only one molecule, need to unsqueeze, and do manual concatenation, so indexing works.
+                X_cat = torch.unsqueeze(X.repeat(2), 0)
+            else:
+                X_last = X[-1].repeat(len(X), 1)
+                X_cat = torch.cat((X, X_last), dim=1) # (sample_n_crem, 256)
+
+            p_all = self.mc(X_cat)
             if p_all.ndim == 0:
                 #When there's only one molecule, need to unsqueeze so indexing works
                 p_all = torch.unsqueeze(p_all, 0)
             p_crem = p_all[actions[i].item()]
             p_agg[i] = p_crem
-            X_agg[i] = X.sum(0)
+            X_agg[i] = X[-1] #Pooled representation of starting state is the input to the critic-value function
         return p_agg, X_agg
 
 

@@ -16,9 +16,12 @@ from rdkit.Chem.Fingerprints import FingerprintMols
 
 from .gcpn_policy import GCPN, GCPN_crem
 from .MLP import Critic, Discriminator
+
 from utils.general_utils import load_surrogate_model, maybe_download_file
-from utils.state_utils import wrap_state, state_to_graph, state_to_mol
 from utils.graph_utils import mol_to_pyg_graph
+from utils.state_utils import wrap_state, nodes_to_atom_labels, dense_to_sparse_adj, state_to_graph, state_to_mol
+
+
 
 
 class Memory:

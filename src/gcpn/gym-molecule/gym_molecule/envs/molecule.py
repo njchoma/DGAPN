@@ -230,15 +230,16 @@ class MoleculeEnv(gym.Env):
             stop = True
 
         ### calculate intermediate rewards
-        if self.check_valency():
-            if self.mol.GetNumAtoms() + self.mol.GetNumBonds() - self.mol_old.GetNumAtoms() - self.mol_old.GetNumBonds() > 0:
-                reward_step = self.reward_step_total / self.max_atom  # successfully add node/edge
-                self.smile_list.append(self.get_final_smiles())
-            else:
-                reward_step = -self.reward_step_total / self.max_atom  # edge exist
-        else:
-            reward_step = -self.reward_step_total / self.max_atom  # invalid action
-            self.mol = self.mol_old
+        reward_step = 0
+        # if self.check_valency():
+        #     if self.mol.GetNumAtoms() + self.mol.GetNumBonds() - self.mol_old.GetNumAtoms() - self.mol_old.GetNumBonds() > 0:
+        #         reward_step = self.reward_step_total / self.max_atom  # successfully add node/edge
+        #         self.smile_list.append(self.get_final_smiles())
+        #     else:
+        #         reward_step = -self.reward_step_total / self.max_atom  # edge exist
+        # else:
+        #     reward_step = -self.reward_step_total / self.max_atom  # invalid action
+        #     self.mol = self.mol_old
 
         ### calculate terminal rewards
         # todo: add terminal action
@@ -491,8 +492,11 @@ class MoleculeEnv(gym.Env):
         """
         mol = copy.deepcopy(self.mol)
         try:
+            # Sanitizing without specifying flags seems to be ok.
             Chem.SanitizeMol(mol)
-        except:
+        except Exception as e:
+            print("in get_observation")
+            print(e)
             pass
         n = mol.GetNumAtoms()
         n_shift = len(self.possible_atom_types)  # assume isolated nodes new nodes exist
