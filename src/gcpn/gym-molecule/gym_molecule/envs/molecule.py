@@ -101,7 +101,7 @@ class MoleculeEnv(gym.Env):
             self.conditional_list = load_conditional(conditional)
             self.conditional = random.sample(self.conditional_list, 1)[0]
             self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional[0]))
-            Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+            #Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
             self.mol = Chem.RWMol()
         self.smile_list = []
@@ -214,7 +214,7 @@ class MoleculeEnv(gym.Env):
                 stop = True
             else:
                 self.mol = memory.states[-1][action]
-                Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+                #Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
                 stop = False
 
         ### take non crem action
@@ -360,10 +360,10 @@ class MoleculeEnv(gym.Env):
         if self.is_conditional:
             self.conditional = random.sample(self.conditional_list, 1)[0]
             self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional[0]))
-            Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+            #Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         elif smile is not None:
             self.mol = Chem.RWMol(Chem.MolFromSmiles(smile))
-            Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+            #Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
             self.mol = Chem.RWMol()
             # self._add_atom(np.random.randint(len(self.possible_atom_types)))  # random add one atom
@@ -491,86 +491,86 @@ class MoleculeEnv(gym.Env):
         n = atom_num + atom_type_num
         """
         mol = copy.deepcopy(self.mol)
-        try:
-            # Sanitizing without specifying flags seems to be ok.
-            Chem.SanitizeMol(mol)
-        except Exception as e:
-            print("in get_observation")
-            print(e)
-            pass
-        n = mol.GetNumAtoms()
-        n_shift = len(self.possible_atom_types)  # assume isolated nodes new nodes exist
-
-        F = np.zeros((1, self.max_atom, self.d_n))
-        for a in mol.GetAtoms():
-            atom_idx = a.GetIdx()
-            atom_symbol = a.GetSymbol()
-            if self.has_feature:
-                formal_charge = a.GetFormalCharge()
-                implicit_valence = a.GetImplicitValence()
-                ring_atom = a.IsInRing()
-                degree = a.GetDegree()
-                hybridization = a.GetHybridization()
-            # print(atom_symbol,formal_charge,implicit_valence,ring_atom,degree,hybridization)
-            if self.has_feature:
-                # float_array = np.concatenate([(atom_symbol ==
-                #                                self.possible_atom_types),
-                #                               (formal_charge ==
-                #                                self.possible_formal_charge),
-                #                               (implicit_valence ==
-                #                                self.possible_implicit_valence),
-                #                               (ring_atom ==
-                #                                self.possible_ring_atom),
-                #                               (degree == self.possible_degree),
-                #                               (hybridization ==
-                #                                self.possible_hybridization)]).astype(float)
-                float_array = np.concatenate([(atom_symbol ==
-                                               self.possible_atom_types),
-                                              ([not a.IsInRing()]),
-                                              ([a.IsInRingSize(3)]),
-                                              ([a.IsInRingSize(4)]),
-                                              ([a.IsInRingSize(5)]),
-                                              ([a.IsInRingSize(6)]),
-                                              ([a.IsInRing() and (not a.IsInRingSize(3))
-                                                and (not a.IsInRingSize(4))
-                                                and (not a.IsInRingSize(5))
-                                                and (not a.IsInRingSize(6))]
-                                              )]).astype(float)
-            else:
-                float_array = (atom_symbol == self.possible_atom_types).astype(float)
-            # assert float_array.sum() == 6   # because there are 6 types of one
-            # print(float_array,float_array.sum())
-            # hot atom features
-            F[0, atom_idx, :] = float_array
-        # add the atom features for the auxiliary atoms. We only include the
-        # atom symbol features
-        auxiliary_atom_features = np.zeros((n_shift, self.d_n))  # for padding
-        temp = np.eye(n_shift)
-        auxiliary_atom_features[:temp.shape[0], :temp.shape[1]] = temp
-        F[0, n:n + n_shift, :] = auxiliary_atom_features
-        # print('n',n,'n+n_shift',n+n_shift,auxiliary_atom_features.shape)
-
-        d_e = len(self.possible_bond_types)
-        E = np.zeros((d_e, self.max_atom, self.max_atom))
-        for i in range(d_e):
-            E[i, :n + n_shift, :n + n_shift] = np.eye(n + n_shift)
-        for b in self.mol.GetBonds():  # self.mol, very important!! no aromatic
-            begin_idx = b.GetBeginAtomIdx()
-            end_idx = b.GetEndAtomIdx()
-            bond_type = b.GetBondType()
-            float_array = (bond_type == self.possible_bond_types).astype(float)
-            try:
-                assert float_array.sum() != 0
-            except:
-                print('error', bond_type)
-            E[:, begin_idx, end_idx] = float_array
-            E[:, end_idx, begin_idx] = float_array
-        ob = {}
-        if self.is_normalize:
-            E = self.normalize_adj(E)
-        ob['adj'] = E
-        ob['node'] = F
-        return ob
+        # try:
+        #     # Sanitizing without specifying flags seems to be ok.
+        #     Chem.SanitizeMol(mol)
+        # except Exception as e:
+        #     print("in get_observation")
+        #     print(e)
+        #     pass
+        # n = mol.GetNumAtoms()
+        # n_shift = len(self.possible_atom_types)  # assume isolated nodes new nodes exist
+        #
+        # F = np.zeros((1, self.max_atom, self.d_n))
+        # for a in mol.GetAtoms():
+        #     atom_idx = a.GetIdx()
+        #     atom_symbol = a.GetSymbol()
+        #     if self.has_feature:
+        #         formal_charge = a.GetFormalCharge()
+        #         implicit_valence = a.GetImplicitValence()
+        #         ring_atom = a.IsInRing()
+        #         degree = a.GetDegree()
+        #         hybridization = a.GetHybridization()
+        #     # print(atom_symbol,formal_charge,implicit_valence,ring_atom,degree,hybridization)
+        #     if self.has_feature:
+        #         # float_array = np.concatenate([(atom_symbol ==
+        #         #                                self.possible_atom_types),
+        #         #                               (formal_charge ==
+        #         #                                self.possible_formal_charge),
+        #         #                               (implicit_valence ==
+        #         #                                self.possible_implicit_valence),
+        #         #                               (ring_atom ==
+        #         #                                self.possible_ring_atom),
+        #         #                               (degree == self.possible_degree),
+        #         #                               (hybridization ==
+        #         #                                self.possible_hybridization)]).astype(float)
+        #         float_array = np.concatenate([(atom_symbol ==
+        #                                        self.possible_atom_types),
+        #                                       ([not a.IsInRing()]),
+        #                                       ([a.IsInRingSize(3)]),
+        #                                       ([a.IsInRingSize(4)]),
+        #                                       ([a.IsInRingSize(5)]),
+        #                                       ([a.IsInRingSize(6)]),
+        #                                       ([a.IsInRing() and (not a.IsInRingSize(3))
+        #                                         and (not a.IsInRingSize(4))
+        #                                         and (not a.IsInRingSize(5))
+        #                                         and (not a.IsInRingSize(6))]
+        #                                       )]).astype(float)
+        #     else:
+        #         float_array = (atom_symbol == self.possible_atom_types).astype(float)
+        #     # assert float_array.sum() == 6   # because there are 6 types of one
+        #     # print(float_array,float_array.sum())
+        #     # hot atom features
+        #     F[0, atom_idx, :] = float_array
+        # # add the atom features for the auxiliary atoms. We only include the
+        # # atom symbol features
+        # auxiliary_atom_features = np.zeros((n_shift, self.d_n))  # for padding
+        # temp = np.eye(n_shift)
+        # auxiliary_atom_features[:temp.shape[0], :temp.shape[1]] = temp
+        # F[0, n:n + n_shift, :] = auxiliary_atom_features
+        # # print('n',n,'n+n_shift',n+n_shift,auxiliary_atom_features.shape)
+        #
+        # d_e = len(self.possible_bond_types)
+        # E = np.zeros((d_e, self.max_atom, self.max_atom))
+        # for i in range(d_e):
+        #     E[i, :n + n_shift, :n + n_shift] = np.eye(n + n_shift)
+        # for b in self.mol.GetBonds():  # self.mol, very important!! no aromatic
+        #     begin_idx = b.GetBeginAtomIdx()
+        #     end_idx = b.GetEndAtomIdx()
+        #     bond_type = b.GetBondType()
+        #     float_array = (bond_type == self.possible_bond_types).astype(float)
+        #     try:
+        #         assert float_array.sum() != 0
+        #     except:
+        #         print('error', bond_type)
+        #     E[:, begin_idx, end_idx] = float_array
+        #     E[:, end_idx, begin_idx] = float_array
+        # ob = {}
+        # if self.is_normalize:
+        #     E = self.normalize_adj(E)
+        # ob['adj'] = E
+        # ob['node'] = F
+        return self.mol
 
     def get_observation_mol(self, mol):
         """

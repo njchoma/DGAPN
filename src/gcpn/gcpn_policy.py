@@ -51,10 +51,11 @@ class GCPN_crem(nn.Module):
 
         # Adhoc rdkit fixes for mol representation
         #mol.UpdatePropertyCache(strict=False)
-        Chem.SanitizeMol(mol,
-                         Chem.SanitizeFlags.SANITIZE_FINDRADICALS | Chem.SanitizeFlags.SANITIZE_KEKULIZE |\
-                         Chem.SanitizeFlags.SANITIZE_SETAROMATICITY | Chem.SanitizeFlags.SANITIZE_SETCONJUGATION |\
-                         Chem.SanitizeFlags.SANITIZE_SETHYBRIDIZATION | Chem.SanitizeFlags.SANITIZE_SYMMRINGS)
+
+        # Chem.SanitizeMol(mol,
+        #                  Chem.SanitizeFlags.SANITIZE_FINDRADICALS | Chem.SanitizeFlags.SANITIZE_KEKULIZE |\
+        #                  Chem.SanitizeFlags.SANITIZE_SETAROMATICITY | Chem.SanitizeFlags.SANITIZE_SETCONJUGATION |\
+        #                  Chem.SanitizeFlags.SANITIZE_SETHYBRIDIZATION | Chem.SanitizeFlags.SANITIZE_SYMMRINGS)
 
         # CReM
         db_fname = 'replacements02_sc2.db'
@@ -63,12 +64,13 @@ class GCPN_crem(nn.Module):
             new_mols = list(mutate_mol(mol, db_fname, return_mol=True))
             print("CReM options:" + str(len(new_mols)))
             new_mols = [Chem.RemoveHs(i[1]) for i in new_mols]
+
             if len(new_mols) > self.sample_crem:
                 print("Downsampling to 20 options.")
                 new_mols = choices(new_mols, k=self.sample_crem)
         except Exception as e:
-            print("I'm in forward")
-            print(e)
+            print("CReM forward error: " + str(e))
+            print("SMILE: " + Chem.MolToSmiles(mol))
             new_mols = []
         new_mols.append(mol)  # Also consider the molecule by itself, if chosen stop is implied.
         new_pygs = Batch().from_data_list([mol_to_pyg_graph(i) for i in new_mols]).to(self.device)
