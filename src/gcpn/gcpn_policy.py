@@ -15,8 +15,11 @@ from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, de
 from torch_scatter import scatter_add
 from utils.graph_utils import mol_to_pyg_graph
 from rdkit import Chem
-from crem.crem import mutate_mol
+#from crem.crem import mutate_mol
 
+import molpher
+from molpher.core.morphing import Molpher
+from molpher.core.morphing.operators import *
 
 class GCPN_crem(nn.Module):
     def __init__(self,
@@ -60,12 +63,30 @@ class GCPN_crem(nn.Module):
         db_fname = 'replacements02_sc2.db'
 
         try:
-            new_mols = list(mutate_mol(mol, db_fname, return_mol=True))
-            print("CReM options:" + str(len(new_mols)))
-            new_mols = [Chem.RemoveHs(i[1]) for i in new_mols]
-            if len(new_mols) > self.sample_crem:
-                print("Downsampling to 20 options.")
-                new_mols = choices(new_mols, k=self.sample_crem)
+            molpher = Molpher(
+                mol
+                , [
+                    AddAtom()
+                    , RemoveAtom()
+                    , MutateAtom()
+                    , AddBond()
+                    , RemoveBond()
+                    , ContractBond()
+                    , InterlayAtom()
+                    , RerouteBond()
+                ]
+                , attempts=100
+            )
+
+            molpher()
+            morphs = molpher.morphs
+            new_mols = [x.asRDMol() for x in morphs]
+            # new_mols = list(mutate_mol(mol, db_fname, return_mol=True))
+            # print("CReM options:" + str(len(new_mols)))
+            # new_mols = [Chem.RemoveHs(i[1]) for i in new_mols]
+            # if len(new_mols) > self.sample_crem:
+            #     print("Downsampling to 20 options.")
+            #     new_mols = choices(new_mols, k=self.sample_crem)
         except Exception as e:
             print("I'm in forward")
             print(e)
