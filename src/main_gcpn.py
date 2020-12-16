@@ -111,7 +111,7 @@ def main():
     args = molecule_arg_parser().parse_args()
     print("====args====", args)
     dt = get_current_datetime()
-    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + dt))
+    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + dt))
 
     # From rl-baselines/baselines/ppo1/pposgd_simple_gcn.py in rl_graph_generation
     if not os.path.exists('molecule_gen'):
