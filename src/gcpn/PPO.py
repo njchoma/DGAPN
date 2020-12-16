@@ -9,6 +9,8 @@ from torch_geometric.data import Data, Batch
 from rdkit import Chem
 from rdkit import DataStructs
 from rdkit.Chem import rdMolDescriptors
+from rdkit.Chem.Fingerprints import FingerprintMols
+
 
 from .gcpn_policy import GCPN
 from .MLP import Critic, Discriminator
@@ -66,8 +68,9 @@ class ActorCriticGCPN(nn.Module):
     def forward(self):
         raise NotImplementedError
     
-    def act(self, state, memory):
-        action, probs = self.actor(state)
+    def act(self, state, memory, device):
+        graph = Batch.from_data_list([mol_to_pyg_graph(state)]).to(device)
+        action, probs = self.actor(graph)
         action_logprob = torch.log(probs)
         memory.states.append(state)
         memory.actions.append(action)
@@ -138,9 +141,8 @@ class PPO_GCPN:
         
         self.MseLoss = nn.MSELoss()
 
-    def select_action(self, state, memory):
-        g = state.to(self.device)
-        action = self.policy_old.act(g, memory)
+    def select_action(self, state, memory, device):
+        action = self.policy_old.act(state, memory, device)
         return action
     
     def update(self, memory, i_episode, writer=None):
@@ -158,7 +160,7 @@ class PPO_GCPN:
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         
         # convert list to tensor
-        old_states = Batch.from_data_list(memory.states).to(self.device)
+        old_states = Batch.from_data_list([mol_to_pyg_graph(mol) for mol in memory.states]).to(self.device)
         old_actions = torch.squeeze(torch.tensor(memory.actions).to(self.device), 1).detach()
         old_logprobs = torch.squeeze(torch.stack(memory.logprobs), 1).to(self.device).detach()
         
@@ -213,7 +215,7 @@ class PPO_GCPN:
 #####################################################
 
 
-def get_surrogate_reward(state, env, surrogate_model, device):
+def get_surrogate_reward(state, surrogate_model, device):
     #g = state_to_graph(state, env, keep_self_edges=False)
     g = Batch().from_data_list([mol_to_pyg_graph(state)])
     g = g.to(device)
@@ -304,7 +306,7 @@ def train_ppo(args, env, writer=None):
         for t in range(max_timesteps):
             time_step +=1
             # Running policy_old:
-            action = ppo.select_action(state, memory)
+            action = ppo.select_action(state, memory, device)
             state, reward, done, info = env.step(action)
 
             if done:
@@ -325,8 +327,7 @@ def train_ppo(args, env, writer=None):
                 with open('molecule_gen/'+args.name+'.csv', 'a') as f:
                     if args.is_conditional:
                         start_mol, end_mol = Chem.MolFromSmiles(info['start_smile']), Chem.MolFromSmiles(info['smile'])
-                        start_fingerprint, end_fingerprint = rdMolDescriptors.GetMorganFingerprintAsBitVect(start_mol, radius=2, nBits=2048, useChirality=True),\
-                                                             rdMolDescriptors.GetMorganFingerprintAsBitVect(end_mol, radius=2, nBits=2048, useChirality=True)
+                        start_fingerprint, end_fingerprint = FingerprintMols.FingerprintMol(start_mol), FingerprintMols.FingerprintMol(end_mol)
                         sim = DataStructs.TanimotoSimilarity(start_fingerprint, end_fingerprint)
 
                         row = ''.join(['{},']*12)[:-1]+'\n'
