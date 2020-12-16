@@ -68,7 +68,7 @@ class MoleculeEnv(gym.Env):
             self.conditional_list = load_conditional(conditional)
             self.conditional = random.sample(self.conditional_list, 1)[0]
             self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional[0]))
-            Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+            #Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
             self.mol = Chem.RWMol()
         self.smile_list = []
@@ -150,6 +150,7 @@ class MoleculeEnv(gym.Env):
         self.mol_old = copy.deepcopy(self.mol)  # keep old mol
         total_atoms = self.mol.GetNumAtoms()
 
+
         ### take action
         if action[0, 3] == 0 or self.counter < self.min_action:  # not stop
             stop = False
@@ -197,8 +198,8 @@ class MoleculeEnv(gym.Env):
             else:
                 # final mol object where any radical electrons are changed to bonds to hydrogen
                 final_mol = self.get_final_mol()
-                s = Chem.MolToSmiles(final_mol, isomericSmiles=True)
-                final_mol = Chem.MolFromSmiles(s)
+                #s = Chem.MolToSmiles(final_mol, isomericSmiles=True)
+                #final_mol = Chem.MolFromSmiles(s)
 
                 # mol filters with negative rewards
                 if not steric_strain_filter(final_mol):  # passes 3D conversion, no excessive strain
@@ -283,10 +284,10 @@ class MoleculeEnv(gym.Env):
         if self.is_conditional:
             self.conditional = random.sample(self.conditional_list, 1)[0]
             self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional[0]))
-            Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+            #Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         elif smile is not None:
             self.mol = Chem.RWMol(Chem.MolFromSmiles(smile))
-            Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
+            #Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
             self.mol = Chem.RWMol()
             # self._add_atom(np.random.randint(len(self.possible_atom_types)))  # random add one atom
@@ -391,16 +392,10 @@ class MoleculeEnv(gym.Env):
         n = atom_num + atom_type_num
         """
         mol = copy.deepcopy(self.mol)
-        try:
-            Chem.SanitizeMol(mol)
-        except:
-            pass
-        ob = mol_to_pyg_graph(mol)
-        return ob
+        return self.mol
 
 
-## below are for general graph generation env
-
+### YES/NO filters ###
 def zinc_molecule_filter(mol):
     """
     Flags molecules based on problematic functional groups as
@@ -685,3 +680,4 @@ def reward_penalized_log_p(mol):
 #                                                        'F)=CC=C4)=C3)=O)=C2)=CC=C1)=O')), 2) == 4.49
 # assert round(reward_penalized_log_p(Chem.MolFromSmiles('ClC(C('
 #                                                        'Cl)=C1)=CC=C1NC2=CC=CC=C2C(NC(NC3=C(C(NC4=C(Cl)C=CC=C4)=S)C=CC=C3)=O)=O')), 2) == 4.93
+

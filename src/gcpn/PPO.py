@@ -212,8 +212,11 @@ class PPO_GCPN:
 #                   FINAL REWARDS                   #
 #####################################################
 
-def get_surrogate_reward(state, surrogate_model, device):
-    g = Batch.from_data_list([state]).to(device)
+
+def get_surrogate_reward(state, env, surrogate_model, device):
+    #g = state_to_graph(state, env, keep_self_edges=False)
+    g = Batch().from_data_list([mol_to_pyg_graph(state)])
+    g = g.to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
     reward = pred_docking_score.item() * -1
@@ -245,8 +248,10 @@ def train_ppo(args, env, writer=None):
 
     nb_edge_types = 3
     input_dim = 121
-    device = torch.device("cpu") if args.cpu else \
-        torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
+
+    device = torch.device("cpu") if args.cpu else torch.device(
+        'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
+
     ppo = PPO_GCPN(lr,
                    betas,
                    gamma,
@@ -292,7 +297,8 @@ def train_ppo(args, env, writer=None):
     # training loop
     for i_episode in range(1, max_episodes+1):
         cur_ep_ret_env = 0
-        # Now state is a pyg graph.
+
+        #Now state is a mol
         state = env.reset()
         surr_reward=0.0
         for t in range(max_timesteps):
@@ -308,7 +314,7 @@ def train_ppo(args, env, writer=None):
                         reward += surr_reward / 5
                         info['surrogate_reward'] = surr_reward
                     except Exception as e:
-                        print(e)
+                        print("Error in surrogate " + str(e))
                         info['surrogate_reward'] = None
                         pass
                 else:
