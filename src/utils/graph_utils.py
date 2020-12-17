@@ -94,6 +94,10 @@ def mol_to_pyg_graph(mol, idm=True):
         # mol = Chem.RemoveHs(mol)
         W = 1. / Chem.rdmolops.Get3DDistanceMatrix(mol)
         W[np.isinf(W)] = 0
+        # sparsify the values
+        threshold = np.sort(W, axis=None)[::-1][len(W)]
+        W[W<threshold] = 0
+        # convert to sparse representation
         W_spr = dense_to_sparse(torch.FloatTensor(W))
         g_idm = Data(x=g_adj.x, edge_index=W_spr[0], edge_attr=W_spr[1])
 
