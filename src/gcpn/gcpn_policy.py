@@ -61,16 +61,18 @@ class GCPN(nn.Module):
         actions = np.array([[a_first, a_second, a_edge, a_stop]])
         probs = torch.stack((p_first, p_second, p_edge, p_stop))
 
-        probs =  probs * self.prob_redux_factor + (1-self.prob_redux_factor)/2
         return actions, probs
 
     def get_first(self, X, mask=None, eval_action=None):
         f_probs = self.mf(X)
+        f_probs = redux_probs(f_probs, self.prob_redux_factor)
+
         if mask is not None:
             nb_true_nodes = int(sum(mask))-9
             true_node_mask = mask.clone()
             true_node_mask[nb_true_nodes:] = 0.0
             f_probs = f_probs*true_node_mask # UNSURE, CHECK
+        
         return sample_from_probs(f_probs, eval_action)
 
     def get_second(self, X, a_first, mask=None, eval_action=None):
@@ -79,6 +81,7 @@ class GCPN(nn.Module):
         X_cat = torch.cat((X_first, X),dim=1)
 
         f_probs = self.ms(X_cat)
+        f_probs = redux_probs(f_probs, self.prob_redux_factor)
         if mask is not None:
             f_probs = f_probs*mask # UNSURE, CHECK
             f_probs[a_first] = 0.0
@@ -91,6 +94,7 @@ class GCPN(nn.Module):
 
         f_logits = self.me(X_cat)
         f_probs = nn.functional.softmax(f_logits, dim=0)
+        f_probs = redux_probs(f_probs, self.prob_redux_factor)
         return sample_from_probs(f_probs, eval_action)
 
     def get_stop(self, X, eval_action=None):
@@ -101,12 +105,15 @@ class GCPN(nn.Module):
         m = Bernoulli(f_prob)
         a = (m.sample().item()) if eval_action is None else eval_action
         f_prob = 1-f_prob if a==0 else f_prob # probability of choosing 0
+        f_prob = redux_probs(f_prob, self.prob_redux_factor)
         return int(a), f_prob
         
 
     def get_first_opt(self, X, eval_actions, batch):
         f_probs = self.mf(X, batch)
         probs = f_probs[eval_actions]
+
+        probs = redux_probs(probs, self.prob_redux_factor)
         return probs
 
     def get_second_opt(self, X, a_first, a_second, batch):
@@ -116,6 +123,8 @@ class GCPN(nn.Module):
 
         f_probs = self.ms(X_cat, batch)
         p_second = f_probs[a_second]
+
+        p_second = redux_probs(p_second, self.prob_redux_factor)
         return p_second
         
     def get_edge_opt(self, X, a_first, a_second, a_edge):
@@ -124,8 +133,10 @@ class GCPN(nn.Module):
         X_cat = torch.cat((X_first, X_second), dim=1)
 
         f_logits = self.me(X_cat)
-        f_prob = nn.functional.softmax(f_logits, dim=1)
-        probs = torch.gather(f_prob, 1, a_edge.unsqueeze(1)).squeeze()
+        f_probs = nn.functional.softmax(f_logits, dim=1)
+        probs = torch.gather(f_probs, 1, a_edge.unsqueeze(1)).squeeze()
+
+        probs = redux_probs(probs, self.prob_redux_factor)
         return probs
 
     def get_stop_opt(self, X, batch, a_stop):
@@ -136,6 +147,8 @@ class GCPN(nn.Module):
         f_prob = torch.cat((prob_not_stop, prob_stop), dim=1)
 
         prob = torch.gather(f_prob, 1, a_stop.unsqueeze(1)).squeeze()
+
+        prob = redux_probs(prob, self.prob_redux_factor)
         return prob
 
     def evaluate(self, orig_states, actions):
@@ -359,6 +372,10 @@ class MyBatchNorm(BatchNorm1d):
                                                   self.num_features, self.eps,
                                                   self.momentum, self.affine,
                                                   self.track_running_stats)
+
+def redux_probs(probs, redux_factor):
+    return  probs * redux_factor + (1-redux_factor)/2
+    
 
 def sample_from_probs(p, action):
     m = Categorical(p)
