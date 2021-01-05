@@ -20,7 +20,8 @@ class GCPN(nn.Module):
                  gnn_nb_hidden,
                  gnn_nb_hidden_kernel,
                  mlp_nb_layers,
-                 mlp_nb_hidden):
+                 mlp_nb_hidden,
+                 prob_redux_factor = 1.0):
         super(GCPN, self).__init__()
 
         self.gnn_embed = GNN_Embed(gnn_nb_hidden,
@@ -45,6 +46,7 @@ class GCPN(nn.Module):
                                     mlp_nb_hidden,
                                     emb_dim,
                                     apply_softmax=False)
+        self.prob_redux_factor = prob_redux_factor
 
     def forward(self, graph):
         nb_nodes = graph.x.shape[0]
@@ -58,6 +60,8 @@ class GCPN(nn.Module):
 
         actions = np.array([[a_first, a_second, a_edge, a_stop]])
         probs = torch.stack((p_first, p_second, p_edge, p_stop))
+
+        probs =  probs * self.prob_redux_factor + (1-self.prob_redux_factor)/2
         return actions, probs
 
     def get_first(self, X, mask=None, eval_action=None):

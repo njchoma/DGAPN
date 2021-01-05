@@ -61,7 +61,8 @@ class ActorCriticGCPN(nn.Module):
                  gnn_nb_hidden,
                  gnn_nb_hidden_kernel,
                  mlp_nb_layers,
-                 mlp_nb_hidden):
+                 mlp_nb_hidden,
+                 prob_redux_factor):
         super(ActorCriticGCPN, self).__init__()
 
         # action mean range -1 to 1
@@ -72,7 +73,8 @@ class ActorCriticGCPN(nn.Module):
                            gnn_nb_hidden,
                            gnn_nb_hidden_kernel,
                            mlp_nb_layers,
-                           mlp_nb_hidden)
+                           mlp_nb_hidden,
+                           prob_redux_factor)
         # critic
         self.critic = GCPN_Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
         
@@ -129,7 +131,8 @@ class PPO_GCPN:
                  gnn_nb_hidden,
                  gnn_nb_hidden_kernel,
                  mlp_nb_layers,
-                 mlp_nb_hidden):
+                 mlp_nb_hidden,
+                 prob_redux_factor):
         self.lr = lr
         self.betas = betas
         self.gamma = gamma
@@ -145,7 +148,8 @@ class PPO_GCPN:
                                       gnn_nb_hidden,
                                       gnn_nb_hidden_kernel,
                                       mlp_nb_layers,
-                                      mlp_nb_hidden).to(device)
+                                      mlp_nb_hidden,
+                                      prob_redux_factor).to(device)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
         
         self.policy_old = ActorCriticGCPN(input_dim,
@@ -155,7 +159,8 @@ class PPO_GCPN:
                                           gnn_nb_hidden,
                                           gnn_nb_hidden_kernel,
                                           mlp_nb_layers,
-                                          mlp_nb_hidden).to(device)
+                                          mlp_nb_hidden,
+                                          prob_redux_factor).to(device)
         self.policy_old.load_state_dict(self.policy.state_dict())
         
         self.MseLoss = nn.MSELoss()
@@ -320,7 +325,8 @@ def train_ppo(args, surrogate_model, env, writer=None):
                    args.num_hidden_g,
                    args.num_hidden_g,
                    args.mlp_num_layer,
-                   args.mlp_num_hidden)
+                   args.mlp_num_hidden,
+                   args.prob_redux_factor)
     
     print(ppo)
     memory = Memory()

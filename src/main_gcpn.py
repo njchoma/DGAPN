@@ -48,6 +48,7 @@ def molecule_arg_parser():
     add_arg('--num_hidden_g', type=int, default=128)
     add_arg('--mlp_num_layer', type=int, default=3)
     add_arg('--mlp_num_hidden', type=int, default=128)
+    add_arg('--prob_redux_factor', type=float, default=1.0)
 
     # LOSS PARAMETERS
     add_arg('--eta', type=float, default=0.01, help='relative weight for entropy loss')
