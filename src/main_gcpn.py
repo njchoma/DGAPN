@@ -23,6 +23,11 @@ def molecule_arg_parser():
     add_arg('--cpu', action='store_true')
     add_arg('--gpu', default='0')
 
+    # EVAL MODE PARAMETERS
+    add_arg('--eval', action='store_true')
+    add_arg('--state_dict', default="")
+    add_arg('--num_done', type=int, default=1)
+
     # SURROGATE REWARD
     add_arg('--use_surrogate', '-sur', action='store_true')
     add_arg('--surrogate_reward_timestep_delay', type=int, default=0)
@@ -40,14 +45,14 @@ def molecule_arg_parser():
     add_arg('--reward_target', type=float, default=0.5, help='target reward value')
     add_arg('--has_feature', type=int, default=0)
     add_arg('--is_conditional', type=int, default=0)  # default 0
-    add_arg('--conditional', type=str, default='')  # default 0
-    add_arg('--max_action', type=int, default=128)  # default 0
-    add_arg('--min_action', type=int, default=20)  # default 0
+    add_arg('--conditional', type=str, default='')
+    add_arg('--max_action', type=int, default=128)
+    add_arg('--min_action', type=int, default=20)
     add_arg('--use_crem', action='store_true')
     add_arg('--sample_crem', type=int, default=20)
 
     # NETWORK PARAMETERS
-    add_arg('--emb_size', type=int, default=128)  # default 64
+    add_arg('--emb_size', type=int, default=128)
     add_arg('--layer_num_g', type=int, default=3)
     add_arg('--num_hidden_g', type=int, default=128)
     add_arg('--heads_g', type=int, default=2, help='attention heads for gnn')
@@ -113,9 +118,8 @@ def main():
     dt = get_current_datetime()
     writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + dt))
 
-    # From rl-baselines/baselines/ppo1/pposgd_simple_gcn.py in rl_graph_generation
-    if not os.path.exists('molecule_gen'):
-        os.makedirs('molecule_gen')
+    os.makedirs('molecule_gen', exist_ok=True)
+    os.makedirs(os.path.join(args.artifact_path, 'saves'), exist_ok=True)
 
     train(args, seed=args.seed, writer=writer)
 
