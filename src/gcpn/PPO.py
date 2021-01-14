@@ -1,13 +1,17 @@
 import gym
 import numpy as np
 from collections import deque
-
+import gzip
+import shutil
+import os
+import random
+import pandas as pd
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
 from torch.distributions import MultivariateNormal
 
 from torch_geometric.data import Data, Batch
-from torch_geometric.utils import dense_to_sparse
 
 from rdkit import Chem
 from rdkit import DataStructs
@@ -17,7 +21,7 @@ from .gcpn_policy import GCPN
 from .MLP import Critic, Discriminator
 
 from utils.general_utils import load_surrogate_model
-from utils.graph_utils import state_to_pyg
+from utils.graph_utils import mol_to_pyg_graph
 from utils.state_utils import wrap_state, nodes_to_atom_labels, dense_to_sparse_adj, state_to_graph
 
 
@@ -217,12 +221,15 @@ class PPO_GCPN:
             if (i % 10) == 0:
                 print("  {:3d}: Loss: {:7.3f}".format(i, loss))
             ## adversarial
-            if (i + 1) == self.K_epochs:
+            if truth is not None and (i + 1) == self.K_epochs:
+                truth = Batch().from_data_list(truth).to(self.device)
                 truth_fidelity = self.policy.evaluate_disc(truth)
+
                 score = torch.cat((truth_fidelity, fidelity))
                 objective = torch.cat((torch.ones_like(truth_fidelity), torch.zeros_like(fidelity)))
 
-                adversarial_loss = self.alpha * self.BCEWithLogitsLoss(score, objective)
+                adversarial_loss = self.alpha * F.binary_cross_entropy_with_logits(
+                    score, objective)  # combine operation for numerical stability
                 print("  {:3d}: Adversarial Loss: {:7.3f}".format(i, adversarial_loss))
                 loss += adversarial_loss
 
@@ -234,11 +241,14 @@ class PPO_GCPN:
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
 
-    def update_disc(self, truth, i_episode, writer=None):
+    def update_disc(self, truth, truth_score, i_episode, writer=None):
+        truth = Batch().from_data_list(truth).to(self.device)
         fidelity = self.policy.evaluate_disc(truth)
 
         ## adversarial
-        adversarial_loss = self.alpha * self.BCEWithLogitsLoss(fidelity, torch.ones_like(fidelity))
+        weight = F.softmin(torch.Tensor(truth_score).to(self.device)) * torch.Tensor(len(truth_score)).to(self.device)
+        adversarial_loss = self.alpha * F.binary_cross_entropy_with_logits(
+            fidelity, torch.ones_like(fidelity), weight)
         print("  Adversarial Loss (Real): {:7.3f}".format(adversarial_loss))
 
         ## take gradient step
@@ -288,6 +298,7 @@ def train_ppo(args, env, writer=None):
     
     update_timestep = 2000      # update policy every n timesteps
     truth_frequency = 5         # frequency of feeding truth to discriminator
+
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
     gamma = 0.99                # discount factor
@@ -303,6 +314,12 @@ def train_ppo(args, env, writer=None):
     input_dim = ob.x.shape[1]
     device = torch.device("cpu") if args.cpu else \
         torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
+
+    if args.use_adversarial:
+        truth = pd.read_csv(args.conditional, header=None)
+        # preserve the top 1%
+        truth = [(smile, score) for smile, score in zip(truth.iloc[:, 1].tolist(), truth.iloc[:, 0].tolist())]
+        truth = sorted(truth, key=lambda t: t[1])[:int(len(truth) / 100.)]
     
     ppo = PPO_GCPN(lr,
                    betas,
@@ -342,14 +359,17 @@ def train_ppo(args, env, writer=None):
     avg_length = 0
     time_step = 0
 
-    episode_count = 0
+    trajectory_count = 0
+    episode_count = 0 # just use i_episode?
 
     # variables for plotting rewards
-
     rewbuffer_env = deque(maxlen=100)
+
     # training loop
     for i_episode in range(1, max_episodes+1):
+        trajectory_count += 1
         cur_ep_ret_env = 0
+
         state = env.reset()
         surr_reward = 0.0
         for t in range(max_timesteps):
@@ -413,18 +433,23 @@ def train_ppo(args, env, writer=None):
             # update if its time
             if time_step % update_timestep == 0:
                 print("updating ppo")
-                # TODO: import a batch of true molecules here.
-                #   The data type of `truth` should be `Batch`.
-                #   `MyDataset` in `load_data.py` might be useful.
-                truth = None
-                ppo.update(memory, truth, i_episode, writer)
+                truth_pyg = None
+                if args.use_adversarial:
+                    truth_sample = random.sample(truth, trajectory_count)
+                    truth_pyg = [t[0] for t in truth_sample]
+                    truth_pyg = [mol_to_pyg_graph(Chem.MolFromSmiles(smile)) for smile in truth_pyg]
+                ppo.update(memory, truth_pyg, i_episode, writer)
+
                 memory.clear_memory()
-                if time_step % (update_timestep*truth_frequency) == 0:
-                    # TODO: import a batch of true molecules here.
-                    #   The data type of `truth` should be `Batch`.
-                    #   `MyDataset` in `load_data.py` might be useful.
-                    truth = None
-                    ppo.update_disc(truth, i_episode, writer)
+                trajectory_count = 0
+
+                if args.use_adversarial and time_step % (update_timestep * truth_frequency) == 0:
+                    truth_sample = random.sample(truth, 100)
+                    truth_scr = [t[1] for t in truth_sample]
+                    truth_pyg = [t[0] for t in truth_sample]
+                    truth_pyg = [mol_to_pyg_graph(Chem.MolFromSmiles(smile)) for smile in truth_pyg]
+                    ppo.update_disc(truth_pyg, truth_scr, i_episode, writer)
+
             running_reward += reward
             cur_ep_ret_env += reward
             if (((i_episode+1)%20)==0) and render:

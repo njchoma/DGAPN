@@ -33,6 +33,10 @@ def molecule_arg_parser():
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_model_path', default='')
 
+    # ADVERSARIAL REWARD
+    add_arg('--use_adversarial', '-adv', action='store_true')
+    add_arg('--adversarial_reward_episode_delay', type=int, default=20)
+
     # ENVIRONMENT PARAMETERS
     add_arg('--dataset', type=str, default='zinc', help='caveman; grid; ba; zinc; gdb')
     add_arg('--logp_ratio', type=float, default=1)
@@ -42,7 +46,6 @@ def molecule_arg_parser():
     add_arg('--normalize_adj', type=int, default=0)
     add_arg('--reward_type', type=str, default='qed', help='logppen;logp_target;qed;qedsa;qed_target;mw_target;gan')
     add_arg('--reward_target', type=float, default=0.5, help='target reward value')
-    add_arg('--adversarial_reward_episode_delay', type=int, default=20)
     add_arg('--has_feature', type=int, default=0)
     add_arg('--is_conditional', type=int, default=0)  # default 0
     add_arg('--conditional', type=str, default='')  # default 0
