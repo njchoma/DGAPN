@@ -15,29 +15,9 @@ from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, de
 from torch_scatter import scatter_add
 
 from utils.graph_utils import mol_to_pyg_graph
-import copy
 
 from rdkit import Chem
 from crem.crem import mutate_mol
-
-
-def convert_radical_electrons_to_hydrogens(mol):
-    """
-    Converts radical electrons in a molecule into bonds to hydrogens. Only
-    use this if molecule is valid. Results a new mol object
-    :param mol: rdkit mol object
-    :return: rdkit mol object
-    """
-    m = copy.deepcopy(mol)
-    if Chem.Descriptors.NumRadicalElectrons(m) == 0:  # not a radical
-        return m
-    else:  # a radical
-        for a in m.GetAtoms():
-            num_radical_e = a.GetNumRadicalElectrons()
-            if num_radical_e > 0:
-                a.SetNumRadicalElectrons(0)
-                a.SetNumExplicitHs(num_radical_e)
-    return m
 
 
 class GCPN_crem(nn.Module):
@@ -62,7 +42,7 @@ class GCPN_crem(nn.Module):
                                    True)
         self.mc = Action_Prediction(mlp_nb_layers,
                                     mlp_nb_hidden,
-                                    emb_dim)
+                                    2 * emb_dim)
         self.emb_dim = emb_dim
         self.device = device
         self.sample_crem = sample_crem
@@ -72,13 +52,12 @@ class GCPN_crem(nn.Module):
         Need to return action, prob, and list of states."""
 
         # Adhoc rdkit fixes for mol representation
-        mol.UpdatePropertyCache(strict=False)
-        mol = convert_radical_electrons_to_hydrogens(mol)
-        Chem.SanitizeMol(mol,
-                         Chem.SanitizeFlags.SANITIZE_FINDRADICALS | Chem.SanitizeFlags.SANITIZE_KEKULIZE | \
-                         Chem.SanitizeFlags.SANITIZE_SETAROMATICITY | Chem.SanitizeFlags.SANITIZE_SETCONJUGATION | \
-                         Chem.SanitizeFlags.SANITIZE_SETHYBRIDIZATION | Chem.SanitizeFlags.SANITIZE_SYMMRINGS,
-                         catchErrors=True)
+        #mol.UpdatePropertyCache(strict=False)
+
+        # Chem.SanitizeMol(mol,
+        #                  Chem.SanitizeFlags.SANITIZE_FINDRADICALS | Chem.SanitizeFlags.SANITIZE_KEKULIZE |\
+        #                  Chem.SanitizeFlags.SANITIZE_SETAROMATICITY | Chem.SanitizeFlags.SANITIZE_SETCONJUGATION |\
+        #                  Chem.SanitizeFlags.SANITIZE_SETHYBRIDIZATION | Chem.SanitizeFlags.SANITIZE_SYMMRINGS)
 
         # CReM
         db_fname = 'replacements02_sc2.db'
@@ -87,11 +66,13 @@ class GCPN_crem(nn.Module):
             new_mols = list(mutate_mol(mol, db_fname, return_mol=True))
             print("CReM options:" + str(len(new_mols)))
             new_mols = [Chem.RemoveHs(i[1]) for i in new_mols]
+
             if len(new_mols) > self.sample_crem:
                 print("Downsampling to 20 options.")
                 new_mols = choices(new_mols, k=self.sample_crem)
         except Exception as e:
-            print(e)
+            print("CReM forward error: " + str(e))
+            print("SMILE: " + Chem.MolToSmiles(mol))
             new_mols = []
         new_mols.append(mol)  # Also consider the molecule by itself, if chosen stop is implied.
         new_pygs = Batch().from_data_list([mol_to_pyg_graph(i) for i in new_mols]).to(self.device)
@@ -102,7 +83,9 @@ class GCPN_crem(nn.Module):
                 action, prob = -1, torch.tensor(1.0)
             else:
                 X = self.gnn_embed(new_pygs)
-                f_probs = self.mc(X)  # Mask is not needed since each row is a molecule.
+                X_last = X[-1].repeat(len(X), 1)
+                X_cat = torch.cat((X, X_last), dim=1)
+                f_probs = self.mc(X_cat)  # Mask is not needed since each row is a molecule.
                 action, prob = sample_from_probs(f_probs, eval_action)
 
             if action == (len(new_mols) - 1):
@@ -121,14 +104,22 @@ class GCPN_crem(nn.Module):
         p_agg = torch.empty(n_steps).to(self.device)
         X_agg = torch.empty((n_steps, self.emb_dim)).to(self.device)
         for i, batch in enumerate(orig_states):
-            X = self.gnn_embed(batch)  # (n_crem, 128)
-            p_all = self.mc(X)
+            X = self.gnn_embed(batch)  # (sample_n_crem, 128)
+
+            if X.ndim == 1:
+                #When there's only one molecule, need to unsqueeze, and do manual concatenation, so indexing works.
+                X_cat = torch.unsqueeze(X.repeat(2), 0)
+            else:
+                X_last = X[-1].repeat(len(X), 1)
+                X_cat = torch.cat((X, X_last), dim=1) # (sample_n_crem, 256)
+
+            p_all = self.mc(X_cat)
             if p_all.ndim == 0:
                 # When there's only one molecule, need to unsqueeze so indexing works
                 p_all = torch.unsqueeze(p_all, 0)
             p_crem = p_all[actions[i].item()]
             p_agg[i] = p_crem
-            X_agg[i] = X.sum(0)
+            X_agg[i] = X[-1] #Pooled representation of starting state is the input to the critic-value function
         return p_agg, X_agg
 
 

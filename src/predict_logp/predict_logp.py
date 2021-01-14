@@ -149,7 +149,7 @@ def proc_one_epoch(net,
         loss = criterion(y_pred, y)
         if train:
             loss.backward()
-            optim.step(,
+            optim.step()
         epoch_loss += loss.item()
 
         if ((i+1)%(nb_batch//print_freq))==0:

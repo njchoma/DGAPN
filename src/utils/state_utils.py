@@ -89,8 +89,11 @@ def state_to_mol(state, env, keep_self_edges=True):
     return mol
 
 
-def state_to_graph(state, env, keep_self_edges=True):
-    mol = state_to_mol(state, env, keep_self_edges)
+def state_to_graph(state, env, keep_self_edges=True, is_mol=False):
+    if not is_mol:
+        mol = state_to_mol(state, env, keep_self_edges)
+    else:
+        mol = state
     g = mol_to_pyg_graph(mol)
     g = Batch.from_data_list([g])
     return g
