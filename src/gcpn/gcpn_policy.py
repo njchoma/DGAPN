@@ -17,6 +17,8 @@ from utils.graph_utils import mol_to_pyg_graph
 from rdkit import Chem
 from crem.crem import mutate_mol
 
+from .kernels import linear, gauss
+
 
 class GCPN_crem(nn.Module):
     def __init__(self,
@@ -38,6 +40,7 @@ class GCPN_crem(nn.Module):
                                    input_dim,
                                    emb_dim,
                                    True)
+        self.batch_norm = nn.BatchNorm1d(emb_dim)
         self.mc = Action_Prediction(mlp_nb_layers,
                                     mlp_nb_hidden,
                                     2 * emb_dim)
@@ -81,8 +84,9 @@ class GCPN_crem(nn.Module):
                 action, prob = -1, torch.tensor(1.0)
             else:
                 X = self.gnn_embed(new_pygs)
+                X = gauss(self.batch_norm(X))
                 X_last = X[-1].repeat(len(X), 1)
-                # Instead of using a MLP, we can use a dot product between the new hidden features and the original.
+                # Instead of using a MLP, we can use a dot product between the hidden kernel features.
                 f_logits = torch.sum(X * X_last, dim=1)
                 f_probs = nn.functional.softmax(f_logits, dim=0)
                 # X_cat = torch.cat((X, X_last), dim=1)
