@@ -16,6 +16,7 @@ from rdkit.Chem.Fingerprints import FingerprintMols
 
 from .gcpn_policy import GCPN, GCPN_crem
 from .MLP import Critic, Discriminator
+from gym_molecule.envs.molecule import load_conditional
 
 import os
 from utils.general_utils import load_surrogate_model, maybe_download_file
@@ -319,6 +320,7 @@ def train_ppo(args, env, writer=None):
     # If running policy in eval mode, load pre-trained params.
     if args.eval:
         ppo.policy.load_state_dict(torch.load(args.state_dict, map_location=device))
+        smiles = [row[0] for row in load_conditional(args.conditional)]
 
     print(ppo)
     memory = Memory()
@@ -358,8 +360,9 @@ def train_ppo(args, env, writer=None):
     # training loop
     for i_episode in range(1, max_episodes + 1):
         cur_ep_ret_env = 0
-        # Now state is a mol
-        state = env.reset()
+
+        # Now state is a mol.
+        state = env.reset(smiles[i_episode]) if args.eval else env.reset()
         surr_reward = 0.0
 
         # If args.eval is True, we're in eval mode so don't track gradients.
@@ -429,6 +432,7 @@ def train_ppo(args, env, writer=None):
                 if done:
                     break
 
+            # If we're in eval, stop when we have generated enough molecules.
             if args.eval and n_done == args.num_done:
                 break
 
