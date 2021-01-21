@@ -82,8 +82,11 @@ class GCPN_crem(nn.Module):
             else:
                 X = self.gnn_embed(new_pygs)
                 X_last = X[-1].repeat(len(X), 1)
-                X_cat = torch.cat((X, X_last), dim=1)
-                f_probs = self.mc(X_cat)  # Mask is not needed since each row is a molecule.
+                # Instead of using a MLP, we can use a dot product between the new hidden features and the original.
+                f_logits = torch.sum(X * X_last, dim=1)
+                f_probs = nn.functional.softmax(f_logits, dim=0)
+                # X_cat = torch.cat((X, X_last), dim=1)
+                # f_probs = self.mc(X_cat)  # Mask is not needed since each row is a molecule.
                 action, prob = sample_from_probs(f_probs, eval_action)
 
             if action == (len(new_mols) - 1):
