@@ -3,10 +3,13 @@
 *.swp
 run*
 test_run*
-/src/.idea/
-*.DS_Store
-num_check.py
+molecule_gen*
 *.idea/
+*.DS_Store
+*.db
+*.db.gz
+src/dataset/*.csv
+module_check.py
 *.png
 
 # Byte-compiled / optimized / DLL files

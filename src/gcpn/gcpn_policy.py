@@ -3,12 +3,15 @@ import numpy as np
 
 import torch
 import torch.nn as nn
+from torchvision import transforms
 from torch.distributions.bernoulli import Bernoulli
 from torch.distributions.categorical import Categorical
 
 import torch_geometric as pyg
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
+
+from .kernels import linear, gauss
 
 
 class GCPN(nn.Module):
@@ -26,7 +29,6 @@ class GCPN(nn.Module):
         self.gnn_embed = GNN_Embed(gnn_nb_hidden,
                                    gnn_nb_layers,
                                    gnn_nb_hidden_kernel,
-                                   1,
                                    input_dim,
                                    emb_dim)
 
@@ -166,7 +168,6 @@ class GNN_Embed(nn.Module):
                nb_hidden_gnn,
                nb_layer,
                nb_hidden_kernel,
-               nb_kernel,
                input_dim,
                emb_dim):
     super(GNN_Embed, self).__init__()
@@ -244,15 +245,22 @@ def batched_softmax(logits, batch):
 #####################################################
 
 class MyGCNConv(MessagePassing):
-    def __init__(self, in_channels, out_channels, nb_hidden_kernel=0, nb_edge_attr=1, apply_norm=False):
+    def __init__(self, in_channels, out_channels, nb_hidden_kernel, nb_edge_attr=1, apply_norm=False, kernel='linear'):
         super(MyGCNConv, self).__init__(aggr='add')  # "Add" aggregation.
         self.lin = torch.nn.Linear(2*in_channels, out_channels)
         self.act = nn.ReLU()
 
-        if nb_hidden_kernel>0:
+        self.kernel = kernel
+        if kernel is 'linear':
             self.linA = torch.nn.Linear(in_channels*2+nb_edge_attr, nb_hidden_kernel)
             self.linB = torch.nn.Linear(nb_hidden_kernel, 1)
-            self.sigmoid = nn.Sigmoid()
+            self.actK = nn.Sigmoid()
+        elif kernel is 'gaussian':
+            self.linA = torch.nn.Linear(in_channels*2+nb_edge_attr, nb_hidden_kernel)
+            self.linB = torch.nn.Linear(nb_hidden_kernel, in_channels)
+            self.normK = nn.BatchNorm1d(in_channels)
+        else:
+            raise ValueError("kernel not recognized.")
 
         self.apply_norm = apply_norm
         if apply_norm:
@@ -280,10 +288,17 @@ class MyGCNConv(MessagePassing):
     def message(self, x_i, x_j, edge_attr):
         edge_attr = edge_attr.unsqueeze(1)
         E = torch.cat([x_i, x_j, edge_attr], dim=1)
-        h = self.act(self.linA(E))
-        w = self.sigmoid(self.linB(h))
-
-        return w * x_j
+        if self.kernel is 'linear':
+            h = self.act(self.linA(E))
+            f = linear(self.linB(h))
+            w = self.actK(f)
+            out = w * x_j
+        if self.kernel is 'gaussian':
+            h = self.act(self.linA(E))
+            n = self.normK(self.linB(h))
+            f = gauss(n)
+            out = f
+        return out
 
     def update(self, aggr_out):
         return aggr_out

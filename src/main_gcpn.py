@@ -42,8 +42,6 @@ def molecule_arg_parser():
     add_arg('--max_action', type=int, default=128)  # default 0
     add_arg('--min_action', type=int, default=20)  # default 0
 
-    # NETWORK PARAMETERS
-    add_arg('--emb_size', type=int, default=128) # default 64
     # POLICY PARAMETERS
     add_arg('--emb_size', type=int, default=128)  # default 64
     add_arg('--layer_num_g', type=int, default=3)
