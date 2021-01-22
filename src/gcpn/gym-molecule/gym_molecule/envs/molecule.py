@@ -245,8 +245,9 @@ class MoleculeEnv(gym.Env):
         # todo: add terminal action
 
         if self.is_conditional:
-            terminate_condition = (self.mol.GetNumAtoms() >= self.max_atom - self.possible_atom_types.shape[
-                0] - self.min_action or self.counter >= self.max_action or stop) and self.counter >= self.min_action
+            terminate_condition = stop
+            #terminate_condition = (self.mol.GetNumAtoms() >= self.max_atom - self.possible_atom_types.shape[
+            #    0] - self.min_action or self.counter >= self.max_action or stop) and self.counter >= self.min_action
         else:
             terminate_condition = (self.mol.GetNumAtoms() >= self.max_atom - self.possible_atom_types.shape[
                 0] or self.counter >= self.max_action or stop) and self.counter >= self.min_action
@@ -357,11 +358,12 @@ class MoleculeEnv(gym.Env):
         to avoid error, assume an atom already exists
         :return: ob
         '''
-        if self.is_conditional:
+        if self.is_conditional and smile is None:
             self.conditional = random.sample(self.conditional_list, 1)[0]
             self.mol = Chem.RWMol(Chem.MolFromSmiles(self.conditional[0]))
             #Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         elif smile is not None:
+            print("Modifying: " + str(smile))
             self.mol = Chem.RWMol(Chem.MolFromSmiles(smile))
             #Chem.SanitizeMol(self.mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_KEKULIZE)
         else:
