@@ -283,7 +283,7 @@ def train_ppo(args, env, writer=None):
     max_episodes = 50000  # max training episodes
     max_timesteps = 1500  # max timesteps in one episode
 
-    update_timestep = 2000  # update policy every n timesteps
+    update_timestep = 500  # update policy every n timesteps
     K_epochs = 80  # update policy for K epochs
     eps_clip = 0.2  # clip parameter for PPO
     gamma = 0.99  # discount factor
@@ -369,7 +369,8 @@ def train_ppo(args, env, writer=None):
         with torch.set_grad_enabled(not args.eval):
             for t in range(max_timesteps):
                 time_step += 1
-
+                
+                #print(smiles[i_episode])
                 action = ppo.select_action(state, memory, env)
                 state, reward, done, info = env.step(action, memory, crem=args.use_crem)
 
@@ -377,7 +378,7 @@ def train_ppo(args, env, writer=None):
                     if args.use_surrogate and (i_episode > args.surrogate_reward_timestep_delay):
                         try:
                             surr_reward = get_final_reward(state, env, surrogate_model, device)
-                            reward += surr_reward / 5
+                            reward = surr_reward
                             info['surrogate_reward'] = surr_reward
                         except Exception as e:
                             print("Error in surrogate " + str(e))
@@ -430,6 +431,7 @@ def train_ppo(args, env, writer=None):
                 if (((i_episode + 1) % 20) == 0) and render:
                     env.render()
                 if done:
+                    print("Done! " + str(n_done))
                     break
 
             # If we're in eval, stop when we have generated enough molecules.
