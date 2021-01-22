@@ -64,13 +64,9 @@ class GCPN_crem(nn.Module):
         db_fname = 'replacements02_sc2.db'
 
         try:
-            new_mols = list(mutate_mol(mol, db_fname, return_mol=True))
+            new_mols = list(mutate_mol(mol, db_fname, max_replacements = self.sample_crem, return_mol=True, ncores=16))
             print("CReM options:" + str(len(new_mols)))
             new_mols = [Chem.RemoveHs(i[1]) for i in new_mols]
-
-            if len(new_mols) > self.sample_crem:
-                print("Downsampling to 20 options.")
-                new_mols = choices(new_mols, k=self.sample_crem)
         except Exception as e:
             print("CReM forward error: " + str(e))
             print("SMILE: " + Chem.MolToSmiles(mol))
