@@ -362,7 +362,7 @@ def train_ppo(args, env, writer=None):
         cur_ep_ret_env = 0
 
         # Now state is a mol.
-        state = env.reset(smiles[i_episode]) if args.eval else env.reset()
+        state = env.reset(smiles[i_episode], crem=args.use_crem) if args.eval else env.reset(crem=args.use_crem)
         surr_reward = 0.0
 
         # If args.eval is True, we're in eval mode so don't track gradients.
@@ -393,12 +393,12 @@ def train_ppo(args, env, writer=None):
                         if args.is_conditional:
                             start_mol, end_mol = Chem.MolFromSmiles(info['start_smile']), Chem.MolFromSmiles(
                                 info['smile'])
-                            start_fingerprint, end_fingerprint = FingerprintMols.FingerprintMol(
-                                start_mol), FingerprintMols.FingerprintMol(end_mol)
-                            sim = DataStructs.TanimotoSimilarity(start_fingerprint, end_fingerprint)
+                            #start_fingerprint, end_fingerprint = FingerprintMols.FingerprintMol(
+                            #    start_mol), FingerprintMols.FingerprintMol(end_mol)
+                            #sim = DataStructs.TanimotoSimilarity(start_fingerprint, end_fingerprint)
 
-                            row = ''.join(['{},'] * 12)[:-1] + '\n'
-                            f.write(row.format(info['start_smile'], info['smile'], sim, info['reward_valid'],
+                            row = ''.join(['{},'] * 11)[:-1] + '\n'
+                            f.write(row.format(info['start_smile'], info['smile'], info['reward_valid'],
                                                info['reward_qed'], \
                                                info['reward_sa'], info['final_stat'], info['flag_steric_strain_filter'],
                                                info['flag_zinc_molecule_filter'], \
