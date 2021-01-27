@@ -26,7 +26,6 @@ def molecule_arg_parser():
     # EVAL MODE PARAMETERS
     add_arg('--eval', action='store_true')
     add_arg('--state_dict', default="")
-    add_arg('--num_done', type=int, default=1)
 
     # SURROGATE REWARD
     add_arg('--use_surrogate', '-sur', action='store_true')

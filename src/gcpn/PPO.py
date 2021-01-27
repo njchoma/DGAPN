@@ -321,6 +321,8 @@ def train_ppo(args, env, writer=None):
     if args.eval:
         ppo.policy.load_state_dict(torch.load(args.state_dict, map_location=device))
         smiles = [row[0] for row in load_conditional(args.conditional)]
+        max_episodes = len(smiles)
+        print("Max_episodes ", max_episodes)
 
     print(ppo)
     memory = Memory()
@@ -362,7 +364,7 @@ def train_ppo(args, env, writer=None):
         cur_ep_ret_env = 0
 
         # Now state is a mol.
-        state = env.reset(smiles[i_episode], crem=args.use_crem) if args.eval else env.reset(crem=args.use_crem)
+        state = env.reset(smiles[i_episode-1], crem=args.use_crem) if args.eval else env.reset(crem=args.use_crem)
         surr_reward = 0.0
 
         # If args.eval is True, we're in eval mode so don't track gradients.
@@ -416,12 +418,8 @@ def train_ppo(args, env, writer=None):
                 memory.rewards.append(reward)
                 memory.is_terminals.append(done)
 
-                # if we're in eval, don't update the policy.
-                if args.eval:
-                    continue
-
-                # update if its time
-                if time_step % update_timestep == 0:
+                # update if its time, and if we're not in eval
+                if (time_step % update_timestep == 0) and (args.eval == False):
                     print("updating ppo")
                     ppo.update(memory, i_episode, writer)
                     memory.clear_memory()
@@ -434,9 +432,6 @@ def train_ppo(args, env, writer=None):
                     print("Done! " + str(n_done))
                     break
 
-            # If we're in eval, stop when we have generated enough molecules.
-            if args.eval and n_done == args.num_done:
-                break
 
             writer.add_scalar("EpSurrogate", -1 * surr_reward, episode_count)
             rewbuffer_env.append(cur_ep_ret_env)
