@@ -258,7 +258,8 @@ class MyGCNConv(MessagePassing):
         elif kernel is 'gaussian':
             self.linA = torch.nn.Linear(in_channels*2+nb_edge_attr, nb_hidden_kernel)
             self.linB = torch.nn.Linear(nb_hidden_kernel, in_channels)
-            self.normK = nn.BatchNorm1d(in_channels)
+            self.normA = nn.BatchNorm1d(in_channels)
+            self.normB = nn.BatchNorm1d(in_channels)
         else:
             raise ValueError("kernel not recognized.")
 
@@ -295,8 +296,8 @@ class MyGCNConv(MessagePassing):
             out = w * x_j
         if self.kernel is 'gaussian':
             h = self.act(self.linA(E))
-            n = self.normK(self.linB(h))
-            f = gauss(n)
+            n = self.normA(self.linB(h))
+            f = self.normB(gauss(n))
             out = f
         return out
 
