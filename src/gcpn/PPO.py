@@ -56,6 +56,7 @@ class ActorCriticGCPN(nn.Module):
                  mlp_nb_hidden,
                  crem,
                  sample_crem,
+                 eval,
                  device):
         super(ActorCriticGCPN, self).__init__()
 
@@ -70,6 +71,7 @@ class ActorCriticGCPN(nn.Module):
                                    mlp_nb_layers,
                                    mlp_nb_hidden,
                                    sample_crem,
+                                   eval,
                                    device)
         else:
             self.actor = GCPN(input_dim,
@@ -137,6 +139,7 @@ class PPO_GCPN:
                  mlp_nb_hidden,
                  crem,
                  sample_crem,
+                 eval,
                  device):
         self.lr = lr
         self.betas = betas
@@ -158,6 +161,7 @@ class PPO_GCPN:
                                       mlp_nb_hidden,
                                       crem,
                                       sample_crem,
+                                      eval,
                                       device).to(self.device)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
 
@@ -171,6 +175,7 @@ class PPO_GCPN:
                                           mlp_nb_hidden,
                                           crem,
                                           sample_crem,
+                                          eval,
                                           device).to(self.device)
         self.policy_old.load_state_dict(self.policy.state_dict())
 
@@ -315,6 +320,7 @@ def train_ppo(args, env, writer=None):
                    args.mlp_num_hidden,
                    args.use_crem,
                    args.sample_crem,
+                   args.eval,
                    device)
 
     # If running policy in eval mode, load pre-trained params.

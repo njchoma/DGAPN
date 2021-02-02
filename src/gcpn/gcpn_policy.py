@@ -28,6 +28,7 @@ class GCPN_crem(nn.Module):
                  mlp_nb_layers,
                  mlp_nb_hidden,
                  sample_crem,
+                 eval,
                  device):
         super(GCPN_crem, self).__init__()
 
@@ -44,6 +45,9 @@ class GCPN_crem(nn.Module):
         self.emb_dim = emb_dim
         self.device = device
         self.sample_crem = sample_crem
+        self.eval = eval
+        if self.eval:
+            self.sample_crem = None
 
     def forward(self, mol, eval_action=None):
         """Find's list of molecule mutations with CReM, then feeds them to a GNN_embedding network, then a MLP.
