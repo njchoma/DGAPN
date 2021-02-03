@@ -2,7 +2,7 @@ import os
 import argparse
 
 from dataset import get_dataset, preprocess
-from predict_logp import predict_logp
+from gnn_surrogate import gnn_surrogate
 
 def read_args():
     parser = argparse.ArgumentParser()
@@ -30,17 +30,17 @@ def main():
 
     scores, smiles = preprocess.main(args.data_path)
 
-    predict_logp.main(artifact_path,
-                      scores,
-                      smiles,
-                      gpu_num=args.gpu,
-                      upsample=args.upsample,
-                      exp_loss=args.exp_loss,
-                      nb_hidden=args.hidden,
-                      nb_layer=args.layers,
-                      use_3d=args.use_3d,
-                      store_preprocessed=args.store_preprocessed,
-                      data_path = args.data_path)
+    gnn_surrogate.main(artifact_path,
+                       scores,
+                       smiles,
+                       gpu_num=args.gpu,
+                       upsample=args.upsample,
+                       exp_loss=args.exp_loss,
+                       nb_hidden=args.hidden,
+                       nb_layer=args.layers,
+                       use_3d=args.use_3d,
+                       store_preprocessed=args.store_preprocessed,
+                       data_path = args.data_path)
 
 
 if __name__ == "__main__":

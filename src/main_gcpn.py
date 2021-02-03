@@ -9,7 +9,7 @@ from gcpn.train import train
 from torch.utils.tensorboard import SummaryWriter
 
 from utils.general_utils import maybe_download_file
-from predict_logp import model
+from gnn_surrogate import model
 
 def molecule_arg_parser():
     parser = argparse.ArgumentParser(
