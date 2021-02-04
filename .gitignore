@@ -1,5 +1,8 @@
 # MY ADDITIONS
+commands
+module_check.py
 *.pth
+*.png
 *.swp
 run*
 test_run*
@@ -9,8 +12,6 @@ molecule_gen*
 *.db
 *.db.gz
 src/dataset/*.csv
-module_check.py
-*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

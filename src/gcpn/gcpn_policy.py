@@ -17,8 +17,6 @@ from utils.graph_utils import mol_to_pyg_graph
 from rdkit import Chem
 from crem.crem import mutate_mol
 
-from .kernels import linear, gauss
-
 
 class GCPN_crem(nn.Module):
     def __init__(self,
@@ -80,7 +78,6 @@ class GCPN_crem(nn.Module):
                 action, prob = -1, torch.tensor(1.0)
             else:
                 X = self.gnn_embed(new_pygs)
-                X = gauss(self.batch_norm(X))
                 X_last = X[-1].repeat(len(X), 1)
                 # Instead of using a MLP, we can use a dot product between the hidden kernel features.
                 f_logits = torch.sum(X * X_last, dim=1)
