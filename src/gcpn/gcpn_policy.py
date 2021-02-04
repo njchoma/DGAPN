@@ -39,7 +39,7 @@ class GCPN_crem(nn.Module):
                                    input_dim,
                                    emb_dim,
                                    stochastic_kernel,
-                                   True)
+                                   crem=True)
         self.batch_norm = nn.BatchNorm1d(emb_dim)
         self.mc = Action_Prediction(mlp_nb_layers,
                                     mlp_nb_hidden,

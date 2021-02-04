@@ -70,6 +70,7 @@ class ActorCriticGCPN(nn.Module):
                                    emb_dim,
                                    mlp_nb_layers,
                                    mlp_nb_hidden,
+                                   stochastic_kernel,
                                    sample_crem,
                                    device)
         else:
@@ -80,7 +81,8 @@ class ActorCriticGCPN(nn.Module):
                               gnn_nb_hidden,
                               gnn_heads,
                               mlp_nb_layers,
-                              mlp_nb_hidden)
+                              mlp_nb_hidden,
+                              stochastic_kernel)
         # critic
         self.critic = Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
 
