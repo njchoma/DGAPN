@@ -54,6 +54,7 @@ class ActorCriticGCPN(nn.Module):
                  gnn_heads,
                  mlp_nb_layers,
                  mlp_nb_hidden,
+                 stochastic_kernel,
                  crem,
                  sample_crem,
                  device):
@@ -135,6 +136,7 @@ class PPO_GCPN:
                  gnn_heads,
                  mlp_nb_layers,
                  mlp_nb_hidden,
+                 stochastic_kernel,
                  crem,
                  sample_crem,
                  device):
@@ -145,6 +147,7 @@ class PPO_GCPN:
         self.upsilon = upsilon
         self.eps_clip = eps_clip
         self.K_epochs = K_epochs
+        self.stochastic_kernel = stochastic_kernel
         self.device = device
         self.crem = crem
 
@@ -156,6 +159,7 @@ class PPO_GCPN:
                                       gnn_heads,
                                       mlp_nb_layers,
                                       mlp_nb_hidden,
+                                      stochastic_kernel,
                                       crem,
                                       sample_crem,
                                       device).to(self.device)
@@ -169,6 +173,7 @@ class PPO_GCPN:
                                           gnn_heads,
                                           mlp_nb_layers,
                                           mlp_nb_hidden,
+                                          stochastic_kernel,
                                           crem,
                                           sample_crem,
                                           device).to(self.device)
@@ -250,6 +255,14 @@ class PPO_GCPN:
             if (i % 10) == 0:
                 print("  {:3d}: Loss: {:7.3f}".format(i, loss))
 
+            # Detach projections after first iteration
+            if i == 0 and self.stochastic_kernel:
+                self.policy.actor.gnn_embed.detach_projections()
+
+        # Reset projections for graph kernel
+        if self.stochastic_kernel:
+            self.policy.actor.gnn_embed.reset_projections()
+
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
 
@@ -313,6 +326,7 @@ def train_ppo(args, env, writer=None):
                    args.heads_g,
                    args.mlp_num_layer,
                    args.mlp_num_hidden,
+                   args.stochastic_kernel,
                    args.use_crem,
                    args.sample_crem,
                    device)
