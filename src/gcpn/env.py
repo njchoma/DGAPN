@@ -1,0 +1,68 @@
+import os
+import numpy as np
+from rdkit import Chem
+from crem.crem import mutate_mol
+
+from torch_geometric.data import Batch
+
+from dataset.get_dataset import download_dataset, unpack_dataset
+from dataset import preprocess
+from utils.graph_utils import mol_to_pyg_graph
+
+DATASET_URL = "http://www.qsar4u.com/files/cremdb/replacements02_sc2.db.gz"
+DATASET_NAME = 'replacements02_sc2.db'
+
+class CReM_Env(object):
+    def __init__(self,
+                 storage_path,
+                 nb_sample_crem = 16,
+                 nb_cores = 16):
+
+        warm_start_dataset_path = os.path.join(storage_path, 'debug.csv')
+        self.scores, self.smiles = preprocess.main(warm_start_dataset_path)
+        self.nb_sample_crem = nb_sample_crem
+        self.nb_cores = nb_cores
+
+        _ = download_dataset(storage_path,
+                             DATASET_NAME+'.gz',
+                             DATASET_URL)
+        self.db_fname = unpack_dataset(storage_path,
+                                       DATASET_NAME+'.gz',
+                                       DATASET_NAME)
+
+
+    def reset(self):
+        idx = np.random.randint(len(self.scores))
+        mol = Chem.MolFromSmiles(self.smiles[idx])
+
+
+        g = mol_to_pyg_graph(mol)[0]
+        g_candidates = self.get_crem_candidates(mol)
+
+        print(type(g), type(g_candidates))
+        exit()
+
+        return g, g_candidates
+
+    def step(self, selected_mol, stop):
+        crem_candidates = self.get_crem_candidates(mol)
+        return None
+
+    def get_crem_candidates(self, mol):
+
+        try:
+            new_mols = list(mutate_mol(mol,
+                                       self.db_fname,
+                                       max_replacements = self.nb_sample_crem,
+                                       return_mol=True,
+                                       ncores=self.nb_cores))
+            print("CReM options:" + str(len(new_mols)))
+            new_mols = [Chem.RemoveHs(i[1]) for i in new_mols]
+        except Exception as e:
+            print("CReM forward error: " + str(e))
+            print("SMILE: " + Chem.MolToSmiles(mol))
+            new_mols = []
+        new_mols = [mol] + new_mols
+        g_candidates = [mol_to_pyg_graph(i)[0] for i in new_mols]
+        g_candidates = Batch.from_data_list(g_candidates)
+        return g_candidates

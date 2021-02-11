@@ -65,22 +65,22 @@ class ActorCriticGCPN(nn.Module):
         super(ActorCriticGCPN, self).__init__()
 
         # action mean range -1 to 1
-        self.actor = GCPN(input_dim,
-                           emb_dim,
-                           nb_edge_types,
-                           gnn_nb_layers,
-                           gnn_nb_hidden,
-                           gnn_nb_hidden_kernel,
-                           mlp_nb_layers,
-                           mlp_nb_hidden)
+        self.actor = GCPN_CReM(input_dim,
+                               emb_dim,
+                               nb_edge_types,
+                               gnn_nb_layers,
+                               gnn_nb_hidden,
+                               gnn_nb_hidden_kernel,
+                               mlp_nb_layers,
+                               mlp_nb_hidden)
         # critic
         self.critic = GCPN_Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
         
     def forward(self):
         raise NotImplementedError
     
-    def act(self, state, memory):
-        action, probs = self.actor(state)
+    def act(self, state, memory, surrogate_model):
+        action, probs = self.actor(state, surrogate_model)
         action_logprob = torch.log(probs)
         
         memory.states.append(state.to_data_list()[0])
@@ -161,11 +161,11 @@ class PPO_GCPN:
         self.MseLoss = nn.MSELoss()
 
     
-    def select_action(self, state, memory, env):
-        g = state_to_surrogate_graph(state, env).to(device)
-        # state = wrap_state(state).to(device)
-        action = self.policy_old.act(g, memory)
-        return action
+    def select_action(self, state, memory, surrogate_model):
+        g = state.to(device)
+        action, new_state = self.policy_old.act(g, memory, surrogate_model)
+        done = action[1]
+        return done, new_state
     
     def update(self, memory, i_episode, writer=None):
         # Monte Carlo estimate of rewards:
@@ -236,37 +236,8 @@ class PPO_GCPN:
 #                   FINAL REWARDS                   #
 #####################################################
 
-def nodes_to_atom_labels(nodes, env, nb_nodes):
-    atom_types = env.possible_atom_types
-    atom_idx = np.argmax(nodes[:nb_nodes], axis=1)
-    node_labels = np.asarray(atom_types)[atom_idx]
-    return node_labels
-
-def dense_to_sparse_adj(adj, keep_self_edges):
-    # Remove self-edges converting to surrogate input
-    if not keep_self_edges:
-        adj = adj - np.diag(np.diag(adj))
-    sp = np.nonzero(adj)
-    sp = np.stack(sp)
-    return sp
-
-def state_to_surrogate_graph(state, env, keep_self_edges=True):
-    nodes = state['node'].squeeze()
-    nb_nodes = int(np.sum(nodes))
-    adj = state['adj'][:,:nb_nodes, :nb_nodes]
-
-    atoms = nodes_to_atom_labels(nodes, env, nb_nodes)
-    bonds = []
-    for a,b in zip(adj, env.possible_bond_types):
-        sp = dense_to_sparse_adj(a, keep_self_edges)
-        bonds.append((sp, b))
-    g = state_to_pyg(atoms, bonds)
-    g = Batch.from_data_list(g)
-    return g
-    
-
-def get_final_reward(state, env, surrogate_model):
-    g = state_to_surrogate_graph(state, env, keep_self_edges=False)
+def get_reward(state, surrogate_model):
+    g = Batch().from_data_list([state])
     g = g.to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
@@ -286,12 +257,12 @@ def train_ppo(args, surrogate_model, env, writer=None):
 
     ############## Hyperparameters ##############
     render = True
-    solved_reward = 100          # stop training if avg_reward > solved_reward
+    solved_reward = 100         # stop training if avg_reward > solved_reward
     log_interval = 80           # print avg reward in the interval
     max_episodes = 50000        # max training episodes
-    max_timesteps = 1500        # max timesteps in one episode
+    max_timesteps = 15          # max timesteps in one episode
     
-    update_timestep = 2000      # update policy every n timesteps
+    update_interval = 100       # update policy every n episodes
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
     gamma = 0.99                # discount factor
@@ -302,8 +273,6 @@ def train_ppo(args, surrogate_model, env, writer=None):
     #############################################
 
     ob = env.reset()
-    nb_edge_types = ob['adj'].shape[0]
-    ob = state_to_surrogate_graph(ob, env)
     input_dim = ob.x.shape[1]
     
     ppo = PPO_GCPN(lr,
@@ -315,7 +284,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
                    eps_clip,
                    input_dim,
                    args.emb_size,
-                   nb_edge_types,
+                   1,
                    args.layer_num_g,
                    args.num_hidden_g,
                    args.num_hidden_g,
@@ -327,6 +296,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
     print("lr:", lr, "beta:", betas)
 
     surrogate_model = surrogate_model.to(device)
+    surrogate_model.eval()
     
     # logging variables
     running_reward = 0
@@ -342,16 +312,16 @@ def train_ppo(args, surrogate_model, env, writer=None):
     for i_episode in range(1, max_episodes+1):
         cur_ep_ret_env = 0
         state = env.reset()
-        surr_reward=0.0
-        for t in range(max_timesteps):
-            time_step +=1
-            # Running policy_old:
-            action = ppo.select_action(state, memory, env)
-            state, reward, done, _ = env.step(action)
+        starting_reward = get_reward(state, surrogate_model)
 
-            if done and (i_episode > args.surrogate_reward_timestep_delay):
-                surr_reward = get_final_reward(state, env, surrogate_model)
-                reward += surr_reward / 5
+        for t in range(max_timesteps):
+            # Running policy_old:
+            done, state = ppo.select_action(state, memory, surrogate_model)
+            reward = 0
+
+            if done or (t==(max_timesteps-1)):
+                surr_reward = get_reward(state, surrogate_model)
+                reward = surr_reward-starting_reward
 
             
             
@@ -359,20 +329,18 @@ def train_ppo(args, surrogate_model, env, writer=None):
             memory.rewards.append(reward)
             memory.is_terminals.append(done)
 
-            # update if its time
-            if time_step % update_timestep == 0:
-                print("updating ppo")
-                ppo.update(memory, i_episode, writer)
-                memory.clear_memory()
-                time_step = 0
             running_reward += reward
-            cur_ep_ret_env += reward
-            if (((i_episode+1)%20)==0) and render:
-                env.render()
             if done:
                 break
+
+        # update if it's time
+        if i_episode % update_interval == 0:
+            print("updating ppo")
+            ppo.update(memory, i_episode, writer)
+            memory.clear_memory()
+
         writer.add_scalar("EpSurrogate", -1*surr_reward, episode_count)
-        rewbuffer_env.append(cur_ep_ret_env)
+        rewbuffer_env.append(reward)
         avg_length += t
 
         # write to Tensorboard
@@ -382,7 +350,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
         episode_count += 1
 
         # stop training if avg_reward > solved_reward
-        if running_reward > (log_interval*solved_reward):
+        if np.mean(rewbuffer_env) > solved_reward:
             print("########## Solved! ##########")
             torch.save(ppo.policy.state_dict(), './PPO_continuous_solved_{}.pth'.format('test'))
             break

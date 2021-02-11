@@ -360,3 +360,136 @@ def sample_from_probs(p, action):
     m = Categorical(p)
     a = m.sample() if action is None else action
     return a.item(), p[a]
+
+
+
+
+#####################################################
+#                       CREM                        #
+#####################################################
+
+class GCPN_CReM(nn.Module):
+    def __init__(self,
+                 input_dim,
+                 emb_dim,
+                 nb_edge_types,
+                 mlp_nb_layers,
+                 mlp_nb_hidden):
+        super(GCPN_CReM, self).__init__()
+
+        layers = [nn.Linear(emb_dim, nb_hidden)]
+        for _ in range(nb_layers-1):
+            layers.append(nn.Linear(nb_hidden, nb_hidden))
+
+        self.layers = nn.ModuleList(layers)
+        self.final_layer = nn.Linear(nb_hidden, 1)
+        self.act = nn.ReLU()
+
+    def forward(self, g, g_actions, surrogate_model):
+        for i, l in enumerate(self.layers):
+            X = self.act(l(X))
+        return self.final_layer(X).squeeze(1)
+
+    def forward(self, graph, surrogate_model):
+        nb_nodes = graph.x.shape[0]
+        X = self.gnn_embed(graph)
+
+        a_first,  p_first  = self.get_first(X, mask)
+        a_second, p_second = self.get_second(X, a_first, mask)
+        a_edge,   p_edge   = self.get_edge(X, a_first, a_second)
+        a_stop,   p_stop   = self.get_stop(X)
+
+        actions = np.array([[a_first, a_second, a_edge, a_stop]])
+        probs = torch.stack((p_first, p_second, p_edge, p_stop))
+        return actions, probs
+
+    def get_first(self, X, mask=None, eval_action=None):
+        f_probs = self.mf(X)
+        if mask is not None:
+            nb_true_nodes = int(sum(mask))-9
+            true_node_mask = mask.clone()
+            true_node_mask[nb_true_nodes:] = 0.0
+            f_probs = f_probs*true_node_mask # UNSURE, CHECK
+        return sample_from_probs(f_probs, eval_action)
+
+    def get_second(self, X, a_first, mask=None, eval_action=None):
+        nb_nodes = X.shape[0]
+        X_first = X[a_first].unsqueeze(0).repeat(nb_nodes, 1)
+        X_cat = torch.cat((X_first, X),dim=1)
+
+        f_probs = self.ms(X_cat)
+        if mask is not None:
+            f_probs = f_probs*mask # UNSURE, CHECK
+            f_probs[a_first] = 0.0
+        return sample_from_probs(f_probs, eval_action)
+
+    def get_edge(self, X, a_first, a_second, eval_action=None):
+        X_first  = X[a_first]
+        X_second = X[a_second]
+        X_cat = torch.cat((X_first, X_second),dim=0)
+
+        f_logits = self.me(X_cat)
+        f_probs = nn.functional.softmax(f_logits, dim=0)
+        return sample_from_probs(f_probs, eval_action)
+
+    def get_stop(self, X, eval_action=None):
+        X_agg = X.mean(0)
+        f_logit = self.mt(X_agg)
+        f_prob = torch.sigmoid(f_logit).squeeze()
+
+        m = Bernoulli(f_prob)
+        a = (m.sample().item()) if eval_action is None else eval_action
+        f_prob = 1-f_prob if a==0 else f_prob # probability of choosing 0
+        return int(a), f_prob
+        
+
+    def get_first_opt(self, X, eval_actions, batch):
+        f_probs = self.mf(X, batch)
+        probs = f_probs[eval_actions]
+        return probs
+
+    def get_second_opt(self, X, a_first, a_second, batch):
+        X_first = X[a_first]
+        X_first = torch.index_select(X_first, 0, batch)
+        X_cat = torch.cat((X_first, X), dim=1)
+
+        f_probs = self.ms(X_cat, batch)
+        p_second = f_probs[a_second]
+        return p_second
+        
+    def get_edge_opt(self, X, a_first, a_second, a_edge):
+        X_first  = X[a_first]
+        X_second = X[a_second]
+        X_cat = torch.cat((X_first, X_second), dim=1)
+
+        f_logits = self.me(X_cat)
+        f_prob = nn.functional.softmax(f_logits, dim=1)
+        probs = torch.gather(f_prob, 1, a_edge.unsqueeze(1)).squeeze()
+        return probs
+
+    def get_stop_opt(self, X, batch, a_stop):
+        X_agg = pyg.nn.global_mean_pool(X, batch)
+
+        prob_stop = torch.sigmoid(self.mt(X_agg))
+        prob_not_stop = 1-prob_stop
+        f_prob = torch.cat((prob_not_stop, prob_stop), dim=1)
+
+        prob = torch.gather(f_prob, 1, a_stop.unsqueeze(1)).squeeze()
+        return prob
+
+    def evaluate(self, orig_states, actions):
+        batch = orig_states.batch
+        X = self.gnn_embed(orig_states)
+
+        a_first, a_second, batch_num_nodes, = get_batch_idx(batch, actions)
+        p_first_agg  = self.get_first_opt(X, a_first, batch)
+        p_second_agg = self.get_second_opt(X, a_first, a_second, batch)
+        p_edge_agg   = self.get_edge_opt(X, a_first, a_second, actions[:,2])
+        p_stop_agg   = self.get_stop_opt(X, batch, actions[:,3])
+        probs_agg = torch.stack((p_first_agg,
+                                 p_second_agg,
+                                 p_edge_agg,
+                                 p_stop_agg),
+                                dim=1)
+        X_agg = pyg.nn.global_add_pool(X, batch)
+        return probs_agg, X_agg
