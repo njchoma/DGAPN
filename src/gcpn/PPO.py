@@ -471,12 +471,14 @@ def train_ppo(args, env, writer=None):
                 break
 
             if running_reward > best_running_reward:
-                torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves', \
+                torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves',
                                                                  'PPO_best_{}.pth'.format(args.name)))
 
+            torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves',
+                                                             './PPO_continuous_current.pth'))
             # save every 500 episodes
             if i_episode % 500 == 0:
-                torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves', \
+                torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves',
                                                                  './PPO_continuous_{}_{}.pth'.format(args.name,
                                                                                                      str(i_episode))))
 
