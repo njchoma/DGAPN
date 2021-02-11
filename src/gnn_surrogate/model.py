@@ -66,8 +66,15 @@ class GNN_MyGAT(nn.Module):
         self.layers = nn.ModuleList(layers)
         self.final_layer = nn.Linear(nb_hidden, 1)
         self.act = nn.ReLU()
+        self.emb_dim = nb_hidden
 
     def forward(self, g, dense_edge_idx=None):
+        x = self.get_embedding(g)
+        #x = torch.sum(x, dim=0)
+        y = self.final_layer(x).squeeze()
+        return y
+
+    def get_embedding(self, g):
         x = g.x
         edge_index = g.edge_index
         edge_attr  = g.edge_attr
@@ -75,9 +82,7 @@ class GNN_MyGAT(nn.Module):
             x = l(x, edge_index, edge_attr)
             x = self.act(x)
         x = pyg.nn.global_add_pool(x, g.batch)
-        #x = torch.sum(x, dim=0)
-        y = self.final_layer(x).squeeze()
-        return y
+        return x
 
 
 

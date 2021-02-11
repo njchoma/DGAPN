@@ -34,19 +34,18 @@ class CReM_Env(object):
     def reset(self):
         idx = np.random.randint(len(self.scores))
         mol = Chem.MolFromSmiles(self.smiles[idx])
+        return self.mol_to_candidates(mol)
+
+    def step(self, action):
+        mol = self.new_mols[action]
+        return self.mol_to_candidates(mol)
 
 
+    def mol_to_candidates(self, mol):
         g = mol_to_pyg_graph(mol)[0]
         g_candidates = self.get_crem_candidates(mol)
 
-        print(type(g), type(g_candidates))
-        exit()
-
         return g, g_candidates
-
-    def step(self, selected_mol, stop):
-        crem_candidates = self.get_crem_candidates(mol)
-        return None
 
     def get_crem_candidates(self, mol):
 
@@ -62,7 +61,7 @@ class CReM_Env(object):
             print("CReM forward error: " + str(e))
             print("SMILE: " + Chem.MolToSmiles(mol))
             new_mols = []
-        new_mols = [mol] + new_mols
-        g_candidates = [mol_to_pyg_graph(i)[0] for i in new_mols]
+        self.new_mols = [mol] + new_mols
+        g_candidates = [mol_to_pyg_graph(i)[0] for i in self.new_mols]
         g_candidates = Batch.from_data_list(g_candidates)
         return g_candidates

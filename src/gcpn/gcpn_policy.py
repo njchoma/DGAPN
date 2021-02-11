@@ -356,7 +356,7 @@ class MyBatchNorm(BatchNorm1d):
                                                   self.momentum, self.affine,
                                                   self.track_running_stats)
 
-def sample_from_probs(p, action):
+def sample_from_probs(p, action=None):
     m = Categorical(p)
     a = m.sample() if action is None else action
     return a.item(), p[a]
@@ -372,36 +372,53 @@ class GCPN_CReM(nn.Module):
     def __init__(self,
                  input_dim,
                  emb_dim,
-                 nb_edge_types,
-                 mlp_nb_layers,
-                 mlp_nb_hidden):
+                 nb_layers,
+                 nb_hidden):
         super(GCPN_CReM, self).__init__()
 
-        layers = [nn.Linear(emb_dim, nb_hidden)]
+        layers = [nn.Linear(2*emb_dim, nb_hidden)]
         for _ in range(nb_layers-1):
             layers.append(nn.Linear(nb_hidden, nb_hidden))
 
         self.layers = nn.ModuleList(layers)
         self.final_layer = nn.Linear(nb_hidden, 1)
         self.act = nn.ReLU()
+        self.softmax = nn.Softmax(0)
 
-    def forward(self, g, g_actions, surrogate_model):
+    def forward(self, g, g_candidates, surrogate_model):
+        g_emb = self.get_embedding(g, surrogate_model)
+        g_candidates_emb = self.get_embedding(g_candidates, surrogate_model)
+
+        nb_candidates = g_candidates_emb.shape[0]
+        g_emb = g_emb.repeat(nb_candidates, 1)
+        X = torch.cat((g_emb, g_candidates_emb), dim=1)
+        X_states = X
+
         for i, l in enumerate(self.layers):
             X = self.act(l(X))
-        return self.final_layer(X).squeeze(1)
+        X = self.final_layer(X).squeeze(1)
+        probs = self.softmax(X)
+        a, p = sample_from_probs(probs)
 
-    def forward(self, graph, surrogate_model):
-        nb_nodes = graph.x.shape[0]
-        X = self.gnn_embed(graph)
+        return X_states, a, p
 
-        a_first,  p_first  = self.get_first(X, mask)
-        a_second, p_second = self.get_second(X, a_first, mask)
-        a_edge,   p_edge   = self.get_edge(X, a_first, a_second)
-        a_stop,   p_stop   = self.get_stop(X)
+    def get_embedding(self, g, surrogate_model):
+        with torch.autograd.no_grad():
+            emb = surrogate_model.get_embedding(g)
+        return emb
 
-        actions = np.array([[a_first, a_second, a_edge, a_stop]])
-        probs = torch.stack((p_first, p_second, p_edge, p_stop))
-        return actions, probs
+    # def forward(self, graph, surrogate_model):
+    #     nb_nodes = graph.x.shape[0]
+    #     X = self.gnn_embed(graph)
+
+    #     a_first,  p_first  = self.get_first(X, mask)
+    #     a_second, p_second = self.get_second(X, a_first, mask)
+    #     a_edge,   p_edge   = self.get_edge(X, a_first, a_second)
+    #     a_stop,   p_stop   = self.get_stop(X)
+
+    #     actions = np.array([[a_first, a_second, a_edge, a_stop]])
+    #     probs = torch.stack((p_first, p_second, p_edge, p_stop))
+    #     return actions, probs
 
     def get_first(self, X, mask=None, eval_action=None):
         f_probs = self.mf(X)

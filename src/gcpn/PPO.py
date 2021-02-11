@@ -9,7 +9,7 @@ from torch.distributions import MultivariateNormal
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils import dense_to_sparse
 
-from .gcpn_policy import GCPN
+from .gcpn_policy import GCPN_CReM
 
 from utils.graph_utils import state_to_pyg
 
@@ -67,10 +67,6 @@ class ActorCriticGCPN(nn.Module):
         # action mean range -1 to 1
         self.actor = GCPN_CReM(input_dim,
                                emb_dim,
-                               nb_edge_types,
-                               gnn_nb_layers,
-                               gnn_nb_hidden,
-                               gnn_nb_hidden_kernel,
                                mlp_nb_layers,
                                mlp_nb_hidden)
         # critic
@@ -79,11 +75,13 @@ class ActorCriticGCPN(nn.Module):
     def forward(self):
         raise NotImplementedError
     
-    def act(self, state, memory, surrogate_model):
-        action, probs = self.actor(state, surrogate_model)
-        action_logprob = torch.log(probs)
+    def act(self, state, candidates, memory, surrogate_model):
+        state = Batch.from_data_list([state])
+        with torch.autograd.no_grad():
+            states, action, prob = self.actor(state, candidates, surrogate_model)
+        action_logprob = torch.log(prob)
         
-        memory.states.append(state.to_data_list()[0])
+        memory.states.append(states.cpu())
         memory.actions.append(action)
         memory.logprobs.append(action_logprob)
         
@@ -161,11 +159,11 @@ class PPO_GCPN:
         self.MseLoss = nn.MSELoss()
 
     
-    def select_action(self, state, memory, surrogate_model):
+    def select_action(self, state, candidates, memory, surrogate_model):
         g = state.to(device)
-        action, new_state = self.policy_old.act(g, memory, surrogate_model)
-        done = action[1]
-        return done, new_state
+        g_candidates = candidates.to(device)
+        action = self.policy_old.act(g, g_candidates, memory, surrogate_model)
+        return action
     
     def update(self, memory, i_episode, writer=None):
         # Monte Carlo estimate of rewards:
@@ -262,7 +260,8 @@ def train_ppo(args, surrogate_model, env, writer=None):
     max_episodes = 50000        # max training episodes
     max_timesteps = 15          # max timesteps in one episode
     
-    update_interval = 100       # update policy every n episodes
+    # update_interval = 100       # update policy every n episodes
+    update_interval = 2       # update policy every n episodes
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
     gamma = 0.99                # discount factor
@@ -272,8 +271,11 @@ def train_ppo(args, surrogate_model, env, writer=None):
     
     #############################################
 
-    ob = env.reset()
+    ob, _ = env.reset()
     input_dim = ob.x.shape[1]
+
+    # emb_dim = surrogate_model.emb_dim
+    emb_dim = 512 # temp fix to use an old surrogate model
     
     ppo = PPO_GCPN(lr,
                    betas,
@@ -283,7 +285,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
                    K_epochs,
                    eps_clip,
                    input_dim,
-                   args.emb_size,
+                   emb_dim,
                    1,
                    args.layer_num_g,
                    args.num_hidden_g,
@@ -311,17 +313,24 @@ def train_ppo(args, surrogate_model, env, writer=None):
     # training loop
     for i_episode in range(1, max_episodes+1):
         cur_ep_ret_env = 0
-        state = env.reset()
+        state, candidates = env.reset()
         starting_reward = get_reward(state, surrogate_model)
 
         for t in range(max_timesteps):
+            print(t)
             # Running policy_old:
-            done, state = ppo.select_action(state, memory, surrogate_model)
-            reward = 0
+            action = ppo.select_action(state, candidates, memory, surrogate_model)
+            state, candidates = env.step(action)
 
-            if done or (t==(max_timesteps-1)):
+            # done and reward may not be needed anymore
+            reward = 0
+            done = 0
+
+            if t==(max_timesteps-1):
                 surr_reward = get_reward(state, surrogate_model)
                 reward = surr_reward-starting_reward
+                print(reward)
+                print(surr_reward, starting_reward)
 
             
             
@@ -338,6 +347,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
             print("updating ppo")
             ppo.update(memory, i_episode, writer)
             memory.clear_memory()
+            exit()
 
         writer.add_scalar("EpSurrogate", -1*surr_reward, episode_count)
         rewbuffer_env.append(reward)
