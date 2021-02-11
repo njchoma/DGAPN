@@ -475,7 +475,7 @@ def train_ppo(args, env, writer=None):
                                                                  'PPO_best_{}.pth'.format(args.name)))
 
             torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves',
-                                                             './PPO_continuous_current.pth'))
+                                                             './PPO_continuous_running.pth'))
             # save every 500 episodes
             if i_episode % 500 == 0:
                 torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves',
