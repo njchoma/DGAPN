@@ -55,7 +55,7 @@ class CReM_Env(object):
                                        max_replacements = self.nb_sample_crem,
                                        return_mol=True,
                                        ncores=self.nb_cores))
-            print("CReM options:" + str(len(new_mols)))
+            # print("CReM options:" + str(len(new_mols)))
             new_mols = [Chem.RemoveHs(i[1]) for i in new_mols]
         except Exception as e:
             print("CReM forward error: " + str(e))

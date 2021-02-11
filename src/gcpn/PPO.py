@@ -78,22 +78,23 @@ class ActorCriticGCPN(nn.Module):
     def act(self, state, candidates, memory, surrogate_model):
         state = Batch.from_data_list([state])
         with torch.autograd.no_grad():
-            states, action, prob = self.actor(state, candidates, surrogate_model)
+            state, new_states, action, prob = self.actor(state, candidates, surrogate_model)
         action_logprob = torch.log(prob)
         
-        memory.states.append(states.cpu())
+        state = [state.cpu(), Data(x=new_states.cpu())]
+        memory.states.append(state)
         memory.actions.append(action)
         memory.logprobs.append(action_logprob)
         
         return action
     
-    def evaluate(self, state, action):   
-        probs, X_agg = self.actor.evaluate(state, action)
+    def evaluate(self, states, candidates, actions):   
+        probs = self.actor.evaluate(candidates, actions)
         
         action_logprobs = torch.log(probs)
-        state_value = self.critic(X_agg)
+        state_value = self.critic(states)
 
-        entropy = (probs * action_logprobs).sum(1)
+        entropy = probs * action_logprobs
         
         return action_logprobs, state_value, entropy
 
@@ -166,6 +167,7 @@ class PPO_GCPN:
         return action
     
     def update(self, memory, i_episode, writer=None):
+        print("\n\nupdating...")
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
@@ -175,21 +177,26 @@ class PPO_GCPN:
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
         
+
         # Normalizing the rewards:
         rewards = torch.tensor(rewards).to(device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
+
         
         # convert list to tensor
-        old_states = Batch().from_data_list(memory.states).to(device)
-        old_actions = torch.squeeze(torch.tensor(memory.actions).to(device), 1).detach()
-        old_logprobs = torch.squeeze(torch.stack(memory.logprobs), 1).to(device).detach()
+        old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(device)
+        old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(device)
+        old_actions = torch.tensor(memory.actions).to(device)
+        old_logprobs = torch.stack(memory.logprobs).to(device)
         
         # Optimize policy for K epochs:
         print("Optimizing...")
 
         for i in range(self.K_epochs):
             # Evaluating old actions and values :
-            logprobs, state_values, entropies = self.policy.evaluate(old_states, old_actions)
+            logprobs, state_values, entropies = self.policy.evaluate(old_states,
+                                                                     old_candidates,
+                                                                     old_actions)
             
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach())
@@ -197,11 +204,14 @@ class PPO_GCPN:
             # loss
             advantages = rewards - state_values.detach()   
             loss = []
+
+            ratios = ratios.unsqueeze(1)
             for j in range(ratios.shape[1]):
                 r = ratios[:,j]
                 surr1 = r * advantages
                 surr2 = torch.clamp(r, 1-self.eps_clip, 1+self.eps_clip) * advantages
                 l = -torch.min(surr1, surr2)
+
                 if torch.isnan(l).any():
                     print("found nan in loss")
                     print(l)
@@ -256,12 +266,15 @@ def train_ppo(args, surrogate_model, env, writer=None):
     ############## Hyperparameters ##############
     render = True
     solved_reward = 100         # stop training if avg_reward > solved_reward
-    log_interval = 80           # print avg reward in the interval
+    log_interval = 5           # print avg reward in the interval
     max_episodes = 50000        # max training episodes
-    max_timesteps = 15          # max timesteps in one episode
+    # max_timesteps = 15          # max timesteps in one episode
     
     # update_interval = 100       # update policy every n episodes
-    update_interval = 2       # update policy every n episodes
+
+    max_timesteps = 6          # max timesteps in one episode
+    update_interval = 5       # update policy every n episodes
+
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
     gamma = 0.99                # discount factor
@@ -317,7 +330,6 @@ def train_ppo(args, surrogate_model, env, writer=None):
         starting_reward = get_reward(state, surrogate_model)
 
         for t in range(max_timesteps):
-            print(t)
             # Running policy_old:
             action = ppo.select_action(state, candidates, memory, surrogate_model)
             state, candidates = env.step(action)
@@ -329,9 +341,6 @@ def train_ppo(args, surrogate_model, env, writer=None):
             if t==(max_timesteps-1):
                 surr_reward = get_reward(state, surrogate_model)
                 reward = surr_reward-starting_reward
-                print(reward)
-                print(surr_reward, starting_reward)
-
             
             
             # Saving reward and is_terminals:
@@ -347,7 +356,6 @@ def train_ppo(args, surrogate_model, env, writer=None):
             print("updating ppo")
             ppo.update(memory, i_episode, writer)
             memory.clear_memory()
-            exit()
 
         writer.add_scalar("EpSurrogate", -1*surr_reward, episode_count)
         rewbuffer_env.append(reward)
