@@ -22,6 +22,7 @@ def molecule_arg_parser():
     add_arg('--data_path', required=True)
     add_arg('--artifact_path', required=True)
     add_arg('--name', default='default_run')
+    add_arg('--use_cpu', action='store_true')
     # add_arg('--seed', help='RNG seed', type=int, default=666)
 
     add_arg('--surrogate_model_url', default='')
@@ -83,9 +84,8 @@ def main():
                                            args.surrogate_model_url,
                                            args.surrogate_model_path)
 
-    env = CReM_Env(args.data_path
-                   )
-    
+    env = CReM_Env(args.data_path)
+
     print(surrogate_model)
 
     train_ppo(args, surrogate_model, env, writer=writer)

@@ -1,14 +1,17 @@
 # MY ADDITIONS
-*.nfs*
+commands
+module_check.py
 *.pth
+*.png
 *.swp
 run*
 test_run*
-/src/.idea/
-*.DS_Store
-num_check.py
+molecule_gen*
 *.idea/
-*.png
+*.DS_Store
+*.db
+*.db.gz
+src/dataset/*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

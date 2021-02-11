@@ -13,7 +13,6 @@ from .gcpn_policy import GCPN_CReM
 
 from utils.graph_utils import state_to_pyg
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Memory:
     def __init__(self):
@@ -128,7 +127,8 @@ class PPO_GCPN:
                  gnn_nb_hidden,
                  gnn_nb_hidden_kernel,
                  mlp_nb_layers,
-                 mlp_nb_hidden):
+                 mlp_nb_hidden,
+                 device):
         self.lr = lr
         self.betas = betas
         self.gamma = gamma
@@ -136,6 +136,7 @@ class PPO_GCPN:
         self.upsilon = upsilon
         self.eps_clip = eps_clip
         self.K_epochs = K_epochs
+        self.device = device
         
         self.policy = ActorCriticGCPN(input_dim,
                                       emb_dim,
@@ -161,8 +162,8 @@ class PPO_GCPN:
 
     
     def select_action(self, state, candidates, memory, surrogate_model):
-        g = state.to(device)
-        g_candidates = candidates.to(device)
+        g = state.to(self.device)
+        g_candidates = candidates.to(self.device)
         action = self.policy_old.act(g, g_candidates, memory, surrogate_model)
         return action
     
@@ -179,15 +180,15 @@ class PPO_GCPN:
         
 
         # Normalizing the rewards:
-        rewards = torch.tensor(rewards).to(device)
+        rewards = torch.tensor(rewards).to(self.device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
         
         # convert list to tensor
-        old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(device)
-        old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(device)
-        old_actions = torch.tensor(memory.actions).to(device)
-        old_logprobs = torch.stack(memory.logprobs).to(device)
+        old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(self.device)
+        old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(self.device)
+        old_actions = torch.tensor(memory.actions).to(self.device)
+        old_logprobs = torch.stack(memory.logprobs).to(self.device)
         
         # Optimize policy for K epochs:
         print("Optimizing...")
@@ -244,7 +245,7 @@ class PPO_GCPN:
 #                   FINAL REWARDS                   #
 #####################################################
 
-def get_reward(state, surrogate_model):
+def get_reward(state, surrogate_model, device):
     g = Batch().from_data_list([state])
     g = g.to(device)
     with torch.autograd.no_grad():
@@ -289,7 +290,10 @@ def train_ppo(args, surrogate_model, env, writer=None):
 
     # emb_dim = surrogate_model.emb_dim
     emb_dim = 512 # temp fix to use an old surrogate model
-    
+    nb_edge_types = 1
+
+    device = torch.device("cpu") if args.use_cpu else torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     ppo = PPO_GCPN(lr,
                    betas,
                    gamma,
@@ -299,12 +303,13 @@ def train_ppo(args, surrogate_model, env, writer=None):
                    eps_clip,
                    input_dim,
                    emb_dim,
-                   1,
+                   nb_edge_types,
                    args.layer_num_g,
                    args.num_hidden_g,
                    args.num_hidden_g,
                    args.mlp_num_layer,
-                   args.mlp_num_hidden)
+                   args.mlp_num_hidden,
+                   device)
     
     print(ppo)
     memory = Memory()
@@ -327,7 +332,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
     for i_episode in range(1, max_episodes+1):
         cur_ep_ret_env = 0
         state, candidates = env.reset()
-        starting_reward = get_reward(state, surrogate_model)
+        starting_reward = get_reward(state, surrogate_model, device)
 
         for t in range(max_timesteps):
             # Running policy_old:
@@ -339,7 +344,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
             done = 0
 
             if t==(max_timesteps-1):
-                surr_reward = get_reward(state, surrogate_model)
+                surr_reward = get_reward(state, surrogate_model, device)
                 reward = surr_reward-starting_reward
             
             
