@@ -16,5 +16,7 @@ PYARGS="$PYARGS --surrogate_model_url "
 PYARGS="$PYARGS --is_conditional 1"
 PYARGS="$PYARGS --conditional /global/home/users/adchen/MD/2col/uncharged_unique/uncharged_NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv"
 PYARGS="$PYARGS --surrogate_reward_timestep_delay 10"
+PYARGS="$PYARGS --stochastic_kernel"
+PYARGS="$PYARGS --heads_g 2"
 
 python src/main_gcpn.py $PYARGS
