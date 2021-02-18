@@ -431,9 +431,9 @@ class MyGCNConv(MessagePassing):
         if self.stochastic_kernel:
             self.sigma = Parameter(Uniform(1, 2).sample())
             self.P = Normal(torch.zeros(out_channels), self.sigma * torch.ones(out_channels))
-            self.projections = self.P.rsample((in_channels,))
+            self.projections = Parameter(self.P.rsample((in_channels,)))
             self.B = Uniform(torch.zeros(out_channels), 2 * torch.pi * torch.ones(out_channels))
-            self.offsets = self.B.sample((in_channels,))
+            self.offsets = Parameter(self.B.sample(), requires_grad=False)
 
         if bias and concat:
             self.bias = Parameter(torch.zeros(heads * out_channels))
@@ -499,15 +499,15 @@ class MyGCNConv(MessagePassing):
         if alpha is not None:
             out = alpha.view(-1, self.heads, 1) * out
         if self.stochastic_kernel:
-            out = self.projections.size(0) ** (-0.5) * torch.cos(torch.matmul(out, self.projections.T))
+            out = torch.cos(torch.matmul(out, self.projections.T) + self.offsets) #* self.projections.size(0) ** (-0.5)
         return out
 
     def update(self, aggr_out):
         return aggr_out
 
     def reset_projections(self):
-        self.projections = self.P.rsample((self.projections.size(0),))
-        self.offsets = self.B.sample((self.projections.size(0),))
+        self.projections = Parameter(self.P.rsample((self.projections.size(0),))).to(self.linN.device)
+        self.offsets = Parameter(self.B.sample(), requires_grad=False).to(self.linN.device)
 
     def detach_projections(self):
         self.projections = self.projections.detach()

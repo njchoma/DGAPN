@@ -1,0 +1,29 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "main_gcpn",
+            "type": "python",
+            "request": "launch",
+            "program": "src/main_gcpn.py",
+            "args": [
+                "--name", "NSP15_6W01_A1F_uncharged_kernel_dist", 
+                "--data_path", "test_run", 
+                "--artifact_path", "test_run/gcpn",
+                "--use_surrogate",
+                "--use_crem",
+                //"--gpu 3",
+                "--surrogate_model_url", "https://portal.nersc.gov/project/m3623/docking_score_models/NSP15_6W01_A_2_F_neg_exp/predict_logp/best_model.pth",
+                "--is_conditional", "1",
+                "--conditional", "/global/home/users/yulunwu/exaLearnMol/src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
+                "--surrogate_reward_timestep_delay", "10",
+                "--stochastic_kernel",
+                "--layer_num_g", "4"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}
