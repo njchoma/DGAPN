@@ -16,7 +16,7 @@
                 "--use_surrogate",
                 "--use_crem",
                 //"--gpu 3",
-                "--surrogate_model_url", "https://portal.nersc.gov/project/m3623/docking_score_models/NSP15_6W01_A_2_F_neg_exp/predict_logp/best_model.pth",
+                "--surrogate_model_url", "https://portal.nersc.gov/project/m3623/docking_score_models/NSP15_6W01_A_1_F_uncharged_upsamp/predict_logp/best_model.pth",
                 "--is_conditional", "1",
                 "--conditional", "/global/home/users/yulunwu/exaLearnMol/src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
                 "--surrogate_reward_timestep_delay", "10",
