@@ -11,6 +11,7 @@ molecule_gen*
 *.DS_Store
 *.db
 *.db.gz
+*.nfs*
 src/dataset/*.csv
 
 # Byte-compiled / optimized / DLL files

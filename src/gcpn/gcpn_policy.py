@@ -407,6 +407,7 @@ class MyGCNConv(MessagePassing):
         self.res = res
         self.use_attention = use_attention
         self.nb_edge_attr = nb_edge_attr
+        self.projections = None
 
         if self.use_attention:
             self.heads = heads
@@ -430,10 +431,6 @@ class MyGCNConv(MessagePassing):
 
         if self.stochastic_kernel:
             self.sigma = Parameter(Uniform(1, 2).sample())
-            self.P = Normal(torch.zeros(out_channels), self.sigma * torch.ones(out_channels))
-            self.projections = Parameter(self.P.rsample((in_channels,)))
-            self.B = Uniform(torch.zeros(out_channels), 2 * torch.pi * torch.ones(out_channels))
-            self.offsets = Parameter(self.B.sample(), requires_grad=False)
 
         if bias and concat:
             self.bias = Parameter(torch.zeros(heads * out_channels))
@@ -452,6 +449,14 @@ class MyGCNConv(MessagePassing):
 
         if self.batch_norm:
             x = self.norm(x)
+
+        if self.stochastic_kernel and (self.projections is None):
+            self.P = Normal(torch.zeros(self.out_channels).to(self.sigma.device), 
+                            self.sigma * torch.ones(self.out_channels).to(self.sigma.device))
+            self.B = Uniform(torch.zeros(self.out_channels).to(self.sigma.device), 
+                             2*np.pi * torch.ones(self.out_channels).to(self.sigma.device))
+            self.projections = self.P.rsample((self.in_channels,))
+            self.offsets = self.B.sample()
 
         if size is None and torch.is_tensor(x):
             edge_index, edge_attr = remove_self_loops(edge_index, edge_attr=edge_attr)
@@ -506,11 +511,13 @@ class MyGCNConv(MessagePassing):
         return aggr_out
 
     def reset_projections(self):
-        self.projections = Parameter(self.P.rsample((self.projections.size(0),)).to(self.linN.device))
-        self.offsets = Parameter(self.B.sample().to(self.linN.device), requires_grad=False)
+        self.P = Normal(torch.zeros(self.out_channels).to(self.sigma.device), 
+                        self.sigma * torch.ones(self.out_channels).to(self.sigma.device))
+        self.projections = self.P.rsample((self.projections.size(0),))
+        self.offsets = self.B.sample()
 
     def detach_projections(self):
-        self.projections = Parameter(self.projections.detach(), requires_grad=False)
+        self.projections = self.projections.detach()
 
 
 class MyHGCN(MessagePassing):
