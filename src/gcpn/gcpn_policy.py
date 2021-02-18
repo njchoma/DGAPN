@@ -506,11 +506,11 @@ class MyGCNConv(MessagePassing):
         return aggr_out
 
     def reset_projections(self):
-        self.projections = Parameter(self.P.rsample((self.projections.size(0),))).to(self.linN.device)
-        self.offsets = Parameter(self.B.sample(), requires_grad=False).to(self.linN.device)
+        self.projections = Parameter(self.P.rsample((self.projections.size(0),)).to(self.linN.device))
+        self.offsets = Parameter(self.B.sample().to(self.linN.device), requires_grad=False)
 
     def detach_projections(self):
-        self.projections = self.projections.detach()
+        self.projections = Parameter(self.projections.detach(), requires_grad=False)
 
 
 class MyHGCN(MessagePassing):
