@@ -1,7 +1,8 @@
 # MY ADDITIONS
 commands
+settings.json
 module_check.py
-*.pth
+*PPO*.pth
 *.png
 *.swp
 run*
@@ -11,6 +12,8 @@ molecule_gen*
 *.DS_Store
 *.db
 *.db.gz
+*.nfs*
+log/
 src/dataset/*.csv
 
 # Byte-compiled / optimized / DLL files
