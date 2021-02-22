@@ -59,6 +59,7 @@ def molecule_arg_parser():
     add_arg('--mlp_num_layer', type=int, default=3)
     add_arg('--mlp_num_hidden', type=int, default=128)
     add_arg('--stochastic_kernel', action='store_true')
+    add_arg('--reset_projections', action='store_true')
 
     # LOSS PARAMETERS
     add_arg('--eta', type=float, default=0.01, help='relative weight for entropy loss')

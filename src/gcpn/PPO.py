@@ -193,7 +193,7 @@ class PPO_GCPN:
         action = self.policy_old.act(g, memory)
         return action
 
-    def update(self, memory, i_episode, writer=None):
+    def update(self, memory, i_episode, reset_projections=False, writer=None):
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
@@ -262,7 +262,7 @@ class PPO_GCPN:
                 self.policy.actor.gnn_embed.detach_projections()
 
         # Reset projections for graph kernel
-        if self.stochastic_kernel:
+        if reset_projections and self.stochastic_kernel:
             self.policy.actor.gnn_embed.reset_projections()
 
         # Copy new weights into old policy:
@@ -439,7 +439,7 @@ def train_ppo(args, env, writer=None):
                 # update if its time
                 if time_step % update_timestep == 0:
                     print("updating ppo")
-                    ppo.update(memory, i_episode, writer)
+                    ppo.update(memory, i_episode, args.reset_projections, writer)
                     memory.clear_memory()
                     time_step = 0
                 running_reward += reward
