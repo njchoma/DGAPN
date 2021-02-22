@@ -20,6 +20,7 @@ from rdkit.Chem.Fingerprints import FingerprintMols
 from .gcpn_policy import GCPN, GCPN_crem
 from .MLP import Critic, Discriminator
 
+import os
 from utils.general_utils import load_surrogate_model, maybe_download_file
 from utils.graph_utils import mol_to_pyg_graph
 from utils.state_utils import wrap_state, nodes_to_atom_labels, dense_to_sparse_adj, state_to_graph, state_to_mol
@@ -502,7 +503,7 @@ def train_ppo(args, env, writer=None):
                 if time_step % update_timestep == 0:
                     print("updating ppo")
                     truth_pyg = None
-                    if args.use_adversarial:
+                    if args.use_adversarial and (i_episode < args.adversarial_reward_episode_cutoff):
                         truth_sample = random.sample(truth, trajectory_count)
                         truth_pyg = [t[0] for t in truth_sample]
                         truth_pyg = [mol_to_pyg_graph(Chem.MolFromSmiles(smile)) for smile in truth_pyg]
@@ -511,7 +512,9 @@ def train_ppo(args, env, writer=None):
                     memory.clear_memory()
                     trajectory_count = 0
 
-                    if args.use_adversarial and time_step % (update_timestep * truth_frequency) == 0:
+                if time_step % (update_timestep * truth_frequency) == 0:
+                    if args.use_adversarial and (i_episode < args.adversarial_reward_episode_cutoff):
+                        print("updating discriminator")
                         truth_sample = random.sample(truth, 100)
                         truth_scr = [t[1] for t in truth_sample]
                         truth_pyg = [t[0] for t in truth_sample]
@@ -544,10 +547,13 @@ def train_ppo(args, env, writer=None):
                 torch.save(ppo.policy.state_dict(), './PPO_continuous_solved.pth')
                 break
 
+            # save best model
             if running_reward > best_running_reward:
                 torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves', \
                                                                  'PPO_best_{}.pth'.format(args.name)))
-
+            # save running model
+            torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves',
+                                                             './PPO_continuous_running_{}.pth'.format(args.name)))
             # save every 500 episodes
             if i_episode % 500 == 0:
                 torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves', \
