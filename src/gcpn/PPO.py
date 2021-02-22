@@ -292,7 +292,8 @@ def train_ppo(args, surrogate_model, env, writer=None):
     emb_dim = 512 # temp fix to use an old surrogate model
     nb_edge_types = 1
 
-    device = torch.device("cpu") if args.use_cpu else torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu") if args.use_cpu else torch.device(
+        'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
 
     ppo = PPO_GCPN(lr,
                    betas,

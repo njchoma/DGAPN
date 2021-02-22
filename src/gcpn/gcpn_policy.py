@@ -29,9 +29,8 @@ def batched_softmax(logits, batch):
 
 def get_batch_shift(pyg_batch):
     batch_num_nodes = torch.bincount(pyg_batch)
-    batch_size = batch_num_nodes.shape[0]
 
-    cumsum = torch.cumsum(batch_num_nodes, dim=0) - batch_num_nodes[0]
+    cumsum = torch.cat((torch.LongTensor([0]).to(cumsum.device), torch.cumsum(batch_num_nodes, dim=0)[:-1]))
     return cumsum
 
 #####################################################
