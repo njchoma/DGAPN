@@ -399,7 +399,7 @@ def train_ppo(args, env, writer=None):
 
     if args.use_surrogate:
         print("{} episodes before surrogate model as final reward".format(
-            args.surrogate_reward_timestep_delay))
+            args.surrogate_reward_episode_delay))
         surrogate_model = load_surrogate_model(args.artifact_path,
                                                args.surrogate_model_url,
                                                args.surrogate_model_path,
@@ -439,7 +439,7 @@ def train_ppo(args, env, writer=None):
 
                 if done:
                     # surrogate
-                    if args.use_surrogate and (i_episode > args.surrogate_reward_timestep_delay):
+                    if args.use_surrogate and (i_episode > args.surrogate_reward_episode_delay):
                         try:
                             surr_reward = get_surrogate_reward(state, env, surrogate_model, device)
                             reward += surr_reward / 5
