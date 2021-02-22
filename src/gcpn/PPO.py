@@ -260,7 +260,7 @@ class PPO_GCPN:
                 print("  {:3d}: Loss: {:7.3f}".format(i, loss))
             ## adversarial
             if truth is not None and (i + 1) == self.K_epochs:
-                truth = Batch().from_data_list([mol_to_pyg_graph(mol) for mol in truth]).to(self.device)
+                truth = Batch().from_data_list(truth).to(self.device)
                 truth_fidelity = self.policy.evaluate_disc(truth)
 
                 score = torch.cat((truth_fidelity, fidelity))
@@ -280,7 +280,7 @@ class PPO_GCPN:
         self.policy_old.load_state_dict(self.policy.state_dict())
 
     def update_disc(self, truth, truth_score, i_episode, writer=None):
-        truth = Batch().from_data_list([mol_to_pyg_graph(mol) for mol in truth]).to(self.device)
+        truth = Batch().from_data_list(truth).to(self.device)
         fidelity = self.policy.evaluate_disc(truth)
 
         ## adversarial
@@ -351,11 +351,12 @@ def train_ppo(args, env, writer=None):
     input_dim = 121
     device = torch.device("cpu") if args.cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
-    
-    truth = pd.read_csv(args.conditional, header=None, nrows=1000)
-    # preserve the top 20%
-    truth = [(smile, score) for smile, score in zip(truth.iloc[:,1].tolist(), truth.iloc[:,0].tolist())]
-    truth = sorted(truth, key=lambda t: t[1])[:int(len(truth)/5.)]
+
+    if args.use_adversarial:
+        truth = pd.read_csv(args.conditional, header=None)
+        # preserve the top 1%
+        truth = [(smile, score) for smile, score in zip(truth.iloc[:, 1].tolist(), truth.iloc[:, 0].tolist())]
+        truth = sorted(truth, key=lambda t: t[1])[:int(len(truth) / 100.)]
 
     ppo = PPO_GCPN(lr,
                    betas,
@@ -421,8 +422,8 @@ def train_ppo(args, env, writer=None):
     # training loop
     for i_episode in range(1, max_episodes + 1):
         trajectory_count += 1
-
         cur_ep_ret_env = 0
+
         # Now state is a mol
         state = env.reset()
         surr_reward = 0.0
@@ -449,7 +450,7 @@ def train_ppo(args, env, writer=None):
                     else:
                         info['surrogate_reward'] = None
                     # adversarial
-                    if args.use_adversarial and (i_episode > args.adversarial_reward_episode_delay):
+                    if args.use_adversarial and (i_episode < args.adversarial_reward_episode_cutoff):
                         try:
                             advers_reward = get_adversarial_reward(state, env, ppo.policy, device)
                             # TODO: Rescale this reward.
@@ -500,23 +501,22 @@ def train_ppo(args, env, writer=None):
                 # update if its time
                 if time_step % update_timestep == 0:
                     print("updating ppo")
-                    truth_mol = None
+                    truth_pyg = None
                     if args.use_adversarial:
                         truth_sample = random.sample(truth, trajectory_count)
-                        truth_mol = [t[0] for t in truth_sample]
-                        truth_mol = [Chem.MolFromSmiles(smi) for smi in truth_mol]
-                    ppo.update(memory, truth_mol, i_episode, writer)
+                        truth_pyg = [t[0] for t in truth_sample]
+                        truth_pyg = [mol_to_pyg_graph(Chem.MolFromSmiles(smile)) for smile in truth_pyg]
+                    ppo.update(memory, truth_pyg, i_episode, writer)
 
                     memory.clear_memory()
                     trajectory_count = 0
-                    time_step = 0
 
                     if args.use_adversarial and time_step % (update_timestep * truth_frequency) == 0:
                         truth_sample = random.sample(truth, 100)
                         truth_scr = [t[1] for t in truth_sample]
-                        truth_mol = [t[0] for t in truth_sample]
-                        truth_mol = [Chem.MolFromSmiles(mol) for mol in truth_mol]
-                        ppo.update_disc(truth_mol, truth_scr, i_episode, writer)
+                        truth_pyg = [t[0] for t in truth_sample]
+                        truth_pyg = [mol_to_pyg_graph(Chem.MolFromSmiles(smile)) for smile in truth_pyg]
+                        ppo.update_disc(truth_pyg, truth_scr, i_episode, writer)
                 
                 running_reward += reward
                 cur_ep_ret_env += reward

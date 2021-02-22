@@ -1,5 +1,9 @@
 # MY ADDITIONS
-*.pth
+commands
+settings.json
+module_check.py
+*PPO*.pth
+*.png
 *.swp
 run*
 test_run*
@@ -8,8 +12,9 @@ molecule_gen*
 *.DS_Store
 *.db
 *.db.gz
+*.nfs*
+log/
 src/dataset/*.csv
-module_check.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
