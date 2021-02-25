@@ -548,6 +548,7 @@ def train_ppo(args, env):
 
 
             writer.add_scalar("EpSurrogate", -1 * surr_reward, episode_count)
+            writer.add_scalar("EpFidelity", advers_reward, episode_count)
             rewbuffer_env.append(cur_ep_ret_env)
             avg_length += t
 
