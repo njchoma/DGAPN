@@ -31,23 +31,23 @@ class CReM_Env(object):
                                        DATASET_NAME)
 
 
-    def reset(self):
+    def reset(self, include_current_state=True):
         idx = np.random.randint(len(self.scores))
         mol = Chem.MolFromSmiles(self.smiles[idx])
-        return self.mol_to_candidates(mol)
+        return self.mol_to_candidates(mol, include_current_state)
 
-    def step(self, action):
+    def step(self, action, include_current_state=True):
         mol = self.new_mols[action]
-        return self.mol_to_candidates(mol)
+        return self.mol_to_candidates(mol, include_current_state)
 
 
-    def mol_to_candidates(self, mol):
+    def mol_to_candidates(self, mol, include_current_state):
         g = mol_to_pyg_graph(mol)[0]
-        g_candidates = self.get_crem_candidates(mol)
+        g_candidates, done = self.get_crem_candidates(mol, include_current_state)
 
-        return g, g_candidates
+        return g, g_candidates, done
 
-    def get_crem_candidates(self, mol):
+    def get_crem_candidates(self, mol, include_current_state):
 
         try:
             new_mols = list(mutate_mol(mol,
@@ -61,7 +61,11 @@ class CReM_Env(object):
             print("CReM forward error: " + str(e))
             print("SMILE: " + Chem.MolToSmiles(mol))
             new_mols = []
-        self.new_mols = [mol] + new_mols
+        self.new_mols = [mol] + new_mols if include_current_state else new_mols
         g_candidates = [mol_to_pyg_graph(i)[0] for i in self.new_mols]
+        
+        if len(g_candidates)==0:
+            return None, True
+
         g_candidates = Batch.from_data_list(g_candidates)
-        return g_candidates
+        return g_candidates, False

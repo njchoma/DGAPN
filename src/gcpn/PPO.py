@@ -285,7 +285,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
     
     #############################################
 
-    ob, _ = env.reset()
+    ob, _, _ = env.reset()
     input_dim = ob.x.shape[1]
 
     # emb_dim = surrogate_model.emb_dim
@@ -331,19 +331,18 @@ def train_ppo(args, surrogate_model, env, writer=None):
     # training loop
     for i_episode in range(1, max_episodes+1):
         cur_ep_ret_env = 0
-        state, candidates = env.reset()
+        state, candidates, done = env.reset()
         starting_reward = get_reward(state, surrogate_model, device)
 
         for t in range(max_timesteps):
             # Running policy_old:
             action = ppo.select_action(state, candidates, memory, surrogate_model)
-            state, candidates = env.step(action)
+            state, candidates, done = env.step(action)
 
             # done and reward may not be needed anymore
             reward = 0
-            done = 0
 
-            if t==(max_timesteps-1):
+            if (t==(max_timesteps-1)) or done:
                 surr_reward = get_reward(state, surrogate_model, device)
                 reward = surr_reward-starting_reward
             
