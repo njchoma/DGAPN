@@ -267,14 +267,14 @@ def train_ppo(args, surrogate_model, env, writer=None):
     ############## Hyperparameters ##############
     render = True
     solved_reward = 100         # stop training if avg_reward > solved_reward
-    log_interval = 5           # print avg reward in the interval
+    log_interval = 5            # print avg reward in the interval
     max_episodes = 50000        # max training episodes
     # max_timesteps = 15          # max timesteps in one episode
+    # update_interval = 75        # update policy every n episodes
     
-    # update_interval = 100       # update policy every n episodes
+    max_timesteps = 6           # max timesteps in one episode
+    update_interval = 30        # update policy every n episodes
 
-    max_timesteps = 6          # max timesteps in one episode
-    update_interval = 5       # update policy every n episodes
 
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
@@ -336,6 +336,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
         starting_reward = get_reward(state, surrogate_model, device)
 
         for t in range(max_timesteps):
+            time_step += 1
             # Running policy_old:
             action = ppo.select_action(state, candidates, memory, surrogate_model)
             state, candidates, done = env.step(action)
@@ -357,8 +358,9 @@ def train_ppo(args, surrogate_model, env, writer=None):
                 break
 
         # update if it's time
-        if i_episode % update_interval == 0:
+        if time_step > update_interval:
             print("updating ppo")
+            time_step = 0
             ppo.update(memory, i_episode, writer)
             memory.clear_memory()
 
