@@ -4,7 +4,6 @@ from collections import deque
 import gzip
 import shutil
 import os
-from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -21,7 +20,7 @@ from .gcpn_policy import GCPN, GCPN_crem
 from .MLP import Critic, Discriminator
 from gym_molecule.envs.molecule import load_conditional
 
-from utils.general_utils import load_surrogate_model, maybe_download_file
+from utils.general_utils import get_current_datetime, load_surrogate_model, maybe_download_file
 from utils.graph_utils import mol_to_pyg_graph
 from utils.state_utils import wrap_state, nodes_to_atom_labels, dense_to_sparse_adj, state_to_graph, state_to_mol
 
@@ -483,7 +482,7 @@ def train_ppo(args, env):
                                                                  'PPO_best_{}.pth'.format(args.name)))
             # save running model
             torch.save(ppo.policy.state_dict(), os.path.join(save_dir,
-                                                             './PPO_continuous_running_{}.pth'.format(args.name)))
+                                                             './PPO_running_{}.pth'.format(args.name)))
             # save every 500 episodes
             if i_episode % 500 == 0:
                 torch.save(ppo.policy.state_dict(), os.path.join(save_dir,

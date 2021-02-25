@@ -517,7 +517,8 @@ class MyGCNConv(MessagePassing):
         self.offsets = self.B.sample()
 
     def detach_projections(self):
-        self.projections = self.projections.detach()
+        if self.projections.requires_grad is True:
+            self.projections = self.projections.detach()
 
 
 class MyHGCN(MessagePassing):

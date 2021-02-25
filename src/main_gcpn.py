@@ -106,12 +106,6 @@ def molecule_arg_parser():
     return parser
 
 
-def get_current_datetime():
-    now = datetime.now()
-    dt_string = now.strftime("%Y.%m.%d_%H:%M:%S")
-    return dt_string
-
-
 def main():
     args = molecule_arg_parser().parse_args()
     print("====args====", args)
