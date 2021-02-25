@@ -8,7 +8,7 @@ This project aims to:
 ## Getting Started:
 1. Install rdkit.
 ```bash
-conda create -c rdkit -n my-rdkit-env rdkit
+conda create -c rdkit -n my-rdkit-env rdkit python=3.6
 ```
 2. Install customized molecule gym environment (from https://github.com/bowenliu16/rl_graph_generation):
 ```bash
