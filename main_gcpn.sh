@@ -17,6 +17,6 @@ PYARGS="$PYARGS --use_surrogate"
 PYARGS="$PYARGS --surrogate_model_url https://portal.nersc.gov/project/m3623/docking_score_models/NSP15_6W01_A_1_F_uncharged_upsamp/predict_logp/best_model.pth"
 PYARGS="$PYARGS --surrogate_reward_episode_delay 10"
 PYARGS="$PYARGS --use_adversarial"
-PYARGS="$PYARGS --adversarial_reward_episode_cutoff 1000"
+PYARGS="$PYARGS --adversarial_reward_episode_cutoff 100"
 
 python src/main_gcpn.py $PYARGS
