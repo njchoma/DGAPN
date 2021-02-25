@@ -17,9 +17,9 @@ pip install -e .
 ```
 3. Install other dependencies \*
 ```bash
-conda env create -f environment.yml
+conda install yaml mpi4py
+pip install wget networkx
 ```
-\* The `environment.yml` file was created on a system with CUDA Toolkit 10.1 installed. If you have another CUDA Toolkit installed make sure to install the right pytorch and pygeometric versions for your toolkit:
+For `Pytorch` and `Pytorch Geometric`, make sure to install the right versions for your toolkit:
 - Pytorch 1.7.0 (https://pytorch.org/get-started/locally/)
-- Pytorch Geometric (https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html) 
-  - Make sure to install torch geometric 1.6.1 with `pip install torch-geometric==1.6.1`
+- Pytorch Geometric 1.6.1 (https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html)
