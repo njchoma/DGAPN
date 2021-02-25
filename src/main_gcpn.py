@@ -1,12 +1,9 @@
 import os
 import argparse
-from datetime import datetime
 
 import torch
 
 from gcpn.train import train
-
-from torch.utils.tensorboard import SummaryWriter
 
 
 def molecule_arg_parser():
@@ -105,12 +102,6 @@ def molecule_arg_parser():
     return parser
 
 
-def get_current_datetime():
-    now = datetime.now()
-    dt_string = now.strftime("%Y.%m.%d_%H:%M:%S")
-    return dt_string
-
-
 def main():
     args = molecule_arg_parser().parse_args()
     print("====args====", args)
@@ -120,7 +111,7 @@ def main():
     os.makedirs('molecule_gen', exist_ok=True)
     os.makedirs(os.path.join(args.artifact_path, 'saves'), exist_ok=True)
 
-    train(args, seed=args.seed, writer=writer)
+    train(args, seed=args.seed)
 
 
 if __name__ == '__main__':

@@ -4,9 +4,11 @@ from collections import deque
 import gzip
 import shutil
 import os
+
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
+from torch.utils.tensorboard import SummaryWriter
 
 from torch_geometric.data import Data, Batch
 
@@ -18,8 +20,7 @@ from .gcpn_policy import GCPN, GCPN_crem
 from .MLP import Critic, Discriminator
 from gym_molecule.envs.molecule import load_conditional
 
-import os
-from utils.general_utils import load_surrogate_model, maybe_download_file
+from utils.general_utils import get_current_datetime, load_surrogate_model, maybe_download_file
 from utils.graph_utils import mol_to_pyg_graph
 from utils.state_utils import wrap_state, nodes_to_atom_labels, dense_to_sparse_adj, state_to_graph, state_to_mol
 
@@ -280,7 +281,12 @@ def get_final_reward(state, env, surrogate_model, device):
 #                   TRAINING LOOP                   #
 #####################################################
 
-def train_ppo(args, env, writer=None):
+def train_ppo(args, env):
+    dt = get_current_datetime()
+    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + dt))
+    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + dt)
+    os.makedirs(save_dir, exist_ok=True)
+
     ############## Hyperparameters ##############
     render = True
     solved_reward = 100  # stop training if avg_reward > solved_reward
@@ -455,13 +461,16 @@ def train_ppo(args, env, writer=None):
                 torch.save(ppo.policy.state_dict(), './PPO_continuous_solved.pth')
                 break
 
+            # save best model
             if running_reward > best_running_reward:
-                torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves', \
+                torch.save(ppo.policy.state_dict(), os.path.join(save_dir,
                                                                  'PPO_best_{}.pth'.format(args.name)))
-
+            # save running model
+            torch.save(ppo.policy.state_dict(), os.path.join(save_dir,
+                                                             './PPO_running_{}.pth'.format(args.name)))
             # save every 500 episodes
             if i_episode % 500 == 0:
-                torch.save(ppo.policy.state_dict(), os.path.join(args.artifact_path, 'saves', \
+                torch.save(ppo.policy.state_dict(), os.path.join(save_dir,
                                                                  './PPO_continuous_{}_{}.pth'.format(args.name,
                                                                                                      str(i_episode))))
 
