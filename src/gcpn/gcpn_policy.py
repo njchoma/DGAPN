@@ -98,27 +98,29 @@ class GCPN_crem(nn.Module):
         return probs
 
     # TODO (Andrew): Need to change how things are evaluated
-    def evaluate(self, orig_states, actions):
+    def evaluate(self, orig_states, actions=None):
         # batches = [torch.tensor(step.batch) for step in orig_states]
         n_steps = len(orig_states)
-        p_agg = torch.empty(n_steps).to(self.device)
+        p_agg = torch.empty(n_steps).to(self.device) if actions is not None else None
         X_agg = torch.empty((n_steps, self.emb_dim)).to(self.device)
         for i, batch in enumerate(orig_states):
             X = self.gnn_embed(batch)  # (sample_n_crem, 128)
 
-            if X.ndim == 1:
-                #When there's only one molecule, need to unsqueeze, and do manual concatenation, so indexing works.
-                X_cat = torch.unsqueeze(X.repeat(2), 0)
-            else:
-                X_last = X[-1].repeat(len(X), 1)
-                X_cat = torch.cat((X, X_last), dim=1) # (sample_n_crem, 256)
+            if actions is not None:
+                if X.ndim == 1:
+                    #When there's only one molecule, need to unsqueeze, and do manual concatenation, so indexing works.
+                    X_cat = torch.unsqueeze(X.repeat(2), 0)
+                else:
+                    X_last = X[-1].repeat(len(X), 1)
+                    X_cat = torch.cat((X, X_last), dim=1) # (sample_n_crem, 256)
 
-            p_all = self.mc(X_cat)
-            if p_all.ndim == 0:
-                # When there's only one molecule, need to unsqueeze so indexing works
-                p_all = torch.unsqueeze(p_all, 0)
-            p_crem = p_all[actions[i].item()]
-            p_agg[i] = p_crem
+                p_all = self.mc(X_cat)
+                if p_all.ndim == 0:
+                    # When there's only one molecule, need to unsqueeze so indexing works
+                    p_all = torch.unsqueeze(p_all, 0)
+                p_crem = p_all[actions[i].item()]
+                p_agg[i] = p_crem
+
             X_agg[i] = X[-1] #Pooled representation of starting state is the input to the critic-value function
         return p_agg, X_agg
 
