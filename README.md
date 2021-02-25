@@ -6,9 +6,11 @@ This project aims to:
 2. Generate molecules for successful interactions with covid 19 proteins, in developing molecules for a covid 19 treatment.
 
 ## Getting Started:
-1. Install rdkit.
+1. Install chemical environment
 ```bash
 conda create -c rdkit -n my-rdkit-env rdkit python=3.6
+conda activate my-rdkit-env
+pip install crem
 ```
 2. Install customized molecule gym environment (from https://github.com/bowenliu16/rl_graph_generation):
 ```bash
