@@ -10,7 +10,7 @@ def get_rewards(g_batch, surrogate_model):
         scores = surrogate_model(g_batch.to(DEVICE))
     return scores.cpu().numpy()*-1
 
-def greedy_rollout(env, surrogate_model, K, max_rollout=1000):
+def greedy_rollout(env, surrogate_model, K, max_rollout=5):
     g, g_candidates, done = env.reset()
 
     g = Batch.from_data_list([g])
@@ -44,7 +44,7 @@ def greedy_rollout(env, surrogate_model, K, max_rollout=1000):
         
     return start_rew, best_rew
 
-def eval_greedy(surrogate_model, env, N=30, K=4):
+def eval_greedy(surrogate_model, env, N=30, K=1):
 
     surrogate_model = surrogate_model.to(DEVICE)
     surrogate_model.eval()
