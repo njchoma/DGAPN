@@ -15,7 +15,7 @@ conda create -c rdkit -n my-rdkit-env rdkit python=3.6
 cd src/gcpn/gym-molecule
 pip install -e .
 ```
-3. Install other dependencies \*
+3. Install other dependencies
 ```bash
 conda install yaml mpi4py
 pip install wget networkx
