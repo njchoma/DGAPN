@@ -23,7 +23,6 @@ def molecule_arg_parser():
     # EVAL MODE PARAMETERS
     add_arg('--eval', action='store_true')
     add_arg('--state_dict', default="")
-    add_arg('--num_done', type=int, default=1)
 
     # SURROGATE REWARD
     add_arg('--use_surrogate', '-sur', action='store_true')
@@ -47,7 +46,7 @@ def molecule_arg_parser():
     add_arg('--max_action', type=int, default=128)
     add_arg('--min_action', type=int, default=20)
     add_arg('--use_crem', action='store_true')
-    add_arg('--sample_crem', type=int, default=20)
+    add_arg('--sample_crem', type=int, default=16)
 
     # NETWORK PARAMETERS
     add_arg('--emb_size', type=int, default=128)

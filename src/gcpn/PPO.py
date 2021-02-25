@@ -21,6 +21,7 @@ from rdkit.Chem.Fingerprints import FingerprintMols
 
 from .gcpn_policy import GCPN, GCPN_crem
 from .MLP import Critic, Discriminator
+from gym_molecule.envs.molecule import load_conditional
 
 from utils.general_utils import get_current_datetime, load_surrogate_model, maybe_download_file
 from utils.graph_utils import mol_to_pyg_graph
@@ -59,6 +60,7 @@ class ActorCriticGCPN(nn.Module):
                  mlp_nb_hidden,
                  crem,
                  sample_crem,
+                 eval,
                  device):
         super(ActorCriticGCPN, self).__init__()
 
@@ -73,6 +75,7 @@ class ActorCriticGCPN(nn.Module):
                                    mlp_nb_layers,
                                    mlp_nb_hidden,
                                    sample_crem,
+                                   eval,
                                    device)
         else:
             self.actor = GCPN(input_dim,
@@ -151,6 +154,7 @@ class PPO_GCPN:
                  mlp_nb_hidden,
                  crem,
                  sample_crem,
+                 eval,
                  device):
         self.lr = lr
         self.betas = betas
@@ -173,6 +177,7 @@ class PPO_GCPN:
                                       mlp_nb_hidden,
                                       crem,
                                       sample_crem,
+                                      eval,
                                       device).to(self.device)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
 
@@ -186,6 +191,7 @@ class PPO_GCPN:
                                           mlp_nb_hidden,
                                           crem,
                                           sample_crem,
+                                          eval,
                                           device).to(self.device)
         self.policy_old.load_state_dict(self.policy.state_dict())
 
@@ -196,7 +202,7 @@ class PPO_GCPN:
             # g = state_to_mol(state, env, False)
             g = state
         else:
-            g = state_to_graph(state, env, is_mol=True)
+            g = state_to_graph(state, env)
         # state = wrap_state(state).to(self.device)
         action = self.policy_old.act(g, memory)
         return action
@@ -342,7 +348,7 @@ def train_ppo(args, env):
     max_episodes = 50000  # max training episodes
     max_timesteps = 1500  # max timesteps in one episode
 
-    update_timestep = 2000  # update policy every n timesteps
+    update_timestep = 500  # update policy every n timesteps
     truth_frequency = 5  # frequency of feeding truth to discriminator
 
     K_epochs = 80  # update policy for K epochs
@@ -383,11 +389,15 @@ def train_ppo(args, env):
                    args.mlp_num_hidden,
                    args.use_crem,
                    args.sample_crem,
+                   args.eval,
                    device)
 
     # If running policy in eval mode, load pre-trained params.
     if args.eval:
         ppo.policy.load_state_dict(torch.load(args.state_dict, map_location=device))
+        smiles = [row[0] for row in load_conditional(args.conditional)]
+        max_episodes = len(smiles)
+        print("Max_episodes ", max_episodes)
 
     print(ppo)
     memory = Memory()
@@ -431,15 +441,16 @@ def train_ppo(args, env):
         trajectory_count += 1
         cur_ep_ret_env = 0
 
-        # Now state is a mol
-        state = env.reset()
+        # Now state is a mol.
+        state = env.reset(smiles[i_episode-1], crem=args.use_crem) if args.eval else env.reset(crem=args.use_crem)
         surr_reward = 0.0
 
         # If args.eval is True, we're in eval mode so don't track gradients.
         with torch.set_grad_enabled(not args.eval):
             for t in range(max_timesteps):
                 time_step += 1
-
+                
+                #print(smiles[i_episode])
                 action = ppo.select_action(state, memory, env)
                 state, reward, done, info = env.step(action, memory, crem=args.use_crem)
 
@@ -448,7 +459,7 @@ def train_ppo(args, env):
                     if args.use_surrogate and (i_episode > args.surrogate_reward_episode_delay):
                         try:
                             surr_reward = get_surrogate_reward(state, env, surrogate_model, device)
-                            reward += surr_reward / 5
+                            reward += surr_reward
                             info['surrogate_reward'] = surr_reward
                         except Exception as e:
                             print("Error in surrogate " + str(e))
@@ -478,12 +489,12 @@ def train_ppo(args, env):
                         if args.is_conditional:
                             start_mol, end_mol = Chem.MolFromSmiles(info['start_smile']), Chem.MolFromSmiles(
                                 info['smile'])
-                            start_fingerprint, end_fingerprint = FingerprintMols.FingerprintMol(
-                                start_mol), FingerprintMols.FingerprintMol(end_mol)
-                            sim = DataStructs.TanimotoSimilarity(start_fingerprint, end_fingerprint)
+                            #start_fingerprint, end_fingerprint = FingerprintMols.FingerprintMol(
+                            #    start_mol), FingerprintMols.FingerprintMol(end_mol)
+                            #sim = DataStructs.TanimotoSimilarity(start_fingerprint, end_fingerprint)
 
-                            row = ''.join(['{},'] * 12)[:-1] + '\n'
-                            f.write(row.format(info['start_smile'], info['smile'], sim, info['reward_valid'],
+                            row = ''.join(['{},'] * 11)[:-1] + '\n'
+                            f.write(row.format(info['start_smile'], info['smile'], info['reward_valid'],
                                                info['reward_qed'], \
                                                info['reward_sa'], info['final_stat'], info['flag_steric_strain_filter'],
                                                info['flag_zinc_molecule_filter'], \
@@ -501,12 +512,8 @@ def train_ppo(args, env):
                 memory.rewards.append(reward)
                 memory.is_terminals.append(done)
 
-                # if we're in eval, don't update the policy.
-                if args.eval:
-                    continue
-
-                # update if its time
-                if time_step % update_timestep == 0:
+                # update if its time, and if we're not in eval
+                if (time_step % update_timestep == 0) and (args.eval == False):
                     print("updating ppo")
                     truth_pyg = None
                     if args.use_adversarial and (i_episode < args.adversarial_reward_episode_cutoff):
@@ -532,10 +539,9 @@ def train_ppo(args, env):
                 if (((i_episode + 1) % 20) == 0) and render:
                     env.render()
                 if done:
+                    print("Done! " + str(n_done))
                     break
 
-            if args.eval and n_done == args.num_done:
-                break
 
             writer.add_scalar("EpSurrogate", -1 * surr_reward, episode_count)
             rewbuffer_env.append(cur_ep_ret_env)
@@ -555,14 +561,14 @@ def train_ppo(args, env):
 
             # save best model
             if running_reward > best_running_reward:
-                torch.save(ppo.policy.state_dict(), os.path.join(save_dir, \
+                torch.save(ppo.policy.state_dict(), os.path.join(save_dir,
                                                                  'PPO_best_{}.pth'.format(args.name)))
             # save running model
             torch.save(ppo.policy.state_dict(), os.path.join(save_dir,
                                                              './PPO_running_{}.pth'.format(args.name)))
             # save every 500 episodes
             if i_episode % 500 == 0:
-                torch.save(ppo.policy.state_dict(), os.path.join(save_dir, \
+                torch.save(ppo.policy.state_dict(), os.path.join(save_dir,
                                                                  './PPO_continuous_{}_{}.pth'.format(args.name,
                                                                                                      str(i_episode))))
 
