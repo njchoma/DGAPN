@@ -5,7 +5,7 @@ from .gcpn_policy import GCPN
 from .PPO import train_ppo
 
 
-def train(args, seed, writer=None):
+def train(args, seed):
     # MAKE ENVIRONMENT
     env = gym.make('molecule-v0')
     env.init(data_type=args.dataset,
@@ -41,7 +41,7 @@ def train(args, seed, writer=None):
     # print(policy)
 
     # TRAIN
-    train_ppo(args, env, writer=writer)
+    train_ppo(args, env)
 
     env.close()
     print("Environment successfully closed.")
