@@ -483,7 +483,7 @@ def train_ppo(args, env):
                                                                  'PPO_best_{}.pth'.format(args.name)))
             # save running model
             torch.save(ppo.policy.state_dict(), os.path.join(save_dir,
-                                                             './PPO_continuous_running_{}.pth'.format(args.name)))
+                                                             './PPO_running_{}.pth'.format(args.name)))
             # save every 500 episodes
             if i_episode % 500 == 0:
                 torch.save(ppo.policy.state_dict(), os.path.join(save_dir,
