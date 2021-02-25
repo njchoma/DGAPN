@@ -30,8 +30,11 @@ def batched_softmax(logits, batch):
 def get_batch_shift(pyg_batch):
     batch_num_nodes = torch.bincount(pyg_batch)
 
-    cumsum = torch.cat((torch.LongTensor([0]).to(cumsum.device), torch.cumsum(batch_num_nodes, dim=0)[:-1]))
-    return cumsum
+    # shift batch
+    zero = torch.LongTensor([0]).to(batch_num_nodes.device)
+    batch_num_nodes = torch.cat((zero, batch_num_nodes[:-1]))
+
+    return batch_num_nodes
 
 #####################################################
 #                       CREM                        #

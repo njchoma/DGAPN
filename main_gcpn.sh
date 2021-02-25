@@ -4,7 +4,7 @@ eval "$(conda shell.bash hook)"
 conda activate my-rdkit-env_170_161
 
 PYARGS=""
-PYARGS="$PYARGS --name Ep0_rewFacNone"
+PYARGS="$PYARGS --name 0225_index_fix"
 PYARGS="$PYARGS --data_path $DATA/exaLearnMol"
 # PYARGS="$PYARGS --data_path $DATA/exaLearnMol/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.sorted.4col.csv"
 PYARGS="$PYARGS --artifact_path $ARTIFACTS/exaLearnMol/gcpn"
