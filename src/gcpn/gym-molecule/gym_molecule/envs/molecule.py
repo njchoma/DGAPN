@@ -74,7 +74,7 @@ def load_conditional(filepath):
         reader = csv.reader(fp, delimiter=',', quotechar='"')
         # List of lists, [[Smile, Score, row_number],...,]
         data = [[row[1], row[0], id] for id, row in enumerate(reader)]
-        data = data[0:5000]
+        #data = data[0:5000]
     return data
 
 
