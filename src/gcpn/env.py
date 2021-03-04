@@ -16,7 +16,7 @@ class CReM_Env(object):
     def __init__(self,
                  storage_path,
                  nb_sample_crem = 16,
-                 nb_cores = 16):
+                 nb_cores = 1):
 
         warm_start_dataset_path = os.path.join(storage_path, 'NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.sorted.4col.csv')
         self.scores, self.smiles = preprocess.main(warm_start_dataset_path)

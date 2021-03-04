@@ -111,7 +111,7 @@ def wrap_state(ob):
     return data
 
 
-class PPO_GCPN:
+class PPO_GCPN(nn.Module):
     def __init__(self,
                  lr,
                  betas,
@@ -129,6 +129,7 @@ class PPO_GCPN:
                  mlp_nb_layers,
                  mlp_nb_hidden,
                  device):
+        super(PPO_GCPN, self).__init__()
         self.lr = lr
         self.betas = betas
         self.gamma = gamma
@@ -268,6 +269,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
     render = True
     solved_reward = 100         # stop training if avg_reward > solved_reward
     log_interval = 5            # print avg reward in the interval
+    save_interval = 100         # save model in the interval
     max_episodes = 50000        # max training episodes
     # max_timesteps = 15          # max timesteps in one episode
     # update_interval = 75        # update policy every n episodes
@@ -381,8 +383,9 @@ def train_ppo(args, surrogate_model, env, writer=None):
             break
         
         # save every 500 episodes
-        if i_episode % 500 == 0:
-            torch.save(ppo.policy.state_dict(), './PPO_continuous_{}.pth'.format('test'))
+        if (i_episode-1) % save_interval == 0:
+            model_name = '{:05d}_gcpn.pth'.format(i_episode)
+            torch.save(ppo.policy, args.artifact_path+'/'+model_name)
 
         # logging
         if i_episode % log_interval == 0:
@@ -392,4 +395,3 @@ def train_ppo(args, surrogate_model, env, writer=None):
             print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
             running_reward = 0
             avg_length = 0
-
