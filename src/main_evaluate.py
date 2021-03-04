@@ -29,6 +29,9 @@ def molecule_arg_parser():
 
     add_arg('--nb_sample_crem', type=int, default=32)
 
+    add_arg('--nb_test', type=int, default=120)
+    add_arg('--nb_bad_steps', type=int, default=1)
+
     return parser
 
 
@@ -69,12 +72,19 @@ def main():
     print(surrogate_model)
 
     # Greedy
-    # eval_greedy(surrogate_model, env)
+    eval_greedy(surrogate_model,
+                env,
+                N = args.nb_test,
+                K = args.nb_bad_steps)
 
 
     policy = load_gcpn(args.gcpn_path)
     # GCPN_CReM
-    eval_gcpn_crem(policy, surrogate_model, env)
+    # eval_gcpn_crem(policy,
+    #                surrogate_model,
+    #                env,
+    #                N = args.nb_test,
+    #                K = args.nb_bad_steps)
 
 
 if __name__ == '__main__':
