@@ -70,9 +70,12 @@ class GCPN_CReM(nn.Module):
             X = self.act(l(X))
         X = self.final_layer(X).squeeze(1)
         probs = self.softmax(X)
-        a, p = sample_from_probs(probs)
 
-        return g_emb, X_states, a, p
+        if self.training:
+            a, p = sample_from_probs(probs)
+            return g_emb, X_states, a, p
+        else:
+            return g_emb, X_states, probs
 
     def get_embedding(self, g, surrogate_model):
         with torch.autograd.no_grad():

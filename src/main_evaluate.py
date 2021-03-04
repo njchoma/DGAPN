@@ -9,7 +9,8 @@ from torch.utils.tensorboard import SummaryWriter
 from utils.general_utils import maybe_download_file
 from gnn_surrogate import model
 from gcpn.env import CReM_Env
-# from evaluate.eval_gcpn_crem import eval_gcpn_crem
+from gcpn.gcpn_policy import GCPN_CReM
+from evaluate.eval_gcpn_crem import eval_gcpn_crem
 from evaluate.eval_greedy import eval_greedy
 
 def molecule_arg_parser():
@@ -24,6 +25,7 @@ def molecule_arg_parser():
 
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_model_path', default='')
+    add_arg('--gcpn_path', default='')
 
     add_arg('--nb_sample_crem', type=int, default=32)
 
@@ -46,6 +48,11 @@ def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_pat
     print("Surrogate model loaded")
     return surrogate_model
 
+def load_gcpn(gcpn_path):
+    gcpn_model = torch.load(gcpn_path, map_location='cpu')
+    print("GCPN model loaded")
+    return gcpn_model
+
 def main():
     args = molecule_arg_parser().parse_args()
     print("====args====", args)
@@ -61,8 +68,15 @@ def main():
 
     print(surrogate_model)
 
-    eval_greedy(surrogate_model, env)
+    # Greedy
+    # eval_greedy(surrogate_model, env)
+
+
+    policy = load_gcpn(args.gcpn_path)
+    # GCPN_CReM
+    eval_gcpn_crem(policy, surrogate_model, env)
 
 
 if __name__ == '__main__':
     main()
+

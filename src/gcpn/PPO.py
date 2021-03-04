@@ -268,7 +268,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
     ############## Hyperparameters ##############
     render = True
     solved_reward = 100         # stop training if avg_reward > solved_reward
-    log_interval = 5            # print avg reward in the interval
+    log_interval = 20           # print avg reward in the interval
     save_interval = 100         # save model in the interval
     max_episodes = 50000        # max training episodes
     # max_timesteps = 15          # max timesteps in one episode
@@ -385,7 +385,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
         # save every 500 episodes
         if (i_episode-1) % save_interval == 0:
             model_name = '{:05d}_gcpn.pth'.format(i_episode)
-            torch.save(ppo.policy, args.artifact_path+'/'+model_name)
+            torch.save(ppo.policy.actor, args.artifact_path+'/'+model_name)
 
         # logging
         if i_episode % log_interval == 0:
