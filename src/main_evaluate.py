@@ -24,7 +24,8 @@ def molecule_arg_parser():
     add_arg('--artifact_path', required=True)
 
     add_arg('--surrogate_model_url', default='')
-    add_arg('--surrogate_model_path', default='')
+    add_arg('--surrogate_guide_path', default='')
+    add_arg('--surrogate_eval_path', default='')
     add_arg('--gcpn_path', default='')
 
     add_arg('--nb_sample_crem', type=int, default=32)
@@ -62,17 +63,21 @@ def main():
     dt = get_current_datetime()
     writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/'+dt))
     
-    surrogate_model = load_surrogate_model(args.artifact_path,
+    surrogate_guide = load_surrogate_model(args.artifact_path,
                                            args.surrogate_model_url,
-                                           args.surrogate_model_path)
+                                           args.surrogate_guide_path)
+    surrogate_eval  = load_surrogate_model(args.artifact_path,
+                                           '',
+                                           args.surrogate_eval_path)
 
     env = CReM_Env(args.data_path,
                    nb_sample_crem = args.nb_sample_crem)
 
-    print(surrogate_model)
+    print(surrogate_guide)
 
     # Greedy
-    eval_greedy(surrogate_model,
+    eval_greedy(surrogate_guide,
+                surrogate_eval,
                 env,
                 N = args.nb_test,
                 K = args.nb_bad_steps)
@@ -81,7 +86,8 @@ def main():
     policy = load_gcpn(args.gcpn_path)
     # GCPN_CReM
     # eval_gcpn_crem(policy,
-    #                surrogate_model,
+    #                surrogate_guide,
+    #                surrogate_eval,
     #                env,
     #                N = args.nb_test,
     #                K = args.nb_bad_steps)

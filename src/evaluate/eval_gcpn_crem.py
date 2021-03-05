@@ -10,23 +10,27 @@ def get_rewards(g_batch, surrogate_model):
         scores = surrogate_model(g_batch.to(DEVICE))
     return scores.cpu().numpy()*-1
 
-def gcpn_crem_rollout(policy, env, surrogate_model, K, max_rollout=5):
-    g, g_candidates, done = env.reset()
+def gcpn_crem_rollout(policy,
+                      env,
+                      surrogate_guide,
+                      surrogate_eval,
+                      K,
+                      max_rollout=5):
+    g_start, g_candidates, done = env.reset()
 
-    g = Batch.from_data_list([g])
-    start_rew = get_rewards(g, surrogate_model)
-    best_rew = start_rew
+    g = Batch.from_data_list([g_start])
+    best_rew = get_rewards(g, surrogate_guide)
     steps_remaining = K
 
 
     for i in range(max_rollout):
         print("  {:3d} {:2d} {:4.1f}".format(i+1, steps_remaining, best_rew))
         steps_remaining -= 1
-        next_rewards = get_rewards(g_candidates, surrogate_model)
+        next_rewards = get_rewards(g_candidates, surrogate_guide)
         # action = np.argmax(next_rewards)
 
         with torch.autograd.no_grad():
-            _, _, probs = policy(g, g_candidates, surrogate_model)
+            _, _, probs = policy(g, g_candidates, surrogate_guide)
         max_action = np.argmax(probs.cpu().numpy())
         min_action = np.argmin(probs.cpu().numpy())
 
@@ -59,11 +63,16 @@ def gcpn_crem_rollout(policy, env, surrogate_model, K, max_rollout=5):
             break
 
         
-    return start_rew, best_rew
-def eval_gcpn_crem(policy, surrogate_model, env, N=120, K=1):
+    start_rew = get_rewards(Batch.from_data_list([g_start]), surrogate_eval)
+    final_rew = get_rewards(g, surrogate_eval)
+    return start_rew, final_rew
 
-    surrogate_model = surrogate_model.to(DEVICE)
-    surrogate_model.eval()
+def eval_gcpn_crem(policy, surrogate_guide, surrogate_eval, env, N=120, K=1):
+
+    surrogate_guide = surrogate_guide.to(DEVICE)
+    surrogate_guide.eval()
+    surrogate_eval = surrogate_eval.to(DEVICE)
+    surrogate_eval.eval()
     
     policy = policy.to(DEVICE)
     policy.eval()
@@ -72,7 +81,11 @@ def eval_gcpn_crem(policy, surrogate_model, env, N=120, K=1):
     avg_improvement = []
     avg_best = []
     for i in range(N):
-        start_rew, best_rew = gcpn_crem_rollout(policy, env, surrogate_model, K)
+        start_rew, best_rew = gcpn_crem_rollout(policy,
+                                                env,
+                                                surrogate_guide,
+                                                surrogate_eval,
+                                                K)
         improvement = best_rew - start_rew
         print("{:2d}: {:4.1f} {:4.1f} {:4.1f}".format(i+1,
                                                       start_rew,

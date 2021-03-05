@@ -81,6 +81,8 @@ class GNN_MyGAT(nn.Module):
         for i, l in enumerate(self.layers):
             x = l(x, edge_index, edge_attr)
             x = self.act(x)
+            # if i==2:
+            #     x = nn.functional.dropout(x, training=self.training)
         x = pyg.nn.global_add_pool(x, g.batch)
         return x
 
