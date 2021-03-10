@@ -21,7 +21,7 @@ class Memory:
         self.logprobs = []
         self.rewards = []
         self.is_terminals = []
-    
+
     def clear_memory(self):
         del self.actions[:]
         del self.states[:]
@@ -271,12 +271,9 @@ def train_ppo(args, surrogate_model, env, writer=None):
     log_interval = 20           # print avg reward in the interval
     save_interval = 100         # save model in the interval
     max_episodes = 50000        # max training episodes
-    # max_timesteps = 15          # max timesteps in one episode
-    # update_interval = 75        # update policy every n episodes
     
     max_timesteps = 6           # max timesteps in one episode
-    update_interval = 30        # update policy every n episodes
-
+    update_timestep = 30        # update policy every n timesteps
 
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
@@ -360,9 +357,8 @@ def train_ppo(args, surrogate_model, env, writer=None):
                 break
 
         # update if it's time
-        if time_step > update_interval:
+        if time_step % update_timestep == 0:
             print("updating ppo")
-            time_step = 0
             ppo.update(memory, i_episode, writer)
             memory.clear_memory()
 
