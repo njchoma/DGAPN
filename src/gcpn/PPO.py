@@ -271,12 +271,9 @@ def train_ppo(args, surrogate_model, env, writer=None):
     log_interval = 20           # print avg reward in the interval
     save_interval = 100         # save model in the interval
     max_episodes = 50000        # max training episodes
-    # max_timesteps = 15          # max timesteps in one episode
-    # update_interval = 75        # update policy every n episodes
     
     max_timesteps = 6           # max timesteps in one episode
-    update_interval = 30        # update policy every n episodes
-
+    update_timestep = 30        # update policy every n timesteps
 
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
@@ -326,14 +323,11 @@ def train_ppo(args, surrogate_model, env, writer=None):
     avg_length = 0
     time_step = 0
 
-    episode_count = 0
-
     # variables for plotting rewards
 
     rewbuffer_env = deque(maxlen=100)
     # training loop
     for i_episode in range(1, max_episodes+1):
-        cur_ep_ret_env = 0
         state, candidates, done = env.reset()
         starting_reward = get_reward(state, surrogate_model, device)
 
@@ -360,21 +354,19 @@ def train_ppo(args, surrogate_model, env, writer=None):
                 break
 
         # update if it's time
-        if time_step > update_interval:
+        if time_step % update_timestep == 0:
             print("updating ppo")
-            time_step = 0
             ppo.update(memory, i_episode, writer)
             memory.clear_memory()
 
-        writer.add_scalar("EpSurrogate", -1*surr_reward, episode_count)
+        writer.add_scalar("EpSurrogate", -1*surr_reward, i_episode-1)
         rewbuffer_env.append(reward)
         avg_length += t
 
         # write to Tensorboard
-        writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), episode_count)
-        # writer.add_scalar("Average Length", avg_length, global_step=episode_count)
-        # writer.add_scalar("Running Reward", running_reward, global_step=episode_count)
-        episode_count += 1
+        writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode-1)
+        # writer.add_scalar("Average Length", avg_length, global_step=i_episode-1)
+        # writer.add_scalar("Running Reward", running_reward, global_step=i_episode-1)
 
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > solved_reward:
