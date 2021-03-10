@@ -328,7 +328,7 @@ def train_ppo(args, surrogate_model, env):
 
     ################## Process ##################
     pool = Pool(4)
-    update_lock = Lock()
+    lock = Lock()
 
     episode_count = Value("i", 0)
     sample_count = Value("i", 0)
@@ -346,7 +346,8 @@ def train_ppo(args, surrogate_model, env):
         state, candidates, done = env.reset()
         starting_reward = get_reward(state, surrogate_model, device)
 
-        while episode_count.value < max_episodes and sample_count.value < update_timestep:
+        end = False
+        while not end:
             n_step = 0
             for t in range(max_timesteps):
                 n_step += 1
@@ -366,19 +367,19 @@ def train_ppo(args, surrogate_model, env):
                 if done:
                     break
 
-            update_lock.acquire()
-
+            lock.acquire() # C[]
             sample_count.value += n_step
             episode_count.value += 1
 
             running_reward.value += sum(memory.rewards)
             avg_length.value += t
             rewbuffer_env.put(reward)
-
-            update_lock.release()
-
-            ep_surrogates.append(-1*surr_reward)
             ep_rew_env_mean.append(np.mean(rewbuffer_env))
+
+            end = sample_count.value >= update_timestep or episode_count.value >= max_episodes
+
+            lock.release() # L[]
+            ep_surrogates.append(-1*surr_reward)
 
         return memory, ep_surrogates, ep_rew_env_mean
 
@@ -387,7 +388,7 @@ def train_ppo(args, surrogate_model, env):
     memory = Memory()
     ep_surrogates = []
     ep_rew_env_mean = []
-    
+
     update_count = 0 # for adversarial
     save_counter = 0
     log_counter = 0

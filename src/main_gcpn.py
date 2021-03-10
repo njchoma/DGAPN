@@ -57,12 +57,6 @@ def molecule_arg_parser():
 
     return parser
 
-
-def get_current_datetime():
-    now = datetime.now()
-    dt_string = now.strftime("%Y.%m.%d_%H:%M:%S")
-    return dt_string
-
 def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_path):
     if surrogate_model_url != '':
         surrogate_model_path = os.path.join(artifact_path, 'surrogate_model.pth')

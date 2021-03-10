@@ -1,0 +1,23 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "main_gcpn",
+            "type": "python",
+            "request": "launch",
+            "program": "src/main_gcpn.py",
+            "subProcess": true,
+            "args": [
+                "--name", "crem_simplified_parallel", 
+                "--data_path", "test_run", 
+                "--artifact_path", "test_run/gcpn",
+                "--gpu", "0",
+                "surrogate_model_path", "artifact"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}
