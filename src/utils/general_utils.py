@@ -1,6 +1,13 @@
 import os
 import wget
 import logging
+from datetime import datetime
+
+
+def get_current_datetime():
+    now = datetime.now()
+    dt_string = now.strftime("%Y.%m.%d_%H:%M:%S")
+    return dt_string
 
 
 def initialize_logger(artifact_path, name=None, level='INFO'):

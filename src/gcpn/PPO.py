@@ -1,3 +1,4 @@
+import os
 import gym
 import numpy as np
 from collections import deque
@@ -5,13 +6,17 @@ from collections import deque
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
+from torch.utils.tensorboard import SummaryWriter
 
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils import dense_to_sparse
 
 from .gcpn_policy import GCPN_CReM
 
+from utils.general_utils import get_current_datetime
 from utils.graph_utils import state_to_pyg
+
+from multiprocessing import Pool, Lock, Barrier, Value, Queue
 
 
 class Memory:
@@ -167,7 +172,7 @@ class PPO_GCPN(nn.Module):
         g_candidates = candidates.to(self.device)
         action = self.policy_old.act(g, g_candidates, memory, surrogate_model)
         return action
-    
+
     def update(self, memory, i_episode, writer=None):
         print("\n\nupdating...")
         # Monte Carlo estimate of rewards:
@@ -260,20 +265,24 @@ def get_reward(state, surrogate_model, device):
 #                   TRAINING LOOP                   #
 #####################################################
 
-def train_ppo(args, surrogate_model, env, writer=None):
-    print("INFO: Not training with entropy term in loss")
+def train_ppo(args, surrogate_model, env):
     print("{} episodes before surrogate model as final reward".format(
                 args.surrogate_reward_timestep_delay))
+    # logging variables
+    dt = get_current_datetime()
+    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + dt))
+    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + dt)
+    os.makedirs(save_dir, exist_ok=True)
 
     ############## Hyperparameters ##############
     render = True
     solved_reward = 100         # stop training if avg_reward > solved_reward
     log_interval = 20           # print avg reward in the interval
     save_interval = 100         # save model in the interval
+
     max_episodes = 50000        # max training episodes
-    
     max_timesteps = 6           # max timesteps in one episode
-    update_timestep = 30        # update policy every n timesteps
+    update_timestep = 120       # update policy every n timesteps
 
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
@@ -312,82 +321,134 @@ def train_ppo(args, surrogate_model, env, writer=None):
                    device)
     
     print(ppo)
-    memory = Memory()
     print("lr:", lr, "beta:", betas)
 
     surrogate_model = surrogate_model.to(device)
     surrogate_model.eval()
-    
+
+    ################## Process ##################
+    pool = Pool(4)
+    update_lock = Lock()
+
+    episode_count = Value("i", 0)
+    sample_count = Value("i", 0)
+
     # logging variables
-    running_reward = 0
-    avg_length = 0
-    time_step = 0
+    running_reward = Value("f", 0)
+    avg_length = Value("i", 0)
+    rewbuffer_env = Queue(100)
 
-    episode_count = 0
+    def collect_trajectories(ppo, env, surrogate_model, max_episodes, max_timesteps, update_timestep, device):
+        memory = Memory()
+        ep_surrogates = []
+        ep_rew_env_mean = []
 
-    # variables for plotting rewards
-
-    rewbuffer_env = deque(maxlen=100)
-    # training loop
-    for i_episode in range(1, max_episodes+1):
-        cur_ep_ret_env = 0
         state, candidates, done = env.reset()
         starting_reward = get_reward(state, surrogate_model, device)
 
-        for t in range(max_timesteps):
-            time_step += 1
-            # Running policy_old:
-            action = ppo.select_action(state, candidates, memory, surrogate_model)
-            state, candidates, done = env.step(action)
+        while episode_count.value < max_episodes and sample_count.value < update_timestep:
+            n_step = 0
+            for t in range(max_timesteps):
+                n_step += 1
+                # Running policy_old:
+                action = ppo.select_action(state, candidates, memory, surrogate_model)
+                state, candidates, done = env.step(action)
 
-            # done and reward may not be needed anymore
-            reward = 0
+                reward = 0
+                if (t==(max_timesteps-1)) or done:
+                    surr_reward = get_reward(state, surrogate_model, device)
+                    reward = surr_reward-starting_reward
 
-            if (t==(max_timesteps-1)) or done:
-                surr_reward = get_reward(state, surrogate_model, device)
-                reward = surr_reward-starting_reward
-            
-            
-            # Saving reward and is_terminals:
-            memory.rewards.append(reward)
-            memory.is_terminals.append(done)
+                # Saving reward and is_terminals:
+                memory.rewards.append(reward)
+                memory.is_terminals.append(done)
 
-            running_reward += reward
-            if done:
-                break
+                if done:
+                    break
 
-        # update if it's time
-        if time_step % update_timestep == 0:
-            print("updating ppo")
-            ppo.update(memory, i_episode, writer)
-            memory.clear_memory()
+            update_lock.acquire()
 
-        writer.add_scalar("EpSurrogate", -1*surr_reward, episode_count)
-        rewbuffer_env.append(reward)
-        avg_length += t
+            sample_count.value += n_step
+            episode_count.value += 1
+
+            running_reward.value += sum(memory.rewards)
+            avg_length.value += t
+            rewbuffer_env.put(reward)
+
+            update_lock.release()
+
+            ep_surrogates.append(-1*surr_reward)
+            ep_rew_env_mean.append(np.mean(rewbuffer_env))
+
+        return memory, ep_surrogates, ep_rew_env_mean
+
+    #############################################
+
+    memory = Memory()
+    ep_surrogates = []
+    ep_rew_env_mean = []
+    
+    update_count = 0 # for adversarial
+    save_counter = 0
+    log_counter = 0
+
+    # training loop
+    i_episode = 0
+    while i_episode < max_episodes:
+        # parallel runs
+        results = []
+        for i in range(pool._processes):
+            results.append(pool.apply_async(collect_trajectories, 
+                [ppo, env, surrogate_model, max_episodes - i_episode, max_timesteps, update_timestep, device]))
+        # process results
+        for result in results:
+            result = result.get()
+            memory.rewards.extend(result[0].rewards)
+            memory.is_terminals.extend(result[0].is_terminals)
+            ep_surrogates.extend(result[1])
+            ep_rew_env_mean.extend(result[2])
 
         # write to Tensorboard
-        writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), episode_count)
-        # writer.add_scalar("Average Length", avg_length, global_step=episode_count)
-        # writer.add_scalar("Running Reward", running_reward, global_step=episode_count)
-        episode_count += 1
+        for i in reversed(range(episode_count.value)):
+            writer.add_scalar("EpSurrogate", ep_surrogates[i], i_episode - i)
+            writer.add_scalar("EpRewEnvMean", ep_rew_env_mean[i], i_episode - i)
+        ep_surrogates = []
+        ep_rew_env_mean = []
+        # update model
+        print("updating ppo")
+        ppo.update(memory, i_episode, writer)
+        memory.clear_memory()
+
+        update_count += 1
+        save_counter += episode_count.value
+        log_counter += episode_count.value
+
+        i_episode += episode_count.value
 
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > solved_reward:
             print("########## Solved! ##########")
-            torch.save(ppo.policy.state_dict(), './PPO_continuous_solved_{}.pth'.format('test'))
+            torch.save(ppo.policy.state_dict(), os.path.join(save_dir, 'PPO_continuous_solved_{}.pth'.format('test')))
             break
-        
+
+        # save running model
+        torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
+
         # save every 500 episodes
-        if (i_episode-1) % save_interval == 0:
-            model_name = '{:05d}_gcpn.pth'.format(i_episode)
-            torch.save(ppo.policy.actor, args.artifact_path+'/'+model_name)
+        if save_counter > save_interval:
+            torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_gcpn.pth'.format(i_episode)))
+            save_counter -= save_interval
 
         # logging
-        if i_episode % log_interval == 0:
-            avg_length = int(avg_length/log_interval)
-            running_reward = running_reward/log_interval
+        if log_counter > log_interval:
+            avg_length.value = int(avg_length.value/log_counter)
+            running_reward.value = running_reward.value/log_counter
             
-            print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
-            running_reward = 0
-            avg_length = 0
+            print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length.value, running_reward.value))
+            running_reward.value = 0
+            avg_length.value = 0
+            log_counter = 0
+
+        episode_count.value = 0
+        sample_count.value = 0
+
