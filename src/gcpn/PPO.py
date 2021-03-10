@@ -1,3 +1,4 @@
+import os
 import gym
 import numpy as np
 from collections import deque
@@ -5,12 +6,14 @@ from collections import deque
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
+from torch.utils.tensorboard import SummaryWriter
 
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils import dense_to_sparse
 
 from .gcpn_policy import GCPN_CReM
 
+from utils.general_utils import get_current_datetime
 from utils.graph_utils import state_to_pyg
 
 
@@ -260,10 +263,14 @@ def get_reward(state, surrogate_model, device):
 #                   TRAINING LOOP                   #
 #####################################################
 
-def train_ppo(args, surrogate_model, env, writer=None):
-    print("INFO: Not training with entropy term in loss")
+def train_ppo(args, surrogate_model, env):
     print("{} episodes before surrogate model as final reward".format(
                 args.surrogate_reward_timestep_delay))
+    # logging variables
+    dt = get_current_datetime()
+    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + dt))
+    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + dt)
+    os.makedirs(save_dir, exist_ok=True)
 
     ############## Hyperparameters ##############
     render = True
@@ -373,11 +380,13 @@ def train_ppo(args, surrogate_model, env, writer=None):
             print("########## Solved! ##########")
             torch.save(ppo.policy.state_dict(), './PPO_continuous_solved_{}.pth'.format('test'))
             break
-        
+
+        # save running model
+        torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
+
         # save every 500 episodes
         if (i_episode-1) % save_interval == 0:
-            model_name = '{:05d}_gcpn.pth'.format(i_episode)
-            torch.save(ppo.policy.actor, args.artifact_path+'/'+model_name)
+            torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_gcpn.pth'.format(i_episode)))
 
         # logging
         if i_episode % log_interval == 0:

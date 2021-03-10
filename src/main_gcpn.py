@@ -1,6 +1,5 @@
 import os
 import argparse
-from datetime import datetime
 
 import torch
 
@@ -58,12 +57,6 @@ def molecule_arg_parser():
 
     return parser
 
-
-def get_current_datetime():
-    now = datetime.now()
-    dt_string = now.strftime("%Y.%m.%d_%H:%M:%S")
-    return dt_string
-
 def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_path):
     if surrogate_model_url != '':
         surrogate_model_path = os.path.join(artifact_path, 'surrogate_model.pth')
@@ -78,8 +71,6 @@ def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_pat
 def main():
     args = molecule_arg_parser().parse_args()
     print("====args====", args)
-    dt = get_current_datetime()
-    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/'+dt))
     
     surrogate_model = load_surrogate_model(args.artifact_path,
                                            args.surrogate_model_url,
@@ -89,7 +80,7 @@ def main():
 
     print(surrogate_model)
 
-    train_ppo(args, surrogate_model, env, writer=writer)
+    train_ppo(args, surrogate_model, env)
 
 if __name__ == '__main__':
     main()
