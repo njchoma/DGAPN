@@ -361,8 +361,9 @@ def train_ppo(args, surrogate_model, env):
                 break
 
         # update if it's time
-        if time_step % update_timestep == 0:
+        if time_step > update_interval:
             print("updating ppo")
+            time_step = 0
             ppo.update(memory, i_episode, writer)
             memory.clear_memory()
 
