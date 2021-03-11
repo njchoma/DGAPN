@@ -5,8 +5,6 @@ import torch
 
 from gcpn.PPO import train_ppo
 
-from torch.utils.tensorboard import SummaryWriter
-
 from utils.general_utils import maybe_download_file
 from gnn_surrogate import model
 from gcpn.env import CReM_Env

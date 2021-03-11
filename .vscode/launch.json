@@ -12,10 +12,10 @@
             "subProcess": true,
             "args": [
                 "--name", "crem_simplified_parallel", 
-                "--data_path", "test_run", 
+                "--data_path", "src/dataset", 
                 "--artifact_path", "test_run/gcpn",
                 "--gpu", "0",
-                "surrogate_model_path", "artifact"
+                "--surrogate_model_path", "artifact/surrogate_model.pth"
             ],
             "console": "integratedTerminal"
         }

@@ -1,11 +1,12 @@
 import os
 import gym
+import copy
 import numpy as np
-from collections import deque
 
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
+from torch.multiprocessing import Pool, Process, Lock, Barrier, Value, Queue
 from torch.utils.tensorboard import SummaryWriter
 
 from torch_geometric.data import Data, Batch
@@ -16,8 +17,7 @@ from .gcpn_policy import GCPN_CReM
 from utils.general_utils import get_current_datetime
 from utils.graph_utils import state_to_pyg
 
-from multiprocessing import Pool, Lock, Barrier, Value, Queue
-
+import time
 
 class Memory:
     def __init__(self):
@@ -132,8 +132,7 @@ class PPO_GCPN(nn.Module):
                  gnn_nb_hidden,
                  gnn_nb_hidden_kernel,
                  mlp_nb_layers,
-                 mlp_nb_hidden,
-                 device):
+                 mlp_nb_hidden):
         super(PPO_GCPN, self).__init__()
         self.lr = lr
         self.betas = betas
@@ -142,7 +141,6 @@ class PPO_GCPN(nn.Module):
         self.upsilon = upsilon
         self.eps_clip = eps_clip
         self.K_epochs = K_epochs
-        self.device = device
         
         self.policy = ActorCriticGCPN(input_dim,
                                       emb_dim,
@@ -151,7 +149,7 @@ class PPO_GCPN(nn.Module):
                                       gnn_nb_hidden,
                                       gnn_nb_hidden_kernel,
                                       mlp_nb_layers,
-                                      mlp_nb_hidden).to(device)
+                                      mlp_nb_hidden)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
         
         self.policy_old = ActorCriticGCPN(input_dim,
@@ -161,19 +159,21 @@ class PPO_GCPN(nn.Module):
                                           gnn_nb_hidden,
                                           gnn_nb_hidden_kernel,
                                           mlp_nb_layers,
-                                          mlp_nb_hidden).to(device)
+                                          mlp_nb_hidden)
         self.policy_old.load_state_dict(self.policy.state_dict())
         
         self.MseLoss = nn.MSELoss()
 
+    def to_device(self, device):
+        self.policy.to(device)
+        self.policy_old.to(device)
     
     def select_action(self, state, candidates, memory, surrogate_model):
-        g = state.to(self.device)
-        g_candidates = candidates.to(self.device)
-        action = self.policy_old.act(g, g_candidates, memory, surrogate_model)
+        with torch.autograd.no_grad():
+            action = self.policy_old.act(state, candidates, memory, surrogate_model)
         return action
 
-    def update(self, memory, i_episode, writer=None):
+    def update(self, memory, i_episode, device):
         print("\n\nupdating...")
         # Monte Carlo estimate of rewards:
         rewards = []
@@ -186,15 +186,15 @@ class PPO_GCPN(nn.Module):
         
 
         # Normalizing the rewards:
-        rewards = torch.tensor(rewards).to(self.device)
+        rewards = torch.tensor(rewards).to(device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
         
         # convert list to tensor
-        old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(self.device)
-        old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(self.device)
-        old_actions = torch.tensor(memory.actions).to(self.device)
-        old_logprobs = torch.stack(memory.logprobs).to(self.device)
+        old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(device)
+        old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(device)
+        old_actions = torch.tensor(memory.actions).to(device)
+        old_logprobs = torch.stack(memory.logprobs).to(device)
         
         # Optimize policy for K epochs:
         print("Optimizing...")
@@ -251,19 +251,75 @@ class PPO_GCPN(nn.Module):
 #                   FINAL REWARDS                   #
 #####################################################
 
-def get_reward(state, surrogate_model, device):
+def get_reward(state, surrogate_model):
     g = Batch().from_data_list([state])
-    g = g.to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
     reward = pred_docking_score.item() * -1
     return reward
 
 
-
 #####################################################
 #                   TRAINING LOOP                   #
 #####################################################
+
+################## Process ##################
+lock = Lock()
+
+episode_count = Value("i", 0)
+sample_count = Value("i", 0)
+
+# logging variables
+running_reward = Value("f", 0)
+avg_length = Value("i", 0)
+rewbuffer_env = Queue(100)
+
+def collect_trajectories(ppo, surrogate_model, env, max_episodes, max_timesteps, update_timestep):
+    memory = Memory()
+    ep_surrogates = []
+    ep_rew_env_mean = []
+
+    state, candidates, done = env.reset()
+    starting_reward = get_reward(state, surrogate_model)
+
+    end = False
+    while not end:
+        n_step = 0
+        for t in range(max_timesteps):
+            n_step += 1
+            # Running policy_old:
+            action = ppo.select_action(state, candidates, memory, surrogate_model)
+            state, candidates, done = env.step(action)
+
+            reward = 0
+            if (t==(max_timesteps-1)) or done:
+                surr_reward = get_reward(state, surrogate_model)
+                reward = surr_reward-starting_reward
+
+            # Saving reward and is_terminals:
+            memory.rewards.append(reward)
+            memory.is_terminals.append(done)
+
+            if done:
+                break
+
+        lock.acquire() # C[]
+        sample_count.value += n_step
+        episode_count.value += 1
+
+        running_reward.value += sum(memory.rewards)
+        avg_length.value += t
+        rewbuffer_env.put(reward)
+        ep_rew_env_mean.append(np.mean(rewbuffer_env))
+
+        end = sample_count.value >= update_timestep or episode_count.value >= max_episodes
+
+        lock.release() # L[]
+        ep_surrogates.append(-1*surr_reward)
+
+    return memory, ep_surrogates, ep_rew_env_mean
+
+#############################################
 
 def train_ppo(args, surrogate_model, env):
     print("{} episodes before surrogate model as final reward".format(
@@ -317,73 +373,13 @@ def train_ppo(args, surrogate_model, env):
                    args.num_hidden_g,
                    args.num_hidden_g,
                    args.mlp_num_layer,
-                   args.mlp_num_hidden,
-                   device)
-    
+                   args.mlp_num_hidden)
     print(ppo)
     print("lr:", lr, "beta:", betas)
+    ppo.share_memory()
 
-    surrogate_model = surrogate_model.to(device)
     surrogate_model.eval()
-
-    ################## Process ##################
-    pool = Pool(4)
-    lock = Lock()
-
-    episode_count = Value("i", 0)
-    sample_count = Value("i", 0)
-
-    # logging variables
-    running_reward = Value("f", 0)
-    avg_length = Value("i", 0)
-    rewbuffer_env = Queue(100)
-
-    def collect_trajectories(ppo, env, surrogate_model, max_episodes, max_timesteps, update_timestep, device):
-        memory = Memory()
-        ep_surrogates = []
-        ep_rew_env_mean = []
-
-        state, candidates, done = env.reset()
-        starting_reward = get_reward(state, surrogate_model, device)
-
-        end = False
-        while not end:
-            n_step = 0
-            for t in range(max_timesteps):
-                n_step += 1
-                # Running policy_old:
-                action = ppo.select_action(state, candidates, memory, surrogate_model)
-                state, candidates, done = env.step(action)
-
-                reward = 0
-                if (t==(max_timesteps-1)) or done:
-                    surr_reward = get_reward(state, surrogate_model, device)
-                    reward = surr_reward-starting_reward
-
-                # Saving reward and is_terminals:
-                memory.rewards.append(reward)
-                memory.is_terminals.append(done)
-
-                if done:
-                    break
-
-            lock.acquire() # C[]
-            sample_count.value += n_step
-            episode_count.value += 1
-
-            running_reward.value += sum(memory.rewards)
-            avg_length.value += t
-            rewbuffer_env.put(reward)
-            ep_rew_env_mean.append(np.mean(rewbuffer_env))
-
-            end = sample_count.value >= update_timestep or episode_count.value >= max_episodes
-
-            lock.release() # L[]
-            ep_surrogates.append(-1*surr_reward)
-
-        return memory, ep_surrogates, ep_rew_env_mean
-
-    #############################################
+    surrogate_model.share_memory()
 
     memory = Memory()
     ep_surrogates = []
@@ -396,12 +392,20 @@ def train_ppo(args, surrogate_model, env):
     # training loop
     i_episode = 0
     while i_episode < max_episodes:
+        print("collecting rollouts")
+        ppo.to_device(torch.device("cpu"))
+
         # parallel runs
         results = []
+        pool = Pool(4)
         for i in range(pool._processes):
-            results.append(pool.apply_async(collect_trajectories, 
-                [ppo, env, surrogate_model, max_episodes - i_episode, max_timesteps, update_timestep, device]))
-        # process results
+            res = pool.apply_async(collect_trajectories, 
+                [ppo, surrogate_model, env, max_episodes - i_episode, max_timesteps, update_timestep])
+            results.append(res)
+        pool.close()
+        pool.join()
+
+        # unpack results
         for result in results:
             result = result.get()
             memory.rewards.extend(result[0].rewards)
@@ -415,9 +419,11 @@ def train_ppo(args, surrogate_model, env):
             writer.add_scalar("EpRewEnvMean", ep_rew_env_mean[i], i_episode - i)
         ep_surrogates = []
         ep_rew_env_mean = []
+
         # update model
         print("updating ppo")
-        ppo.update(memory, i_episode, writer)
+        ppo.to_device(device)
+        ppo.update(memory, i_episode, device)
         memory.clear_memory()
 
         update_count += 1
