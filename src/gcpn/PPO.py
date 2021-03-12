@@ -170,7 +170,11 @@ class PPO_GCPN(nn.Module):
         self.policy_old.to(device)
     
     def select_action(self, state, candidates, memory, surrogate_model):
-        action = self.policy_old.act(state, candidates, memory, surrogate_model)
+        device = next(ppo.policy_old.parameters()).device
+
+        g = state.to(device)
+        g_candidates = candidates.to(device)
+        action = self.policy_old.act(g, g_candidates, memory, surrogate_model)
         return action
 
     def update(self, memory, i_episode, device):
@@ -459,6 +463,6 @@ def train_ppo(args, surrogate_model, env):
             avg_length.value = 0
             log_counter = 0
 
-        #episode_count.value = 0
-        #sample_count.value = 0
+        episode_count.value = 0
+        sample_count.value = 0
 
