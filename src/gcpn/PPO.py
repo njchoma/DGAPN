@@ -1,7 +1,9 @@
 import os
+import sys
 import gym
 import copy
 import numpy as np
+from collections import deque, OrderedDict
 
 import torch
 import torch.nn as nn
@@ -17,7 +19,7 @@ from .gcpn_policy import GCPN_CReM
 from utils.general_utils import get_current_datetime
 from utils.graph_utils import state_to_pyg
 
-import time
+from gnn_surrogate.model import GNN_MyGAT
 
 class Memory:
     def __init__(self):
@@ -63,7 +65,6 @@ class ActorCriticGCPN(nn.Module):
                  nb_edge_types,
                  gnn_nb_layers,
                  gnn_nb_hidden,
-                 gnn_nb_hidden_kernel,
                  mlp_nb_layers,
                  mlp_nb_hidden):
         super(ActorCriticGCPN, self).__init__()
@@ -71,6 +72,9 @@ class ActorCriticGCPN(nn.Module):
         # action mean range -1 to 1
         self.actor = GCPN_CReM(input_dim,
                                emb_dim,
+                               nb_edge_types,
+                               gnn_nb_layers,
+                               gnn_nb_hidden,
                                mlp_nb_layers,
                                mlp_nb_hidden)
         # critic
@@ -130,7 +134,6 @@ class PPO_GCPN(nn.Module):
                  nb_edge_types,
                  gnn_nb_layers,
                  gnn_nb_hidden,
-                 gnn_nb_hidden_kernel,
                  mlp_nb_layers,
                  mlp_nb_hidden):
         super(PPO_GCPN, self).__init__()
@@ -147,7 +150,6 @@ class PPO_GCPN(nn.Module):
                                       nb_edge_types,
                                       gnn_nb_layers,
                                       gnn_nb_hidden,
-                                      gnn_nb_hidden_kernel,
                                       mlp_nb_layers,
                                       mlp_nb_hidden)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
@@ -157,7 +159,6 @@ class PPO_GCPN(nn.Module):
                                           nb_edge_types,
                                           gnn_nb_layers,
                                           gnn_nb_hidden,
-                                          gnn_nb_hidden_kernel,
                                           mlp_nb_layers,
                                           mlp_nb_hidden)
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -169,8 +170,7 @@ class PPO_GCPN(nn.Module):
         self.policy_old.to(device)
     
     def select_action(self, state, candidates, memory, surrogate_model):
-        with torch.autograd.no_grad():
-            action = self.policy_old.act(state, candidates, memory, surrogate_model)
+        action = self.policy_old.act(state, candidates, memory, surrogate_model)
         return action
 
     def update(self, memory, i_episode, device):
@@ -266,34 +266,46 @@ def get_reward(state, surrogate_model):
 ################## Process ##################
 lock = Lock()
 
-episode_count = Value("i", 0)
-sample_count = Value("i", 0)
+episode_count = Value("i", 0).share_memory()
+sample_count = Value("i", 0).share_memory()
 
 # logging variables
-running_reward = Value("f", 0)
-avg_length = Value("i", 0)
-rewbuffer_env = Queue(100)
+running_reward = Value("f", 0).share_memory()
+avg_length = Value("i", 0).share_memory()
 
-def collect_trajectories(ppo, surrogate_model, env, max_episodes, max_timesteps, update_timestep):
+def collect_trajectories(args, p_state_dict, s_state_dict, env, max_episodes, max_timesteps, update_timestep):
+    policy = ActorCriticGCPN(args.input_size,
+                             args.emb_size,
+                             args.nb_edge_types,
+                             args.layer_num_g,
+                             args.num_hidden_g,
+                             args.mlp_num_layer,
+                             args.mlp_num_hidden)
+    surrogate = GNN_MyGAT(args.input_size,
+                          args.emb_size,
+                          args.num_hidden_g,
+                          args.layer_num_g)
+    policy.load_state_dict(p_state_dict)
+    surrogate.load_state_dict(s_state_dict)
+
     memory = Memory()
     ep_surrogates = []
-    ep_rew_env_mean = []
+    ep_rewards = []
 
     state, candidates, done = env.reset()
-    starting_reward = get_reward(state, surrogate_model)
+    starting_reward = get_reward(state, surrogate)
 
-    end = False
-    while not end:
+    while sample_count.value < update_timestep and episode_count.value < max_episodes:
         n_step = 0
         for t in range(max_timesteps):
             n_step += 1
             # Running policy_old:
-            action = ppo.select_action(state, candidates, memory, surrogate_model)
+            action = policy.act(state, candidates, memory, surrogate)
             state, candidates, done = env.step(action)
 
             reward = 0
             if (t==(max_timesteps-1)) or done:
-                surr_reward = get_reward(state, surrogate_model)
+                surr_reward = get_reward(state, surrogate)
                 reward = surr_reward-starting_reward
 
             # Saving reward and is_terminals:
@@ -309,15 +321,12 @@ def collect_trajectories(ppo, surrogate_model, env, max_episodes, max_timesteps,
 
         running_reward.value += sum(memory.rewards)
         avg_length.value += t
-        rewbuffer_env.put(reward)
-        ep_rew_env_mean.append(np.mean(rewbuffer_env))
-
-        end = sample_count.value >= update_timestep or episode_count.value >= max_episodes
 
         lock.release() # L[]
         ep_surrogates.append(-1*surr_reward)
+        ep_rewards.append(reward)
 
-    return memory, ep_surrogates, ep_rew_env_mean
+    return memory, ep_surrogates, ep_rewards
 
 #############################################
 
@@ -349,12 +358,8 @@ def train_ppo(args, surrogate_model, env):
     
     #############################################
 
-    ob, _, _ = env.reset()
-    input_dim = ob.x.shape[1]
-
-    # emb_dim = surrogate_model.emb_dim
-    emb_dim = 512 # temp fix to use an old surrogate model
-    nb_edge_types = 1
+    #ob, _, _ = env.reset()
+    #args.input_size = ob.x.shape[1]
 
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
@@ -366,59 +371,57 @@ def train_ppo(args, surrogate_model, env):
                    args.upsilon,
                    K_epochs,
                    eps_clip,
-                   input_dim,
-                   emb_dim,
-                   nb_edge_types,
+                   args.input_size,
+                   args.emb_size,
+                   args.nb_edge_types,
                    args.layer_num_g,
-                   args.num_hidden_g,
                    args.num_hidden_g,
                    args.mlp_num_layer,
                    args.mlp_num_hidden)
     print(ppo)
     print("lr:", lr, "beta:", betas)
-    ppo.share_memory()
 
     surrogate_model.eval()
-    surrogate_model.share_memory()
-
-    memory = Memory()
-    ep_surrogates = []
-    ep_rew_env_mean = []
 
     update_count = 0 # for adversarial
     save_counter = 0
     log_counter = 0
 
+    memory = Memory()
+    rewbuffer_env = deque(maxlen=100)
     # training loop
     i_episode = 0
     while i_episode < max_episodes:
         print("collecting rollouts")
         ppo.to_device(torch.device("cpu"))
+        p_state_dict = ppo.policy_old.state_dict()
+        s_state_dict = surrogate_model.state_dict()
 
         # parallel runs
         results = []
         pool = Pool(4)
         for i in range(pool._processes):
             res = pool.apply_async(collect_trajectories, 
-                [ppo, surrogate_model, env, max_episodes - i_episode, max_timesteps, update_timestep])
+                [args, p_state_dict, s_state_dict, env, max_episodes - i_episode, max_timesteps, update_timestep])
             results.append(res)
         pool.close()
         pool.join()
 
         # unpack results
+        ep_surrogates = []
+        ep_rewards = []
         for result in results:
             result = result.get()
             memory.rewards.extend(result[0].rewards)
             memory.is_terminals.extend(result[0].is_terminals)
             ep_surrogates.extend(result[1])
-            ep_rew_env_mean.extend(result[2])
+            ep_rewards.extend(result[2])
 
         # write to Tensorboard
         for i in reversed(range(episode_count.value)):
+            rewbuffer_env.append(ep_rewards[i])
             writer.add_scalar("EpSurrogate", ep_surrogates[i], i_episode - i)
-            writer.add_scalar("EpRewEnvMean", ep_rew_env_mean[i], i_episode - i)
-        ep_surrogates = []
-        ep_rew_env_mean = []
+            writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode - i)
 
         # update model
         print("updating ppo")
@@ -456,6 +459,6 @@ def train_ppo(args, surrogate_model, env):
             avg_length.value = 0
             log_counter = 0
 
-        episode_count.value = 0
-        sample_count.value = 0
+        #episode_count.value = 0
+        #sample_count.value = 0
 

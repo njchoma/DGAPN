@@ -58,15 +58,18 @@ class GNN_Dense(nn.Module):
 
 
 class GNN_MyGAT(nn.Module):
-    def __init__(self, input_dim, nb_hidden, nb_layer, use_3d=False):
+    def __init__(self, input_dim, emb_dim, nb_hidden, nb_layer, use_3d=False):
         super(GNN_MyGAT, self).__init__()
-        layers = [MyGATConv(input_dim, nb_hidden)]
-        for _ in range(nb_layer-1):
-            layers.append(MyGATConv(nb_hidden, nb_hidden))
+        if nb_layer == 1:
+            layers = [MyGATConv(input_dim, emb_dim)]
+        else:
+            layers = [MyGATConv(input_dim, nb_hidden)]
+            for _ in range(nb_layer-2):
+                layers.append(MyGATConv(nb_hidden, nb_hidden))
+            layers.append(MyGATConv(nb_hidden, emb_dim))
         self.layers = nn.ModuleList(layers)
         self.final_layer = nn.Linear(nb_hidden, 1)
         self.act = nn.ReLU()
-        self.emb_dim = nb_hidden
 
     def forward(self, g, dense_edge_idx=None):
         x = self.get_embedding(g)
