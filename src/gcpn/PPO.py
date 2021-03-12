@@ -266,12 +266,12 @@ def get_reward(state, surrogate_model):
 ################## Process ##################
 lock = Lock()
 
-episode_count = Value("i", 0).share_memory()
-sample_count = Value("i", 0).share_memory()
+episode_count = Value("i", 0)
+sample_count = Value("i", 0)
 
 # logging variables
-running_reward = Value("f", 0).share_memory()
-avg_length = Value("i", 0).share_memory()
+running_reward = Value("f", 0)
+avg_length = Value("i", 0)
 
 def collect_trajectories(args, p_state_dict, s_state_dict, env, max_episodes, max_timesteps, update_timestep):
     policy = ActorCriticGCPN(args.input_size,
