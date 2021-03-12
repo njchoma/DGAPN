@@ -98,5 +98,5 @@ def main():
     train_ppo(args, surrogate_model, env)
 
 if __name__ == '__main__':
-    mp.set_start_method('spawn', force=True)
+    mp.set_start_method('fork', force=True)
     main()
