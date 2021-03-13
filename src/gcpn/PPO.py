@@ -332,6 +332,26 @@ def collect_trajectories(args, p_state_dict, s_state_dict, env, max_episodes, ma
 
     return memory, ep_surrogates, ep_rewards
 
+class TwoLayerNet(torch.nn.Module):
+  def __init__(self, D_in, H, D_out):
+    """
+    In the constructor we instantiate two nn.Linear modules and assign them as
+    member variables.
+    """
+    super(TwoLayerNet, self).__init__()
+    self.linear1 = torch.nn.Linear(D_in, H)
+    self.linear2 = torch.nn.Linear(H, D_out)
+
+  def forward(self, x):
+    """
+    In the forward function we accept a Tensor of input data and we must return
+    a Tensor of output data. We can use Modules defined in the constructor as
+    well as arbitrary (differentiable) operations on Tensors.
+    """
+    h_relu = self.linear1(x).clamp(min=0)
+    y_pred = self.linear2(h_relu)
+    return y_pred
+
 #############################################
 
 def train_ppo(args, surrogate_model, env):
@@ -398,6 +418,7 @@ def train_ppo(args, surrogate_model, env):
     while i_episode < max_episodes:
         print("collecting rollouts")
         ppo.to_device(torch.device("cpu"))
+        surrogate_model = TwoLayerNet(256,256,256)
         p_state_dict = ppo.policy_old.state_dict()
         s_state_dict = surrogate_model.state_dict()
 
