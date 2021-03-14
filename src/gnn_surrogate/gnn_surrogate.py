@@ -16,8 +16,7 @@ import torch_geometric as pyg
 
 import utils.graph_utils as graph_utils
 import utils.general_utils as general_utils
-from . import model
-from .model import GNN, GNN_Dense
+from gnn_surrogate.model import GNN, GNN_Dense, GNN_MyGAT
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -369,6 +368,7 @@ def main(artifact_path,
          use_3d=False,
          batch_size=128,
          num_workers=12,
+         emb_dim=512,
          nb_hidden=512,
          nb_layer=7,
          lr=0.001,
@@ -453,10 +453,11 @@ def main(artifact_path,
         net = load_current_model(artifact_path)
         logging.info("Model restored")
     except Exception as e:
-        net = model.GNN_MyGAT(input_dim=train_data.get_input_dim(),
-                              nb_hidden=nb_hidden,
-                              nb_layer=nb_layer,
-                              use_3d=use_3d)
+        net = GNN_MyGAT(input_dim=train_data.get_input_dim(),
+                        emb_dim=emb_dim,
+                        nb_hidden=nb_hidden,
+                        nb_layer=nb_layer,
+                        use_3d=use_3d)
         logging.info(net)
         logging.info("New model created")
     net = net.to(DEVICE)

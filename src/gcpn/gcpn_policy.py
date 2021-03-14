@@ -44,16 +44,19 @@ class GCPN_CReM(nn.Module):
     def __init__(self,
                  input_dim,
                  emb_dim,
-                 nb_layers,
-                 nb_hidden):
+                 nb_edge_types,
+                 gnn_nb_layers,
+                 gnn_nb_hidden,
+                 mlp_nb_layers,
+                 mlp_nb_hidden):
         super(GCPN_CReM, self).__init__()
 
-        layers = [nn.Linear(2*emb_dim, nb_hidden)]
-        for _ in range(nb_layers-1):
-            layers.append(nn.Linear(nb_hidden, nb_hidden))
+        layers = [nn.Linear(2*emb_dim, mlp_nb_hidden)]
+        for _ in range(mlp_nb_layers-1):
+            layers.append(nn.Linear(mlp_nb_hidden, mlp_nb_hidden))
 
         self.layers = nn.ModuleList(layers)
-        self.final_layer = nn.Linear(nb_hidden, 1)
+        self.final_layer = nn.Linear(mlp_nb_hidden, 1)
         self.act = nn.ReLU()
         self.softmax = nn.Softmax(0)
 

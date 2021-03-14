@@ -61,7 +61,6 @@ class ActorCriticGCPN(nn.Module):
                  nb_edge_types,
                  gnn_nb_layers,
                  gnn_nb_hidden,
-                 gnn_nb_hidden_kernel,
                  mlp_nb_layers,
                  mlp_nb_hidden):
         super(ActorCriticGCPN, self).__init__()
@@ -69,6 +68,9 @@ class ActorCriticGCPN(nn.Module):
         # action mean range -1 to 1
         self.actor = GCPN_CReM(input_dim,
                                emb_dim,
+                               nb_edge_types,
+                               gnn_nb_layers,
+                               gnn_nb_hidden,
                                mlp_nb_layers,
                                mlp_nb_hidden)
         # critic
@@ -128,10 +130,8 @@ class PPO_GCPN(nn.Module):
                  nb_edge_types,
                  gnn_nb_layers,
                  gnn_nb_hidden,
-                 gnn_nb_hidden_kernel,
                  mlp_nb_layers,
-                 mlp_nb_hidden,
-                 device):
+                 mlp_nb_hidden):
         super(PPO_GCPN, self).__init__()
         self.lr = lr
         self.betas = betas
@@ -140,16 +140,14 @@ class PPO_GCPN(nn.Module):
         self.upsilon = upsilon
         self.eps_clip = eps_clip
         self.K_epochs = K_epochs
-        self.device = device
         
         self.policy = ActorCriticGCPN(input_dim,
                                       emb_dim,
                                       nb_edge_types,
                                       gnn_nb_layers,
                                       gnn_nb_hidden,
-                                      gnn_nb_hidden_kernel,
                                       mlp_nb_layers,
-                                      mlp_nb_hidden).to(device)
+                                      mlp_nb_hidden)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
         
         self.policy_old = ActorCriticGCPN(input_dim,
@@ -157,22 +155,28 @@ class PPO_GCPN(nn.Module):
                                           nb_edge_types,
                                           gnn_nb_layers,
                                           gnn_nb_hidden,
-                                          gnn_nb_hidden_kernel,
                                           mlp_nb_layers,
-                                          mlp_nb_hidden).to(device)
+                                          mlp_nb_hidden)
         self.policy_old.load_state_dict(self.policy.state_dict())
         
         self.MseLoss = nn.MSELoss()
 
-    
+    def to_device(self, device):
+        self.policy.to(device)
+        self.policy_old.to(device)
+
     def select_action(self, state, candidates, memory, surrogate_model):
-        g = state.to(self.device)
-        g_candidates = candidates.to(self.device)
+        device = next(self.policy_old.parameters()).device
+
+        g = state.to(device)
+        g_candidates = candidates.to(device)
         action = self.policy_old.act(g, g_candidates, memory, surrogate_model)
         return action
-    
-    def update(self, memory, i_episode, writer=None):
+
+    def update(self, memory, i_episode):
         print("\n\nupdating...")
+        device = next(self.policy.parameters()).device
+
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
@@ -184,15 +188,15 @@ class PPO_GCPN(nn.Module):
         
 
         # Normalizing the rewards:
-        rewards = torch.tensor(rewards).to(self.device)
+        rewards = torch.tensor(rewards).to(device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
         
         # convert list to tensor
-        old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(self.device)
-        old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(self.device)
-        old_actions = torch.tensor(memory.actions).to(self.device)
-        old_logprobs = torch.stack(memory.logprobs).to(self.device)
+        old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(device)
+        old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(device)
+        old_actions = torch.tensor(memory.actions).to(device)
+        old_logprobs = torch.stack(memory.logprobs).to(device)
         
         # Optimize policy for K epochs:
         print("Optimizing...")
@@ -258,20 +262,11 @@ def get_reward(state, surrogate_model, device):
     return reward
 
 
-
 #####################################################
 #                   TRAINING LOOP                   #
 #####################################################
 
 def train_ppo(args, surrogate_model, env):
-    print("{} episodes before surrogate model as final reward".format(
-                args.surrogate_reward_timestep_delay))
-    # logging variables
-    dt = get_current_datetime()
-    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + dt))
-    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + dt)
-    os.makedirs(save_dir, exist_ok=True)
-
     ############## Hyperparameters ##############
     render = True
     solved_reward = 100         # stop training if avg_reward > solved_reward
@@ -290,13 +285,13 @@ def train_ppo(args, surrogate_model, env):
     betas = (0.9, 0.999)
     
     #############################################
+    print("lr:", lr, "beta:", betas)
 
-    ob, _, _ = env.reset()
-    input_dim = ob.x.shape[1]
-
-    # emb_dim = surrogate_model.emb_dim
-    emb_dim = 512 # temp fix to use an old surrogate model
-    nb_edge_types = 1
+    # logging variables
+    dt = get_current_datetime()
+    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + dt))
+    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + dt)
+    os.makedirs(save_dir, exist_ok=True)
 
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
@@ -308,30 +303,25 @@ def train_ppo(args, surrogate_model, env):
                    args.upsilon,
                    K_epochs,
                    eps_clip,
-                   input_dim,
-                   emb_dim,
-                   nb_edge_types,
+                   args.input_size,
+                   args.emb_size,
+                   args.nb_edge_types,
                    args.layer_num_g,
                    args.num_hidden_g,
-                   args.num_hidden_g,
                    args.mlp_num_layer,
-                   args.mlp_num_hidden,
-                   device)
-    
+                   args.mlp_num_hidden)
+    ppo.to_device(device)
     print(ppo)
-    memory = Memory()
-    print("lr:", lr, "beta:", betas)
 
     surrogate_model = surrogate_model.to(device)
     surrogate_model.eval()
-    
-    # logging variables
+    print(surrogate_model)
+
     running_reward = 0
     avg_length = 0
     time_step = 0
 
-    # variables for plotting rewards
-
+    memory = Memory()
     rewbuffer_env = deque(maxlen=100)
     # training loop
     for i_episode in range(1, max_episodes+1):
@@ -361,11 +351,13 @@ def train_ppo(args, surrogate_model, env):
                 break
 
         # update if it's time
-        if time_step > update_interval:
+        if time_step > update_timestep:
             print("updating ppo")
             time_step = 0
-            ppo.update(memory, i_episode, writer)
+            ppo.update(memory, i_episode)
             memory.clear_memory()
+            # save running model
+            torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
 
         writer.add_scalar("EpSurrogate", -1*surr_reward, i_episode-1)
         rewbuffer_env.append(reward)
@@ -373,17 +365,12 @@ def train_ppo(args, surrogate_model, env):
 
         # write to Tensorboard
         writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode-1)
-        # writer.add_scalar("Average Length", avg_length, global_step=i_episode-1)
-        # writer.add_scalar("Running Reward", running_reward, global_step=i_episode-1)
 
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > solved_reward:
             print("########## Solved! ##########")
             torch.save(ppo.policy.state_dict(), './PPO_continuous_solved_{}.pth'.format('test'))
             break
-
-        # save running model
-        torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
 
         # save every 500 episodes
         if (i_episode-1) % save_interval == 0:
@@ -397,3 +384,4 @@ def train_ppo(args, surrogate_model, env):
             print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
             running_reward = 0
             avg_length = 0
+

@@ -22,7 +22,7 @@ def read_2col(reader):
             else:
                 continue
         except:
-            print("Row " + str(i) + "was not read.")
+            print("Row " + str(i) + " was not read.")
             continue
     return all_score, all_smiles
 
@@ -37,6 +37,6 @@ def read_4col(reader):
             else:
                 continue
         except:
-            print("Row " + str(i) + "was not read.")
+            print("Row " + str(i) + " was not read.")
             continue
     return all_score, all_smiles
