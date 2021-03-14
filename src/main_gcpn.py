@@ -24,7 +24,8 @@ def molecule_arg_parser():
     add_arg('--name', default='default_run')
     add_arg('--use_cpu', action='store_true')
     add_arg('--gpu', default='0')
-    # add_arg('--seed', help='RNG seed', type=int, default=666)
+    add_arg('--nb_procs', type=int, default=4)
+    #add_arg('--seed', help='RNG seed', type=int, default=666)
 
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_model_path', default='')
@@ -83,17 +84,20 @@ def get_surrogate_dims(surrogate_model):
 
 def main():
     args = molecule_arg_parser().parse_args()
-    
+    #args.nb_procs = mp.cpu_count()
+
     surrogate_model = load_surrogate_model(args.artifact_path,
                                            args.surrogate_model_url,
                                            args.surrogate_model_path)
     args.input_size, args.emb_size, args.nb_edge_types, args.num_hidden_g, args.layer_num_g = get_surrogate_dims(surrogate_model)
 
-    print("====args====\n", args)
-
     env = CReM_Env(args.data_path)
+    ob, _, _ = env.reset()
+    args.input_size = ob.x.shape[1]
 
-    print(surrogate_model)
+    print("====args====\n", args)
+    print("{} episodes before surrogate model as final reward".format(
+                    args.surrogate_reward_timestep_delay))
 
     train_ppo(args, surrogate_model, env)
 

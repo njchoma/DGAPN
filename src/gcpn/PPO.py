@@ -8,7 +8,7 @@ from collections import deque, OrderedDict
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
-from torch.multiprocessing import Pool, Process, Lock, Barrier, Value, Queue
+from torch.multiprocessing import Pool, Process, Lock, Value, Queue, JoinableQueue
 from torch.utils.tensorboard import SummaryWriter
 
 from torch_geometric.data import Data, Batch
@@ -29,12 +29,32 @@ class Memory:
         self.rewards = []
         self.is_terminals = []
 
-    def clear_memory(self):
+    def extend(self, memory):
+        self.actions.extend(memory.actions)
+        self.states.extend(memory.states)
+        self.logprobs.extend(memory.logprobs)
+        self.rewards.extend(memory.rewards)
+        self.is_terminals.extend(memory.is_terminals)
+
+    def clear(self):
         del self.actions[:]
         del self.states[:]
         del self.logprobs[:]
         del self.rewards[:]
         del self.is_terminals[:]
+
+class Log:
+    def __init__(self):
+        self.ep_surrogates = []
+        self.ep_rewards = []
+
+    def extend(self, log):
+        self.ep_surrogates.extend(log.ep_surrogates)
+        self.ep_rewards.extend(log.ep_rewards)
+
+    def clear(self):
+        del self.ep_surrogates[:]
+        del self.ep_rewards[:]
 
 
 #################################################
@@ -269,6 +289,8 @@ def get_reward(state, surrogate_model):
 
 ################## Process ##################
 lock = Lock()
+tasks = multiprocessing.JoinableQueue()
+results = multiprocessing.Queue()
 
 episode_count = Value("i", 0)
 sample_count = Value("i", 0)
@@ -277,92 +299,105 @@ sample_count = Value("i", 0)
 running_reward = Value("f", 0)
 avg_length = Value("i", 0)
 
-def collect_trajectories(args, p_state_dict, s_state_dict, env, max_episodes, max_timesteps, update_timestep):
-    policy = ActorCriticGCPN(args.input_size,
+class Sampler(Process):
+    def __init__(self, args, env, task_queue, result_queue, max_episodes, max_timesteps, update_timestep):
+        super(Sampler, self).__init__()
+        self.task_queue = task_queue
+        self.result_queue = result_queue
+        self.max_episodes = max_episodes
+        self.max_timesteps = max_timesteps
+        self.update_timestep = update_timestep
+
+        self.env = env
+        self.policy = ActorCriticGCPN(args.input_size,
                              args.emb_size,
                              args.nb_edge_types,
                              args.layer_num_g,
                              args.num_hidden_g,
                              args.mlp_num_layer,
                              args.mlp_num_hidden)
-    surrogate = GNN_MyGAT(args.input_size,
+        self.surrogate = GNN_MyGAT(args.input_size,
                           args.emb_size,
                           args.num_hidden_g,
                           args.layer_num_g)
-    policy.load_state_dict(p_state_dict)
-    surrogate.load_state_dict(s_state_dict)
+        self.memory = Memory()
+        self.log = Log()
 
-    memory = Memory()
-    ep_surrogates = []
-    ep_rewards = []
-
-    state, candidates, done = env.reset()
-    starting_reward = get_reward(state, surrogate)
-
-    while sample_count.value < update_timestep and episode_count.value < max_episodes:
-        n_step = 0
-        for t in range(max_timesteps):
-            n_step += 1
-            # Running policy_old:
-            action = policy.act(state, candidates, memory, surrogate)
-            state, candidates, done = env.step(action)
-
-            reward = 0
-            if (t==(max_timesteps-1)) or done:
-                surr_reward = get_reward(state, surrogate)
-                reward = surr_reward-starting_reward
-
-            # Saving reward and is_terminals:
-            memory.rewards.append(reward)
-            memory.is_terminals.append(done)
-
-            if done:
+    def run(self):
+        proc_name = self.name
+        while True:
+            next_task = self.task_queue.get()
+            if next_task is None:
+                # Poison pill means shutdown
+                print '%s: Exiting' % proc_name
+                self.task_queue.task_done()
                 break
 
-        lock.acquire() # C[]
-        sample_count.value += n_step
-        episode_count.value += 1
+            p_state, s_state = next_task()
+            self.policy.load_state_dict(p_state)
+            self.surrogate.load_state_dict(s_state)
+            self.memory.clear()
+            self.log.clear()
 
-        running_reward.value += sum(memory.rewards)
-        avg_length.value += t
+            print '%s: Sampling' % proc_name
+            state, candidates, done = self.env.reset()
 
-        lock.release() # L[]
-        ep_surrogates.append(-1*surr_reward)
-        ep_rewards.append(reward)
+            while sample_count.value < self.update_timestep and episode_count.value < self.max_episodes:
+                n_step = 0
+                for t in range(self.max_timesteps):
+                    n_step += 1
+                    # Running policy_old:
+                    action = self.policy.act(state, candidates, self.memory, self.surrogate)
+                    state, candidates, done = self.env.step(action)
 
-    return memory, ep_surrogates, ep_rewards
+                    reward = 0
+                    if (t==(max_timesteps-1)) or done:
+                        surr_reward = get_reward(state, self.surrogate)
+                        reward = surr_reward
 
-class TwoLayerNet(torch.nn.Module):
-  def __init__(self, D_in, H, D_out):
-    """
-    In the constructor we instantiate two nn.Linear modules and assign them as
-    member variables.
-    """
-    super(TwoLayerNet, self).__init__()
-    self.linear1 = torch.nn.Linear(D_in, H)
-    self.linear2 = torch.nn.Linear(H, D_out)
+                    # Saving reward and is_terminals:
+                    self.memory.rewards.append(reward)
+                    self.memory.is_terminals.append(done)
 
-  def forward(self, x):
-    """
-    In the forward function we accept a Tensor of input data and we must return
-    a Tensor of output data. We can use Modules defined in the constructor as
-    well as arbitrary (differentiable) operations on Tensors.
-    """
-    h_relu = self.linear1(x).clamp(min=0)
-    y_pred = self.linear2(h_relu)
-    return y_pred
+                    if done:
+                        break
+
+                lock.acquire() # C[]
+                sample_count.value += n_step
+                episode_count.value += 1
+
+                running_reward.value += sum(memory.rewards)
+                avg_length.value += t
+
+                lock.release() # L[]
+                self.log.ep_surrogates.append(-1*surr_reward)
+                self.log.ep_rewards.append(reward)
+
+            self.result_queue.put(Result(self.memory, self.log))
+            self.task_queue.task_done()
+        return
+
+class Task(object):
+    def __init__(self, p_state, s_state):
+        self.p_state = p_state
+        self.s_state = s_state
+    def __call__(self):
+        return (self.p_state, self.s_state)
+    #def __str__(self):
+    #    return '%s * %s' % (self.a, self.b)
+
+class Result(object):
+    def __init__(self, memory, log):
+        self.memory = memory
+        self.log = log
+    def __call__(self):
+        return (self.memory, self.log)
+    #def __str__(self):
+    #    return '%s * %s' % (self.a, self.b)
 
 #############################################
 
 def train_ppo(args, surrogate_model, env):
-    print("{} episodes before surrogate model as final reward".format(
-                args.surrogate_reward_timestep_delay))
-    # logging variables
-    dt = get_current_datetime()
-    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + dt))
-    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + dt)
-    os.makedirs(save_dir, exist_ok=True)
-
     ############## Hyperparameters ##############
     render = True
     solved_reward = 100         # stop training if avg_reward > solved_reward
@@ -381,9 +416,19 @@ def train_ppo(args, surrogate_model, env):
     betas = (0.9, 0.999)
     
     #############################################
+    print("lr:", lr, "beta:", betas)
 
-    #ob, _, _ = env.reset()
-    #args.input_size = ob.x.shape[1]
+    print 'Creating %d processes' % args.nb_procs
+    samplers = [Sampler(args, env, tasks, results, max_episodes, max_timesteps, update_timestep)
+                for i in range(args.nb_procs)]
+    for w in samplers:
+        w.start()
+
+    # logging variables
+    dt = get_current_datetime()
+    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + dt))
+    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + dt)
+    os.makedirs(save_dir, exist_ok=True)
 
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
@@ -403,56 +448,46 @@ def train_ppo(args, surrogate_model, env):
                    args.mlp_num_layer,
                    args.mlp_num_hidden)
     print(ppo)
-    print("lr:", lr, "beta:", betas)
 
     surrogate_model.eval()
+    print(surrogate_model)
 
     update_count = 0 # for adversarial
     save_counter = 0
     log_counter = 0
 
     memory = Memory()
+    log = Log()
     rewbuffer_env = deque(maxlen=100)
     # training loop
     i_episode = 0
     while i_episode < max_episodes:
         print("collecting rollouts")
         ppo.to_device(torch.device("cpu"))
-        surrogate_model = TwoLayerNet(256,256,256)
-        p_state_dict = ppo.policy_old.state_dict()
-        s_state_dict = surrogate_model.state_dict()
-
-        # parallel runs
-        results = []
-        pool = Pool(4)
-        for i in range(pool._processes):
-            res = pool.apply_async(collect_trajectories, 
-                [args, p_state_dict, s_state_dict, env, max_episodes - i_episode, max_timesteps, update_timestep])
-            results.append(res)
-        pool.close()
-        pool.join()
-
-        # unpack results
-        ep_surrogates = []
-        ep_rewards = []
+        # Enqueue jobs
+        for i in range(args.nb_procs):
+            tasks.put(ppo.policy_old.state_dict(),
+                      surrogate_model.policy_old.state_dict())
+        # Wait for all of the tasks to finish
+        tasks.join()
+        # Start unpacking results
         for result in results:
             result = result.get()
-            memory.rewards.extend(result[0].rewards)
-            memory.is_terminals.extend(result[0].is_terminals)
-            ep_surrogates.extend(result[1])
-            ep_rewards.extend(result[2])
+            memory.extend(result.memory)
+            log.extend(result.log)
 
         # write to Tensorboard
         for i in reversed(range(episode_count.value)):
-            rewbuffer_env.append(ep_rewards[i])
-            writer.add_scalar("EpSurrogate", ep_surrogates[i], i_episode - i)
+            rewbuffer_env.append(log.ep_rewards[i])
+            writer.add_scalar("EpSurrogate", log.ep_surrogates[i], i_episode - i)
             writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode - i)
+        log.clear()
 
         # update model
         print("updating ppo")
         ppo.to_device(device)
         ppo.update(memory, i_episode, device)
-        memory.clear_memory()
+        memory.clear()
 
         update_count += 1
         save_counter += episode_count.value
@@ -486,4 +521,9 @@ def train_ppo(args, surrogate_model, env):
 
         episode_count.value = 0
         sample_count.value = 0
+    
+    # Add a poison pill for each process
+    for i in range(args.nb_procs):
+        tasks.put(None)
+    tasks.join()
 
