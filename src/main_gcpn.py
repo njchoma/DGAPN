@@ -92,8 +92,8 @@ def main():
     args.input_size, args.emb_size, args.nb_edge_types, args.num_hidden_g, args.layer_num_g = get_surrogate_dims(surrogate_model)
 
     env = CReM_Env(args.data_path)
-    ob, _, _ = env.reset()
-    args.input_size = ob.x.shape[1]
+    #ob, _, _ = env.reset()
+    #args.input_size = ob.x.shape[1]
 
     print("====args====\n", args)
     print("{} episodes before surrogate model as final reward".format(

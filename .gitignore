@@ -10,11 +10,13 @@ test_run*
 molecule_gen*
 *.idea/
 *.DS_Store
+*.csv
 *.db
 *.db.gz
 *.nfs*
 log/
-src/dataset/*.csv
+*/runs/
+*/saves/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

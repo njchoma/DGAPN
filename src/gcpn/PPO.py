@@ -190,15 +190,17 @@ class PPO_GCPN(nn.Module):
         self.policy_old.to(device)
     
     def select_action(self, state, candidates, memory, surrogate_model):
-        device = next(ppo.policy_old.parameters()).device
+        device = next(self.policy_old.parameters()).device
 
         g = state.to(device)
         g_candidates = candidates.to(device)
         action = self.policy_old.act(g, g_candidates, memory, surrogate_model)
         return action
 
-    def update(self, memory, i_episode, device):
+    def update(self, memory, i_episode):
         print("\n\nupdating...")
+        device = next(self.policy.parameters()).device
+
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
@@ -486,7 +488,7 @@ def train_ppo(args, surrogate_model, env):
         # update model
         print("updating ppo")
         ppo.to_device(device)
-        ppo.update(memory, i_episode, device)
+        ppo.update(memory, i_episode)
         memory.clear()
 
         update_count += 1

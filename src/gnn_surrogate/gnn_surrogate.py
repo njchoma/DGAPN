@@ -17,7 +17,6 @@ import torch_geometric as pyg
 
 import utils.graph_utils as graph_utils
 import utils.general_utils as general_utils
-#from .model import GNN, GNN_Dense, GNN_MyGAT
 from gnn_surrogate.model import GNN, GNN_Dense, GNN_MyGAT
 
 torch.multiprocessing.set_sharing_strategy('file_system')
