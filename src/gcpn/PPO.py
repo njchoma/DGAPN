@@ -110,7 +110,6 @@ def wrap_state(ob):
     adj = torch.Tensor(adj)
     nodes = torch.Tensor(nodes)
 
-
     adj = [dense_to_sparse(a) for a in adj]
     data = Data(x=nodes, edge_index=adj[0][0], edge_attr=adj[0][1])
     return data
@@ -173,8 +172,7 @@ class PPO_GCPN(nn.Module):
         action = self.policy_old.act(g, g_candidates, memory, surrogate_model)
         return action
 
-    def update(self, memory, i_episode):
-        print("\n\nupdating...")
+    def update(self, memory):
         device = next(self.policy.parameters()).device
 
         # Monte Carlo estimate of rewards:
@@ -185,13 +183,11 @@ class PPO_GCPN(nn.Module):
                 discounted_reward = 0
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
-        
 
         # Normalizing the rewards:
         rewards = torch.tensor(rewards).to(device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
-        
         # convert list to tensor
         old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(device)
         old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(device)
@@ -340,8 +336,7 @@ def train_ppo(args, surrogate_model, env):
             if (t==(max_timesteps-1)) or done:
                 surr_reward = get_reward(state, surrogate_model, device)
                 reward = surr_reward-starting_reward
-            
-            
+
             # Saving reward and is_terminals:
             memory.rewards.append(reward)
             memory.is_terminals.append(done)
@@ -352,9 +347,9 @@ def train_ppo(args, surrogate_model, env):
 
         # update if it's time
         if time_step > update_timestep:
-            print("updating ppo")
+            print("\n\nupdating ppo @ episode %d..." % i_episode)
             time_step = 0
-            ppo.update(memory, i_episode)
+            ppo.update(memory)
             memory.clear_memory()
             # save running model
             torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
