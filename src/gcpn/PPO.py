@@ -6,9 +6,9 @@ import numpy as np
 from collections import deque, OrderedDict
 
 import torch
+import torch.multiprocessing as mp
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
-from torch.multiprocessing import Pool, Process, Lock, Value, Queue, JoinableQueue
 from torch.utils.tensorboard import SummaryWriter
 
 from torch_geometric.data import Data, Batch
@@ -134,7 +134,6 @@ def wrap_state(ob):
     adj = torch.Tensor(adj)
     nodes = torch.Tensor(nodes)
 
-
     adj = [dense_to_sparse(a) for a in adj]
     data = Data(x=nodes, edge_index=adj[0][0], edge_attr=adj[0][1])
     return data
@@ -197,8 +196,7 @@ class PPO_GCPN(nn.Module):
         action = self.policy_old.act(g, g_candidates, memory, surrogate_model)
         return action
 
-    def update(self, memory, i_episode):
-        print("\n\nupdating...")
+    def update(self, memory):
         device = next(self.policy.parameters()).device
 
         # Monte Carlo estimate of rewards:
@@ -209,13 +207,11 @@ class PPO_GCPN(nn.Module):
                 discounted_reward = 0
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
-        
 
         # Normalizing the rewards:
         rewards = torch.tensor(rewards).to(device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
-        
         # convert list to tensor
         old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(device)
         old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(device)
@@ -290,18 +286,18 @@ def get_reward(state, surrogate_model):
 #####################################################
 
 ################## Process ##################
-lock = Lock()
-tasks = multiprocessing.JoinableQueue()
-results = multiprocessing.Queue()
+lock = mp.Lock()
+tasks = mp.JoinableQueue()
+results = mp.Queue()
 
-episode_count = Value("i", 0)
-sample_count = Value("i", 0)
+episode_count = mp.Value("i", 0)
+sample_count = mp.Value("i", 0)
 
 # logging variables
-running_reward = Value("f", 0)
-avg_length = Value("i", 0)
+running_reward = mp.Value("f", 0)
+avg_length = mp.Value("i", 0)
 
-class Sampler(Process):
+class Sampler(mp.Process):
     def __init__(self, args, env, task_queue, result_queue, max_episodes, max_timesteps, update_timestep):
         super(Sampler, self).__init__()
         self.task_queue = task_queue
@@ -331,7 +327,7 @@ class Sampler(Process):
             next_task = self.task_queue.get()
             if next_task is None:
                 # Poison pill means shutdown
-                print '%s: Exiting' % proc_name
+                print('%s: Exiting' % proc_name)
                 self.task_queue.task_done()
                 break
 
@@ -341,7 +337,7 @@ class Sampler(Process):
             self.memory.clear()
             self.log.clear()
 
-            print '%s: Sampling' % proc_name
+            print('%s: Sampling' % proc_name)
             state, candidates, done = self.env.reset()
 
             while sample_count.value < self.update_timestep and episode_count.value < self.max_episodes:
@@ -353,7 +349,7 @@ class Sampler(Process):
                     state, candidates, done = self.env.step(action)
 
                     reward = 0
-                    if (t==(max_timesteps-1)) or done:
+                    if (t==(self.max_timesteps-1)) or done:
                         surr_reward = get_reward(state, self.surrogate)
                         reward = surr_reward
 
@@ -368,7 +364,7 @@ class Sampler(Process):
                 sample_count.value += n_step
                 episode_count.value += 1
 
-                running_reward.value += sum(memory.rewards)
+                running_reward.value += sum(self.memory.rewards)
                 avg_length.value += t
 
                 lock.release() # L[]
@@ -420,7 +416,7 @@ def train_ppo(args, surrogate_model, env):
     #############################################
     print("lr:", lr, "beta:", betas)
 
-    print 'Creating %d processes' % args.nb_procs
+    print('Creating %d processes' % args.nb_procs)
     samplers = [Sampler(args, env, tasks, results, max_episodes, max_timesteps, update_timestep)
                 for i in range(args.nb_procs)]
     for w in samplers:
@@ -468,15 +464,19 @@ def train_ppo(args, surrogate_model, env):
         ppo.to_device(torch.device("cpu"))
         # Enqueue jobs
         for i in range(args.nb_procs):
-            tasks.put(ppo.policy_old.state_dict(),
-                      surrogate_model.policy_old.state_dict())
+            p_state = ppo.policy_old.state_dict()
+            s_state = surrogate_model.state_dict()
+            tasks.put(Task(p_state, s_state))
         # Wait for all of the tasks to finish
         tasks.join()
+        print("rollouts collected")
         # Start unpacking results
-        for result in results:
-            result = result.get()
+        for i in range(args.nb_procs):
+            result = results.get()
             memory.extend(result.memory)
             log.extend(result.log)
+
+        i_episode += episode_count.value
 
         # write to Tensorboard
         for i in reversed(range(episode_count.value)):
@@ -484,18 +484,15 @@ def train_ppo(args, surrogate_model, env):
             writer.add_scalar("EpSurrogate", log.ep_surrogates[i], i_episode - i)
             writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode - i)
         log.clear()
-
         # update model
-        print("updating ppo")
+        print("\n\nupdating ppo @ episode %d..." % i_episode)
         ppo.to_device(device)
-        ppo.update(memory, i_episode)
+        ppo.update(memory)
         memory.clear()
 
         update_count += 1
         save_counter += episode_count.value
         log_counter += episode_count.value
-
-        i_episode += episode_count.value
 
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > solved_reward:
