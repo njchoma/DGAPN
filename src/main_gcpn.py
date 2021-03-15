@@ -27,6 +27,7 @@ def molecule_arg_parser():
     add_arg('--nb_procs', type=int, default=4)
     #add_arg('--seed', help='RNG seed', type=int, default=666)
 
+    add_arg('--warm_start_dataset_path', default='')
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_model_path', default='')
     add_arg('--surrogate_reward_timestep_delay', type=int, default=0)
@@ -91,7 +92,7 @@ def main():
                                            args.surrogate_model_path)
     args.input_size, args.emb_size, args.nb_edge_types, args.num_hidden_g, args.layer_num_g = get_surrogate_dims(surrogate_model)
 
-    env = CReM_Env(args.data_path)
+    env = CReM_Env(args.data_path, args.warm_start_dataset_path)
     #ob, _, _ = env.reset()
     #args.input_size = ob.x.shape[1]
 

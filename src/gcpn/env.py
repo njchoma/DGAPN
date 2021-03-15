@@ -15,10 +15,10 @@ DATASET_NAME = 'replacements02_sc2.db'
 class CReM_Env(object):
     def __init__(self,
                  storage_path,
+                 warm_start_dataset_path,
                  nb_sample_crem = 16,
                  nb_cores = 1):
 
-        warm_start_dataset_path = os.path.join(storage_path, 'NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv')
         self.scores, self.smiles = preprocess.main(warm_start_dataset_path)
         self.nb_sample_crem = nb_sample_crem
         self.nb_cores = nb_cores

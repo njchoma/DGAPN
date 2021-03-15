@@ -404,15 +404,15 @@ def train_ppo(args, surrogate_model, env):
 
     max_episodes = 50000        # max training episodes
     max_timesteps = 6           # max timesteps in one episode
-    update_timestep = 120       # update policy every n timesteps
+    update_timestep = 500       # update policy every n timesteps
 
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
     gamma = 0.99                # discount factor
-    
+
     lr = 0.0001                 # parameters for Adam optimizer
     betas = (0.9, 0.999)
-    
+
     #############################################
     print("lr:", lr, "beta:", betas)
 
@@ -424,8 +424,8 @@ def train_ppo(args, surrogate_model, env):
 
     # logging variables
     dt = get_current_datetime()
-    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + dt))
-    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + dt)
+    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + '_' + dt))
+    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + '_' + dt)
     os.makedirs(save_dir, exist_ok=True)
 
     device = torch.device("cpu") if args.use_cpu else torch.device(
@@ -520,7 +520,7 @@ def train_ppo(args, surrogate_model, env):
 
         episode_count.value = 0
         sample_count.value = 0
-    
+
     # Add a poison pill for each process
     for i in range(args.nb_procs):
         tasks.put(None)
