@@ -28,10 +28,10 @@ def molecule_arg_parser():
     add_arg('--surrogate_eval_path', default='')
     add_arg('--gcpn_path', default='')
 
-    add_arg('--nb_sample_crem', type=int, default=32)
+    add_arg('--nb_sample_crem', type=int, default=128)
 
     add_arg('--nb_test', type=int, default=120)
-    add_arg('--nb_bad_steps', type=int, default=1)
+    add_arg('--nb_bad_steps', type=int, default=5)
 
     return parser
 
