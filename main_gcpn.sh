@@ -6,7 +6,7 @@ conda activate my-rdkit-env
 DATA=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
 
 PYARGS=""
-PYARGS="$PYARGS --name NSP15_6W01_A1F_uncharged_kernel_dist_noreset"
+PYARGS="$PYARGS --name NSP15_6W01_A1F_uncharged_kernel_dist"
 PYARGS="$PYARGS --data_path $DATA/src/dataset"
 PYARGS="$PYARGS --artifact_path $DATA/artifact"
 PYARGS="$PYARGS --use_surrogate"
@@ -17,6 +17,7 @@ PYARGS="$PYARGS --is_conditional 1"
 PYARGS="$PYARGS --conditional src/dataset/uncharged_NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv"
 PYARGS="$PYARGS --surrogate_reward_timestep_delay 10"
 PYARGS="$PYARGS --stochastic_kernel"
+PYARGS="$PYARGS --reset_projections"
 PYARGS="$PYARGS --layer_num_g 4"
 
 python src/main_gcpn.py $PYARGS
