@@ -99,31 +99,32 @@ class ActorCriticGCPN(nn.Module):
                                mlp_nb_hidden)
         # critic
         self.critic = GCPN_Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
-        
+
     def forward(self):
         raise NotImplementedError
-    
+
     def act(self, state, candidates, memory, surrogate_model):
         state = Batch.from_data_list([state])
         with torch.autograd.no_grad():
             state, new_states, action, prob = self.actor(state, candidates, surrogate_model)
-        action_logprob = torch.log(prob)
-        
+
+        action_logprob = torch.log(prob).item()
         state = [state.cpu(), Data(x=new_states.cpu())]
+
         memory.states.append(state)
         memory.actions.append(action)
         memory.logprobs.append(action_logprob)
-        
+
         return action
-    
+
     def evaluate(self, states, candidates, actions):   
         probs = self.actor.evaluate(candidates, actions)
-        
+
         action_logprobs = torch.log(probs)
         state_value = self.critic(states)
 
         entropy = probs * action_logprobs
-        
+
         return action_logprobs, state_value, entropy
 
 
@@ -187,7 +188,7 @@ class PPO_GCPN(nn.Module):
     def to_device(self, device):
         self.policy.to(device)
         self.policy_old.to(device)
-    
+
     def select_action(self, state, candidates, memory, surrogate_model):
         device = next(self.policy_old.parameters()).device
 
@@ -216,8 +217,8 @@ class PPO_GCPN(nn.Module):
         old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(device)
         old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(device)
         old_actions = torch.tensor(memory.actions).to(device)
-        old_logprobs = torch.stack(memory.logprobs).to(device)
-        
+        old_logprobs = torch.tensor(memory.logprobs).to(device)
+
         # Optimize policy for K epochs:
         print("Optimizing...")
 
@@ -226,9 +227,9 @@ class PPO_GCPN(nn.Module):
             logprobs, state_values, entropies = self.policy.evaluate(old_states,
                                                                      old_candidates,
                                                                      old_actions)
-            
+
             # Finding the ratio (pi_theta / pi_theta__old):
-            ratios = torch.exp(logprobs - old_logprobs.detach())
+            ratios = torch.exp(logprobs - old_logprobs)
 
             # loss
             advantages = rewards - state_values.detach()   

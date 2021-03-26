@@ -33,19 +33,19 @@ def molecule_arg_parser():
     add_arg('--surrogate_reward_timestep_delay', type=int, default=0)
 
     # ENVIRONMENT PARAMETERS
-    # add_arg('--dataset', type=str, default='zinc',help='caveman; grid; ba; zinc; gdb')
-    # add_arg('--logp_ratio', type=float, default=1)
-    # add_arg('--qed_ratio', type=float, default=1)
-    # add_arg('--sa_ratio', type=float, default=1)
-    # add_arg('--reward_step_total', type=float, default=0.5)
-    # add_arg('--normalize_adj', type=int, default=0)
-    # add_arg('--reward_type', type=str, default='qed',help='logppen;logp_target;qed;qedsa;qed_target;mw_target;gan')
-    # add_arg('--reward_target', type=float, default=0.5,help='target reward value')
-    # add_arg('--has_feature', type=int, default=0)
-    # add_arg('--is_conditional', type=int, default=0) # default 0
-    # add_arg('--conditional', type=str, default='low') # default 0
-    # add_arg('--max_action', type=int, default=128) # default 0
-    # add_arg('--min_action', type=int, default=20) # default 0
+    #add_arg('--dataset', type=str, default='zinc',help='caveman; grid; ba; zinc; gdb')
+    #add_arg('--logp_ratio', type=float, default=1)
+    #add_arg('--qed_ratio', type=float, default=1)
+    #add_arg('--sa_ratio', type=float, default=1)
+    #add_arg('--reward_step_total', type=float, default=0.5)
+    #add_arg('--normalize_adj', type=int, default=0)
+    #add_arg('--reward_type', type=str, default='qed',help='logppen;logp_target;qed;qedsa;qed_target;mw_target;gan')
+    #add_arg('--reward_target', type=float, default=0.5,help='target reward value')
+    #add_arg('--has_feature', type=int, default=0)
+    #add_arg('--is_conditional', type=int, default=0) # default 0
+    #add_arg('--conditional', type=str, default='low') # default 0
+    #add_arg('--max_action', type=int, default=128) # default 0
+    #add_arg('--min_action', type=int, default=20) # default 0
 
     # NETWORK PARAMETERS
     #add_arg('--input_size', type=int, default=256)

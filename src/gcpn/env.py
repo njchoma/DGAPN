@@ -18,7 +18,6 @@ class CReM_Env(object):
                  warm_start_dataset_path,
                  nb_sample_crem = 16,
                  nb_cores = 1):
-
         self.scores, self.smiles = preprocess.main(warm_start_dataset_path)
         self.nb_sample_crem = nb_sample_crem
         self.nb_cores = nb_cores
