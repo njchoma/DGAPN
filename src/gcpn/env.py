@@ -62,9 +62,7 @@ class CReM_Env(object):
             new_mols = []
         self.new_mols = [mol] + new_mols if include_current_state else new_mols
         g_candidates = [mol_to_pyg_graph(i)[0] for i in self.new_mols]
-        
+
         if len(g_candidates)==0:
             return None, True
-
-        g_candidates = Batch.from_data_list(g_candidates)
         return g_candidates, False

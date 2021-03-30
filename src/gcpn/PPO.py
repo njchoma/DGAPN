@@ -79,19 +79,15 @@ class ActorCriticGCPN(nn.Module):
     def forward(self):
         raise NotImplementedError
 
-    def act(self, state, candidates, memory, surrogate_model):
-        state = Batch.from_data_list([state])
+    def act(self, states, candidates, surrogate_model, batch_idx):
         with torch.autograd.no_grad():
-            state, new_states, action, prob = self.actor(state, candidates, surrogate_model)
+            states, new_states, actions, probs = self.actor(states, candidates, surrogate_model, batch_idx)
 
-        action_logprob = torch.log(prob).item()
-        state = [state.cpu(), Data(x=new_states.cpu())]
+        actions = actions.squeeze_().tolist()
+        action_logprobs = torch.log(probs).squeeze_().tolist()
+        states = [states.cpu(), new_states.cpu()]
 
-        memory.states.append(state)
-        memory.actions.append(action)
-        memory.logprobs.append(action_logprob)
-
-        return action
+        return states, actions, action_logprobs
 
     def evaluate(self, states, candidates, actions):   
         probs = self.actor.evaluate(candidates, actions)
@@ -165,13 +161,16 @@ class PPO_GCPN(nn.Module):
         self.policy.to(device)
         self.policy_old.to(device)
 
-    def select_action(self, state, candidates, memory, surrogate_model):
+    def select_action(self, state, candidates, surrogate_model, batch_idx=None):
         device = next(self.policy_old.parameters()).device
+        if batch_idx is None:
+            batch_idx = torch.empty(len(candidates), dtype=torch.long).fill_(0)
+        batch_idx = batch_idx.to(device)
 
-        g = state.to(device)
-        g_candidates = candidates.to(device)
-        action = self.policy_old.act(g, g_candidates, memory, surrogate_model)
-        return action
+        g = Batch.from_data_list([state]).to(device)
+        g_candidates = Batch.from_data_list(candidates).to(device)
+        states, actions, action_logprobs = self.policy_old.act(g, g_candidates, surrogate_model, batch_idx)
+        return states, actions, action_logprobs
 
     def update(self, memory):
         device = next(self.policy.parameters()).device
@@ -191,7 +190,7 @@ class PPO_GCPN(nn.Module):
 
         # convert list to tensor
         old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(device)
-        old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(device)
+        old_candidates = Batch().from_data_list([Data(x=m[1]) for m in memory.states]).to(device)
         old_actions = torch.tensor(memory.actions).to(device)
         old_logprobs = torch.tensor(memory.logprobs).to(device)
 
@@ -208,7 +207,7 @@ class PPO_GCPN(nn.Module):
             ratios = torch.exp(logprobs - old_logprobs)
 
             # loss
-            advantages = rewards - state_values.detach()   
+            advantages = rewards - state_values.detach()
             loss = []
 
             ratios = ratios.unsqueeze(1)
@@ -273,7 +272,7 @@ def train_ppo(args, surrogate_model, env):
     
     max_timesteps = 6           # max timesteps in one episode
     update_timestep = 30        # update policy every n timesteps
-
+    
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
     gamma = 0.99                # discount factor
@@ -328,7 +327,11 @@ def train_ppo(args, surrogate_model, env):
         for t in range(max_timesteps):
             time_step += 1
             # Running policy_old:
-            action = ppo.select_action(state, candidates, memory, surrogate_model)
+            state, action, action_logprob = ppo.select_action(state, candidates, surrogate_model)
+            memory.states.append(state)
+            memory.actions.append(action)
+            memory.logprobs.append(action_logprob)
+
             state, candidates, done = env.step(action)
 
             # done and reward may not be needed anymore
