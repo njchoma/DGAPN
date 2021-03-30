@@ -161,8 +161,7 @@ class PPO_GCPN(nn.Module):
         self.policy.to(device)
         self.policy_old.to(device)
 
-    def select_action(self, state, candidates, surrogate_model, batch_idx=None):
-        device = next(self.policy_old.parameters()).device
+    def select_action(self, state, candidates, surrogate_model, device, batch_idx=None):
         if batch_idx is None:
             batch_idx = torch.empty(len(candidates), dtype=torch.long).fill_(0)
         batch_idx = batch_idx.to(device)
@@ -172,9 +171,7 @@ class PPO_GCPN(nn.Module):
         states, actions, action_logprobs = self.policy_old.act(g, g_candidates, surrogate_model, batch_idx)
         return states, actions, action_logprobs
 
-    def update(self, memory):
-        device = next(self.policy.parameters()).device
-
+    def update(self, memory, device):
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
@@ -327,7 +324,7 @@ def train_ppo(args, surrogate_model, env):
         for t in range(max_timesteps):
             time_step += 1
             # Running policy_old:
-            state, action, action_logprob = ppo.select_action(state, candidates, surrogate_model)
+            state, action, action_logprob = ppo.select_action(state, candidates, surrogate_model, device)
             memory.states.append(state)
             memory.actions.append(action)
             memory.logprobs.append(action_logprob)
@@ -353,7 +350,7 @@ def train_ppo(args, surrogate_model, env):
         if time_step > update_timestep:
             print("\n\nupdating ppo @ episode %d..." % i_episode)
             time_step = 0
-            ppo.update(memory)
+            ppo.update(memory, device)
             memory.clear_memory()
             # save running model
             torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
