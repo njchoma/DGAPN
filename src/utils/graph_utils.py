@@ -158,3 +158,12 @@ def state_to_pyg(atoms, bonds):
     if mol is None:
         raise TypeError("Mol is None.")
     return mol_to_pyg_graph(mol)
+
+def get_batch_shift(pyg_batch):
+    batch_num_nodes = torch.bincount(pyg_batch)
+
+    # shift batch
+    zero = torch.LongTensor([0]).to(batch_num_nodes.device)
+    offset = torch.cat((zero, torch.cumsum(batch_num_nodes, dim=0)[:-1]))
+
+    return offset

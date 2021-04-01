@@ -10,12 +10,13 @@ import torch_geometric as pyg
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
 
+from utils.graph_utils import get_batch_shift
 
 #####################################################
 #                   HELPER MODULES                  #
 #####################################################
 def batched_sample(probs, batch):
-    unique = torch.unique(batch)
+    unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), dims=(0,)) # temp fix due to torch.unique bug
     mask = batch.unsqueeze(0) == unique.unsqueeze(1)
 
     m = Categorical(probs * mask)
@@ -29,15 +30,6 @@ def batched_softmax(logits, batch):
     logit_sum = torch.index_select(logit_sum, 0, batch)
     probs = torch.div(logits, logit_sum)
     return probs
-
-def get_batch_shift(pyg_batch):
-    batch_num_nodes = torch.bincount(pyg_batch)
-
-    # shift batch
-    zero = torch.LongTensor([0]).to(batch_num_nodes.device)
-    offset = torch.cat((zero, torch.cumsum(batch_num_nodes, dim=0)[:-1]))
-
-    return offset
 
 #####################################################
 #                       CREM                        #
@@ -78,9 +70,7 @@ class GCPN_CReM(nn.Module):
 
         if self.training:
             a, p = batched_sample(probs, batch_idx)
-            batch_shift = get_batch_shift(batch_idx)
-            actions = a - batch_shift
-            return g_emb, X_states, actions, p
+            return g_emb, X_states, a, p
         else:
             return g_emb, X_states, probs
 
@@ -96,7 +86,7 @@ class GCPN_CReM(nn.Module):
 
         logits = self.final_layer(emb).squeeze(1)
         probs = batched_softmax(logits, candidates.batch)
-        
+
         batch_shift = get_batch_shift(candidates.batch)
         shifted_actions = actions + batch_shift
         return probs[shifted_actions]

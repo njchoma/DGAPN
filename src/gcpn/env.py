@@ -17,10 +17,12 @@ class CReM_Env(object):
                  storage_path,
                  warm_start_dataset_path,
                  nb_sample_crem = 16,
-                 nb_cores = 1):
+                 nb_cores = 1,
+                 mode = 'pyg'):
         self.scores, self.smiles = preprocess.main(warm_start_dataset_path)
         self.nb_sample_crem = nb_sample_crem
         self.nb_cores = nb_cores
+        self.mode = mode
 
         _ = download_dataset(storage_path,
                              DATASET_NAME+'.gz',
@@ -30,9 +32,10 @@ class CReM_Env(object):
                                        DATASET_NAME)
 
 
-    def reset(self, include_current_state=True):
-        idx = np.random.randint(len(self.scores))
-        mol = Chem.MolFromSmiles(self.smiles[idx])
+    def reset(self, mol=None, include_current_state=True):
+        if mol is None:
+            idx = np.random.randint(len(self.scores))
+            mol = Chem.MolFromSmiles(self.smiles[idx])
         return self.mol_to_candidates(mol, include_current_state)
 
     def step(self, action, include_current_state=True):
@@ -41,10 +44,11 @@ class CReM_Env(object):
 
 
     def mol_to_candidates(self, mol, include_current_state):
-        g = mol_to_pyg_graph(mol)[0]
-        g_candidates, done = self.get_crem_candidates(mol, include_current_state)
+        if self.mode == 'pyg':
+            mol = mol_to_pyg_graph(mol)[0]
+        mol_candidates, done = self.get_crem_candidates(mol, include_current_state)
 
-        return g, g_candidates, done
+        return mol, mol_candidates, done
 
     def get_crem_candidates(self, mol, include_current_state):
 
@@ -61,8 +65,10 @@ class CReM_Env(object):
             print("SMILE: " + Chem.MolToSmiles(mol))
             new_mols = []
         self.new_mols = [mol] + new_mols if include_current_state else new_mols
-        g_candidates = [mol_to_pyg_graph(i)[0] for i in self.new_mols]
+        mol_candidates = self.new_mols
+        if self.mode == 'pyg':
+            mol_candidates = [mol_to_pyg_graph(i)[0] for i in mol_candidates]
 
-        if len(g_candidates)==0:
+        if len(mol_candidates)==0:
             return None, True
-        return g_candidates, False
+        return mol_candidates, False

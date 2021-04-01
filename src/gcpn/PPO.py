@@ -14,7 +14,7 @@ from torch_geometric.utils import dense_to_sparse
 from .gcpn_policy import GCPN_CReM
 
 from utils.general_utils import get_current_datetime
-from utils.graph_utils import state_to_pyg
+from utils.graph_utils import get_batch_shift
 
 
 class Memory:
@@ -81,13 +81,14 @@ class ActorCriticGCPN(nn.Module):
 
     def act(self, states, candidates, surrogate_model, batch_idx):
         with torch.autograd.no_grad():
-            states, new_states, actions, probs = self.actor(states, candidates, surrogate_model, batch_idx)
+            states, new_states, acts, probs = self.actor(states, candidates, surrogate_model, batch_idx)
 
-        actions = actions.squeeze_().tolist()
+        shifted_actions = acts.squeeze_().tolist()
+        actions = (acts - get_batch_shift(batch_idx)).squeeze_().tolist()
         action_logprobs = torch.log(probs).squeeze_().tolist()
         states = [states.cpu(), new_states.cpu()]
 
-        return states, actions, action_logprobs
+        return states, actions, action_logprobs, shifted_actions
 
     def evaluate(self, states, candidates, actions):   
         probs = self.actor.evaluate(candidates, actions)
@@ -161,15 +162,20 @@ class PPO_GCPN(nn.Module):
         self.policy.to(device)
         self.policy_old.to(device)
 
-    def select_action(self, state, candidates, surrogate_model, device, batch_idx=None):
+    def select_action(self, states, candidates, surrogate_model, device, batch_idx=None, return_shifted=False):
+        if not isinstance(states, list):
+            states = [states]
         if batch_idx is None:
             batch_idx = torch.empty(len(candidates), dtype=torch.long).fill_(0)
         batch_idx = batch_idx.to(device)
 
-        g = Batch.from_data_list([state]).to(device)
+        g = Batch.from_data_list(states).to(device)
         g_candidates = Batch.from_data_list(candidates).to(device)
-        states, actions, action_logprobs = self.policy_old.act(g, g_candidates, surrogate_model, batch_idx)
-        return states, actions, action_logprobs
+        states, actions, action_logprobs, shifted_actions = self.policy_old.act(g, g_candidates, surrogate_model, batch_idx)
+        if return_shifted:
+            return states, actions, action_logprobs, shifted_actions
+        else:
+            return states, actions, action_logprobs
 
     def update(self, memory, device):
         # Monte Carlo estimate of rewards:
@@ -224,7 +230,7 @@ class PPO_GCPN(nn.Module):
                 loss.append(l)
             loss = torch.stack(loss, 0).sum(0)
             ## entropy
-            loss += self.eta*entropies
+            loss += self.eta * entropies
             ## baseline
             loss = loss.mean() + self.upsilon*self.MseLoss(state_values, rewards)
 
@@ -246,13 +252,18 @@ class PPO_GCPN(nn.Module):
 #                   FINAL REWARDS                   #
 #####################################################
 
-def get_reward(state, surrogate_model, device):
-    g = Batch().from_data_list([state])
+def get_reward(states, surrogate_model, device, done_idx=None):
+    if not isinstance(states, list):
+        states = [states]
+    if done_idx is None:
+        done_idx = range(len(states))
+
+    g = Batch().from_data_list(states)
     g = g.to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
-    reward = pred_docking_score.item() * -1
-    return reward
+    rewards = (-pred_docking_score).tolist()
+    return rewards
 
 
 #####################################################
@@ -268,7 +279,7 @@ def train_ppo(args, surrogate_model, env):
     max_episodes = 50000        # max training episodes
     
     max_timesteps = 6           # max timesteps in one episode
-    update_timestep = 30        # update policy every n timesteps
+    update_timesteps = 30       # update policy every n timesteps
     
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
@@ -347,7 +358,7 @@ def train_ppo(args, surrogate_model, env):
                 break
 
         # update if it's time
-        if time_step > update_timestep:
+        if time_step > update_timesteps:
             print("\n\nupdating ppo @ episode %d..." % i_episode)
             time_step = 0
             ppo.update(memory, device)
