@@ -21,6 +21,8 @@ from utils.graph_utils import state_to_pyg
 
 from gnn_surrogate.model import GNN_MyGAT
 
+from datetime import datetime
+
 class Memory:
     def __init__(self):
         self.actions = []
@@ -299,13 +301,13 @@ running_reward = mp.Value("f", 0)
 avg_length = mp.Value("i", 0)
 
 class Sampler(mp.Process):
-    def __init__(self, args, env, task_queue, result_queue, max_episodes, max_timesteps, update_timestep):
+    def __init__(self, args, env, task_queue, result_queue, max_episodes, max_timesteps, update_timesteps):
         super(Sampler, self).__init__()
         self.task_queue = task_queue
         self.result_queue = result_queue
         self.max_episodes = max_episodes
         self.max_timesteps = max_timesteps
-        self.update_timestep = update_timestep
+        self.update_timesteps = update_timesteps
 
         self.env = env
         self.policy = ActorCriticGCPN(args.input_size,
@@ -341,7 +343,7 @@ class Sampler(mp.Process):
             print('%s: Sampling' % proc_name)
             state, candidates, done = self.env.reset()
 
-            while sample_count.value < self.update_timestep and episode_count.value < self.max_episodes:
+            while sample_count.value < self.update_timesteps and episode_count.value < self.max_episodes:
                 n_step = 0
                 for t in range(self.max_timesteps):
                     n_step += 1
@@ -405,7 +407,7 @@ def train_ppo(args, surrogate_model, env):
 
     max_episodes = 50000        # max training episodes
     max_timesteps = 6           # max timesteps in one episode
-    update_timestep = 500       # update policy every n timesteps
+    update_timesteps = 500       # update policy every n timesteps
 
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
@@ -418,7 +420,7 @@ def train_ppo(args, surrogate_model, env):
     print("lr:", lr, "beta:", betas)
 
     print('Creating %d processes' % args.nb_procs)
-    samplers = [Sampler(args, env, tasks, results, max_episodes, max_timesteps, update_timestep)
+    samplers = [Sampler(args, env, tasks, results, max_episodes, max_timesteps, update_timesteps)
                 for i in range(args.nb_procs)]
     for w in samplers:
         w.start()
@@ -462,6 +464,7 @@ def train_ppo(args, surrogate_model, env):
     i_episode = 0
     while i_episode < max_episodes:
         print("collecting rollouts")
+        #start=datetime.now()
         ppo.to_device(torch.device("cpu"))
         # Enqueue jobs
         for i in range(args.nb_procs):
@@ -479,6 +482,8 @@ def train_ppo(args, surrogate_model, env):
 
         i_episode += episode_count.value
 
+        ppo.to_device(device)
+        #print(datetime.now() - start)
         # write to Tensorboard
         for i in reversed(range(episode_count.value)):
             rewbuffer_env.append(log.ep_rewards[i])
@@ -487,7 +492,6 @@ def train_ppo(args, surrogate_model, env):
         log.clear()
         # update model
         print("\n\nupdating ppo @ episode %d..." % i_episode)
-        ppo.to_device(device)
         ppo.update(memory)
         memory.clear()
 
