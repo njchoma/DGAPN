@@ -278,7 +278,7 @@ def train_ppo(args, surrogate_model, env):
     max_episodes = 50000        # max training episodes
     
     max_timesteps = 6           # max timesteps in one episode
-    update_timesteps = 30       # update policy every n timesteps
+    update_timesteps = 500      # update policy every n timesteps
     
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
@@ -329,7 +329,6 @@ def train_ppo(args, surrogate_model, env):
     # training loop
     for i_episode in range(1, max_episodes+1):
         state, candidates, done = env.reset()
-        starting_reward = get_reward(state, surrogate_model, device)
 
         for t in range(max_timesteps):
             time_step += 1
@@ -346,7 +345,7 @@ def train_ppo(args, surrogate_model, env):
 
             if (t==(max_timesteps-1)) or done:
                 surr_reward = get_reward(state, surrogate_model, device)
-                reward = surr_reward-starting_reward
+                reward = surr_reward
 
             # Saving reward and is_terminals:
             memory.rewards.append(reward)
