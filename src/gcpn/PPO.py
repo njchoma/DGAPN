@@ -14,7 +14,6 @@ from torch_geometric.utils import dense_to_sparse
 from .gcpn_policy import GCPN_CReM
 
 from utils.general_utils import get_current_datetime
-from utils.graph_utils import get_batch_shift
 
 
 class Memory:
@@ -81,14 +80,14 @@ class ActorCriticGCPN(nn.Module):
 
     def act(self, states, candidates, surrogate_model, batch_idx):
         with torch.autograd.no_grad():
-            states, new_states, acts, probs = self.actor(states, candidates, surrogate_model, batch_idx)
+            states, new_states, probs, actions, shifted_actions = self.actor(states, candidates, surrogate_model, batch_idx)
 
-        shifted_actions = acts.squeeze_().tolist()
-        actions = (acts - get_batch_shift(batch_idx)).squeeze_().tolist()
-        action_logprobs = torch.log(probs).squeeze_().tolist()
         states = [states.cpu(), new_states.cpu()]
+        action_logprobs = torch.log(probs).squeeze_().tolist()
+        actions = actions.squeeze_().tolist()
+        shifted_actions = shifted_actions.squeeze_().tolist()
 
-        return states, actions, action_logprobs, shifted_actions
+        return states, action_logprobs, actions, shifted_actions
 
     def evaluate(self, states, candidates, actions):   
         probs = self.actor.evaluate(candidates, actions)
@@ -171,11 +170,11 @@ class PPO_GCPN(nn.Module):
 
         g = Batch.from_data_list(states).to(device)
         g_candidates = Batch.from_data_list(candidates).to(device)
-        states, actions, action_logprobs, shifted_actions = self.policy_old.act(g, g_candidates, surrogate_model, batch_idx)
+        states, action_logprobs, actions, shifted_actions = self.policy_old.act(g, g_candidates, surrogate_model, batch_idx)
         if return_shifted:
-            return states, actions, action_logprobs, shifted_actions
+            return states, action_logprobs, actions, shifted_actions
         else:
-            return states, actions, action_logprobs
+            return states, action_logprobs, actions
 
     def update(self, memory, device):
         # Monte Carlo estimate of rewards:
@@ -335,7 +334,7 @@ def train_ppo(args, surrogate_model, env):
         for t in range(max_timesteps):
             time_step += 1
             # Running policy_old:
-            state, action, action_logprob = ppo.select_action(state, candidates, surrogate_model, device)
+            state, action_logprob, action = ppo.select_action(state, candidates, surrogate_model, device)
             memory.states.append(state)
             memory.actions.append(action)
             memory.logprobs.append(action_logprob)

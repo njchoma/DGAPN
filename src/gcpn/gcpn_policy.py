@@ -69,8 +69,9 @@ class GCPN_CReM(nn.Module):
         probs = batched_softmax(X, batch_idx)
 
         if self.training:
-            a, p = batched_sample(probs, batch_idx)
-            return g_emb, X_states, a, p
+            shifted_actions, p = batched_sample(probs, batch_idx)
+            actions = shifted_actions - get_batch_shift(batch_idx)
+            return g_emb, X_states, p, actions, shifted_actions
         else:
             return g_emb, X_states, probs
 
