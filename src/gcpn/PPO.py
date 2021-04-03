@@ -161,24 +161,9 @@ class PPO_GCPN(nn.Module):
             # loss
             ## policy
             advantages = rewards - state_values.detach()
-            loss = []
-
-            ratios = ratios.unsqueeze(1)
-            for j in range(ratios.shape[1]):
-                r = ratios[:,j]
-                surr1 = r * advantages
-                surr2 = torch.clamp(r, 1-self.eps_clip, 1+self.eps_clip) * advantages
-                l = -torch.min(surr1, surr2)
-
-                if torch.isnan(l).any():
-                    print("found nan in loss")
-                    print(l)
-                    print(torch.isnan(surr1).any())
-                    print(torch.isnan(surr2).any())
-                    print(torch.isnan(advantages).any())
-                    exit()
-                loss.append(l)
-            loss = torch.stack(loss, 0).sum(0)
+            surr1 = ratios * advantages
+            surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
+            loss = -torch.min(surr1, surr2)
             ## entropy
             loss += self.eta * entropies
             ## baseline
@@ -189,7 +174,7 @@ class PPO_GCPN(nn.Module):
             loss.backward()
             self.optimizer.step()
             if (i%10)==0:
-                print("  {:3d}: Loss: {:7.3f}".format(i, loss))
+                print("  {:3d}: Loss: {:7.3f}".format(i, loss.item()))
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -227,7 +212,7 @@ def train_ppo(args, surrogate_model, env):
     max_episodes = 50000        # max training episodes
     
     max_timesteps = 6           # max timesteps in one episode
-    update_timesteps = 30       # update policy every n timesteps
+    update_timesteps = 120      # update policy every n timesteps
     
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO

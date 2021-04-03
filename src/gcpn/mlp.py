@@ -82,7 +82,7 @@ class Action_Prediction(nn.Module):
         for l in self.layers:
             X = self.act(l(X))
         logits = self.final_layer(X)
-        logits = logits.squeeze()
+        logits = logits.squeeze(1)
 
         probs = batched_softmax(logits, batch)
         return probs

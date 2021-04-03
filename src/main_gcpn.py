@@ -50,7 +50,7 @@ def molecule_arg_parser():
     add_arg('--emb_size', type=int, default=256) # default 64, surrogate 512
     add_arg('--nb_edge_types', type=int, default=1)
     add_arg('--layer_num_g', type=int, default=4)
-    add_arg('--num_hidden_g', type=int, default=512)
+    add_arg('--num_hidden_g', type=int, default=256) # surrogate 512
     add_arg('--heads_g', type=int, default=2)
     add_arg('--mlp_num_layer', type=int, default=3)
     add_arg('--mlp_num_hidden', type=int, default=128)
