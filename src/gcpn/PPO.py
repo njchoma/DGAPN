@@ -226,8 +226,8 @@ def train_ppo(args, surrogate_model, env):
 
     # logging variables
     dt = get_current_datetime()
-    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + dt))
-    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + dt)
+    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + '_' + dt))
+    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + '_' + dt)
     os.makedirs(save_dir, exist_ok=True)
 
     device = torch.device("cpu") if args.use_cpu else torch.device(

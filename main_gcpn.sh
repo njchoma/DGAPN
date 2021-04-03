@@ -7,7 +7,7 @@ DATA=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
 
 PYARGS=""
 PYARGS="$PYARGS --name crem_simplified_v2"
-PYARGS="$PYARGS --gpu 0"
+PYARGS="$PYARGS --gpu 1"
 PYARGS="$PYARGS --data_path $DATA/src/dataset"
 PYARGS="$PYARGS --warm_start_dataset_path $DATA/src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.sorted.4col.csv"
 PYARGS="$PYARGS --artifact_path $DATA/artifact"
