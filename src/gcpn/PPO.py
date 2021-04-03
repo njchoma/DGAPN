@@ -159,6 +159,7 @@ class PPO_GCPN(nn.Module):
             ratios = torch.exp(logprobs - old_logprobs)
 
             # loss
+            ## policy
             advantages = rewards - state_values.detach()
             loss = []
 
@@ -201,11 +202,9 @@ class PPO_GCPN(nn.Module):
 #                   FINAL REWARDS                   #
 #####################################################
 
-def get_reward(states, surrogate_model, device, done_idx=None):
+def get_reward(states, surrogate_model, device):
     if not isinstance(states, list):
         states = [states]
-    if done_idx is None:
-        done_idx = range(len(states))
 
     g = Batch().from_data_list(states)
     g = g.to(device)
@@ -228,7 +227,7 @@ def train_ppo(args, surrogate_model, env):
     max_episodes = 50000        # max training episodes
     
     max_timesteps = 6           # max timesteps in one episode
-    update_timesteps = 500      # update policy every n timesteps
+    update_timesteps = 30       # update policy every n timesteps
     
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO

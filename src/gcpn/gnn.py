@@ -1,7 +1,12 @@
 import torch
 import torch.nn as nn
+from torch.nn import Parameter
+from torch.nn import functional as F
 
 import torch_geometric as pyg
+from torch_geometric.nn import MessagePassing
+from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
+from torch_scatter import scatter_add
 
 from .mlp import MyBatchNorm
 
@@ -219,12 +224,12 @@ class MyHGCN(MessagePassing):
         if hyperedge_weight is not None:
             B = B * hyperedge_weight
 
-        if self.norm_mode is "row":
+        if self.norm_mode == "row":
             self.flow = 'source_to_target'
             out = self.propagate(hyperedge_index, x=x, norm=B, alpha=alpha)
             self.flow = 'target_to_source'
             out = self.propagate(hyperedge_index, x=out, norm=D, alpha=alpha)
-        elif self.norm_mode is "col":
+        elif self.norm_mode == "col":
             self.flow = 'source_to_target'
             out = self.propagate(hyperedge_index, x=D.view(-1, 1, 1) * x, norm=B, alpha=alpha)
             self.flow = 'target_to_source'

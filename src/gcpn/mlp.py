@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 
 import torch_geometric as pyg
+from torch.distributions.categorical import Categorical
+
+from utils.graph_utils import get_batch_shift
 
 #####################################################
 #                   HELPER MODULES                  #
@@ -75,7 +78,7 @@ class Action_Prediction(nn.Module):
         self.act = nn.ReLU()
         self.softmax = nn.Softmax(dim=0)
 
-    def get_probs(self, X, batch):
+    def get_prob(self, X, batch):
         for l in self.layers:
             X = self.act(l(X))
         logits = self.final_layer(X)
@@ -85,14 +88,14 @@ class Action_Prediction(nn.Module):
         return probs
 
     def forward(self, X, batch):
-        probs = get_probs(X, batch)
+        probs = self.get_prob(X, batch)
 
         shifted_actions, p = batched_sample(probs, batch)
         actions = shifted_actions - get_batch_shift(batch)
         return p, actions, shifted_actions
 
     def evaluate(self, X, batch, actions):
-        probs = self.get_probs(X, batch)
+        probs = self.get_prob(X, batch)
 
         batch_shift = get_batch_shift(batch)
         shifted_actions = actions + batch_shift

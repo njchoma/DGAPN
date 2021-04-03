@@ -1,16 +1,5 @@
-import time
-import numpy as np
-
 import torch
 import torch.nn as nn
-from torch.distributions.bernoulli import Bernoulli
-from torch.distributions.categorical import Categorical
-
-import torch_geometric as pyg
-from torch_geometric.nn import MessagePassing
-from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
-
-from utils.graph_utils import get_batch_shift
 
 from .gnn import GNN_Embed
 from .mlp import Action_Prediction, Value_Network
@@ -72,9 +61,9 @@ class ActorCriticGCPN(nn.Module):
         state_values = self.critic(self.actor.gnn_embed(states))
         '''
 
-        entropy = probs * action_logprobs
+        entropies = probs * action_logprobs
 
-        return action_logprobs, state_value, entropy
+        return action_logprobs, state_values, entropies
 
 
 class GCPN_Actor(nn.Module):
@@ -102,6 +91,10 @@ class GCPN_Actor(nn.Module):
     def get_emb(self, g, g_candidates, batch_idx):
         g_emb = self.gnn_embed(g)
         g_candidates_emb = self.gnn_embed(g_candidates)
+        if g_emb.dim() == 1:
+            g_emb = g_emb.unsqueeze(0)
+        if g_candidates_emb.dim() == 1:
+            g_candidates_emb = g_candidates_emb.unsqueeze(0)
 
         X = torch.repeat_interleave(g_emb, torch.bincount(batch_idx), dim=0)
         X = torch.cat((X, g_candidates_emb), dim=1)

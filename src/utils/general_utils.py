@@ -3,7 +3,6 @@ import wget
 import logging
 from datetime import datetime
 
-
 def get_current_datetime():
     now = datetime.now()
     dt_string = now.strftime("%Y.%m.%d_%H:%M:%S")
