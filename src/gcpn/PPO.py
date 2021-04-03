@@ -11,11 +11,13 @@ from torch.utils.tensorboard import SummaryWriter
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils import dense_to_sparse
 
-from .gcpn_policy import GCPN_CReM
-
 from utils.general_utils import get_current_datetime
 
+from .gcpn_policy import ActorCriticGCPN
 
+#####################################################
+#                   HELPER MODULES                  #
+#####################################################
 class Memory:
     def __init__(self):
         self.actions = []
@@ -31,75 +33,6 @@ class Memory:
         del self.rewards[:]
         del self.is_terminals[:]
 
-
-#################################################
-#                   GCPN PPO                    #
-#################################################
-
-class GCPN_Critic(nn.Module):
-    def __init__(self, emb_dim, nb_layers, nb_hidden):
-        super(GCPN_Critic, self).__init__()
-        layers = [nn.Linear(emb_dim, nb_hidden)]
-        for _ in range(nb_layers-1):
-            layers.append(nn.Linear(nb_hidden, nb_hidden))
-
-        self.layers = nn.ModuleList(layers)
-        self.final_layer = nn.Linear(nb_hidden, 1)
-        self.act = nn.ReLU()
-
-    def forward(self, X):
-        for i, l in enumerate(self.layers):
-            X = self.act(l(X))
-        return self.final_layer(X).squeeze(1)
-
-
-class ActorCriticGCPN(nn.Module):
-    def __init__(self,
-                 input_dim,
-                 emb_dim,
-                 nb_edge_types,
-                 gnn_nb_layers,
-                 gnn_nb_hidden,
-                 mlp_nb_layers,
-                 mlp_nb_hidden):
-        super(ActorCriticGCPN, self).__init__()
-
-        # action mean range -1 to 1
-        self.actor = GCPN_CReM(input_dim,
-                               emb_dim,
-                               nb_edge_types,
-                               gnn_nb_layers,
-                               gnn_nb_hidden,
-                               mlp_nb_layers,
-                               mlp_nb_hidden)
-        # critic
-        self.critic = GCPN_Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
-
-    def forward(self):
-        raise NotImplementedError
-
-    def act(self, states, candidates, surrogate_model, batch_idx):
-        with torch.autograd.no_grad():
-            states, new_states, probs, actions, shifted_actions = self.actor(states, candidates, surrogate_model, batch_idx)
-
-        states = [states.cpu(), new_states.cpu()]
-        action_logprobs = torch.log(probs).squeeze_().tolist()
-        actions = actions.squeeze_().tolist()
-        shifted_actions = shifted_actions.squeeze_().tolist()
-
-        return states, action_logprobs, actions, shifted_actions
-
-    def evaluate(self, states, candidates, actions):   
-        probs = self.actor.evaluate(candidates, actions)
-
-        action_logprobs = torch.log(probs)
-        state_value = self.critic(states)
-
-        entropy = probs * action_logprobs
-
-        return action_logprobs, state_value, entropy
-
-
 def wrap_state(ob):
     adj = ob['adj']
     nodes = ob['node'].squeeze()
@@ -111,7 +44,9 @@ def wrap_state(ob):
     data = Data(x=nodes, edge_index=adj[0][0], edge_attr=adj[0][1])
     return data
 
-
+#################################################
+#                   GCPN PPO                    #
+#################################################
 class PPO_GCPN(nn.Module):
     def __init__(self,
                  lr,
@@ -126,6 +61,7 @@ class PPO_GCPN(nn.Module):
                  nb_edge_types,
                  gnn_nb_layers,
                  gnn_nb_hidden,
+                 gnn_heads,
                  mlp_nb_layers,
                  mlp_nb_hidden):
         super(PPO_GCPN, self).__init__()
@@ -142,6 +78,7 @@ class PPO_GCPN(nn.Module):
                                       nb_edge_types,
                                       gnn_nb_layers,
                                       gnn_nb_hidden,
+                                      gnn_heads,
                                       mlp_nb_layers,
                                       mlp_nb_hidden)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
@@ -151,32 +88,36 @@ class PPO_GCPN(nn.Module):
                                           nb_edge_types,
                                           gnn_nb_layers,
                                           gnn_nb_hidden,
+                                          gnn_heads,
                                           mlp_nb_layers,
                                           mlp_nb_hidden)
         self.policy_old.load_state_dict(self.policy.state_dict())
         
         self.MseLoss = nn.MSELoss()
 
+        self.device = torch.device("cpu")
+
     def to_device(self, device):
         self.policy.to(device)
         self.policy_old.to(device)
+        self.device = device
 
-    def select_action(self, states, candidates, surrogate_model, device, batch_idx=None, return_shifted=False):
+    def select_action(self, states, candidates, batch_idx=None, return_shifted=False):
         if not isinstance(states, list):
             states = [states]
         if batch_idx is None:
             batch_idx = torch.empty(len(candidates), dtype=torch.long).fill_(0)
-        batch_idx = batch_idx.to(device)
+        batch_idx = batch_idx.to(self.device)
 
-        g = Batch.from_data_list(states).to(device)
-        g_candidates = Batch.from_data_list(candidates).to(device)
-        states, action_logprobs, actions, shifted_actions = self.policy_old.act(g, g_candidates, surrogate_model, batch_idx)
+        g = Batch.from_data_list(states).to(self.device)
+        g_candidates = Batch.from_data_list(candidates).to(self.device)
+        action_logprobs, actions, shifted_actions = self.policy_old.act(g, g_candidates, batch_idx)
         if return_shifted:
-            return states, action_logprobs, actions, shifted_actions
+            return action_logprobs, actions, shifted_actions
         else:
-            return states, action_logprobs, actions
+            return action_logprobs, actions
 
-    def update(self, memory, device):
+    def update(self, memory):
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
@@ -187,14 +128,22 @@ class PPO_GCPN(nn.Module):
             rewards.insert(0, discounted_reward)
 
         # Normalizing the rewards:
-        rewards = torch.tensor(rewards).to(device)
+        rewards = torch.tensor(rewards).to(self.device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
+        # gather candidates
+        old_candidates = []
+        old_candidates_batch = []
+        for i, m in enumerate(memory.states):
+            old_candidates.extend(m[1])
+            old_candidates_batch.extend([i]*len(m[1]))
+
         # convert list to tensor
-        old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(device)
-        old_candidates = Batch().from_data_list([Data(x=m[1]) for m in memory.states]).to(device)
-        old_actions = torch.tensor(memory.actions).to(device)
-        old_logprobs = torch.tensor(memory.logprobs).to(device)
+        old_states = Batch().from_data_list([m[0] for m in memory.states]).to(self.device)
+        old_candidates = Batch().from_data_list(old_candidates).to(self.device)
+        old_candidates_batch = torch.LongTensor(old_candidates_batch).to(self.device)
+        old_actions = torch.tensor(memory.actions).to(self.device)
+        old_logprobs = torch.tensor(memory.logprobs).to(self.device)
 
         # Optimize policy for K epochs:
         print("Optimizing...")
@@ -203,6 +152,7 @@ class PPO_GCPN(nn.Module):
             # Evaluating old actions and values :
             logprobs, state_values, entropies = self.policy.evaluate(old_states,
                                                                      old_candidates,
+                                                                     old_candidates_batch,
                                                                      old_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
@@ -311,6 +261,7 @@ def train_ppo(args, surrogate_model, env):
                    args.nb_edge_types,
                    args.layer_num_g,
                    args.num_hidden_g,
+                   args.heads_g,
                    args.mlp_num_layer,
                    args.mlp_num_hidden)
     ppo.to_device(device)
@@ -332,9 +283,10 @@ def train_ppo(args, surrogate_model, env):
 
         for t in range(max_timesteps):
             time_step += 1
+            memory.states.append([state, candidates])
+
             # Running policy_old:
-            state, action_logprob, action = ppo.select_action(state, candidates, surrogate_model, device)
-            memory.states.append(state)
+            action_logprob, action = ppo.select_action(state, candidates)
             memory.actions.append(action)
             memory.logprobs.append(action_logprob)
 
@@ -342,7 +294,6 @@ def train_ppo(args, surrogate_model, env):
 
             # done and reward may not be needed anymore
             reward = 0
-
             if (t==(max_timesteps-1)) or done:
                 surr_reward = get_reward(state, surrogate_model, device)
                 reward = surr_reward
@@ -359,7 +310,7 @@ def train_ppo(args, surrogate_model, env):
         if time_step > update_timesteps:
             print("\n\nupdating ppo @ episode %d..." % i_episode)
             time_step = 0
-            ppo.update(memory, device)
+            ppo.update(memory)
             memory.clear_memory()
             # save running model
             torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
