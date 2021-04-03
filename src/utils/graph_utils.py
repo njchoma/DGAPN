@@ -160,7 +160,9 @@ def state_to_pyg(atoms, bonds):
     return mol_to_pyg_graph(mol)
 
 def get_batch_shift(pyg_batch):
+    unique = torch.flip(torch.unique(pyg_batch.cpu(), sorted=False).to(pyg_batch.device), dims=(0,)) # temp fix due to torch.unique bug
     batch_num_nodes = torch.bincount(pyg_batch)
+    batch_num_nodes = batch_num_nodes[unique]
 
     # shift batch
     zero = torch.LongTensor([0]).to(batch_num_nodes.device)

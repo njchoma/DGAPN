@@ -32,8 +32,9 @@ class CReM_Env(object):
                                        DATASET_NAME)
 
 
-    def reset(self, mol=None, include_current_state=True):
+    def reset(self, mol=None, seed=None, include_current_state=True):
         if mol is None:
+            np.random.seed(seed)
             idx = np.random.randint(len(self.scores))
             mol = Chem.MolFromSmiles(self.smiles[idx])
         return self.mol_to_candidates(mol, include_current_state)
