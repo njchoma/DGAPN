@@ -117,7 +117,7 @@ class PPO_GCPN(nn.Module):
         else:
             return action_logprobs, actions
 
-    def update(self, memory):
+    def update(self, memory, save_dir):
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
@@ -149,33 +149,37 @@ class PPO_GCPN(nn.Module):
         print("Optimizing...")
 
         for i in range(self.K_epochs):
-            # Evaluating old actions and values :
-            logprobs, state_values, entropies = self.policy.evaluate(old_states,
-                                                                     old_candidates,
-                                                                     old_candidates_batch,
-                                                                     old_actions)
+            with torch.autograd.set_detect_anomaly(True):
+                # Evaluating old actions and values :
+                logprobs, state_values, entropies = self.policy.evaluate(old_states,
+                                                                        old_candidates,
+                                                                        old_candidates_batch,
+                                                                        old_actions)
 
-            # Finding the ratio (pi_theta / pi_theta__old):
-            ratios = torch.exp(logprobs - old_logprobs)
+                # Finding the ratio (pi_theta / pi_theta__old):
+                ratios = torch.exp(logprobs - old_logprobs)
 
-            # loss
-            ## policy
-            advantages = rewards - state_values.detach()
-            surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2)
-            ## entropy
-            loss += self.eta * entropies
-            ## baseline
-            loss = loss.mean() + self.upsilon*self.MseLoss(state_values, rewards)
+                # loss
+                ## policy
+                advantages = rewards - state_values.detach()
+                surr1 = ratios * advantages
+                surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
+                loss = -torch.min(surr1, surr2)
+                ## entropy
+                loss += self.eta * entropies
+                ## baseline
+                loss = loss.mean() + self.upsilon*self.MseLoss(state_values, rewards)
 
-            ## take gradient step
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+                ## take gradient step
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
             if (i%10)==0:
                 print("  {:3d}: Loss: {:7.3f}".format(i, loss.item()))
 
+        # save running model
+        torch.save(self.policy.state_dict(), os.path.join(save_dir, 'running_gcpn.pth'))
+        torch.save(self.policy_old.state_dict(), os.path.join(save_dir, 'running_gcpn_old.pth'))
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
 
@@ -212,7 +216,7 @@ def train_ppo(args, surrogate_model, env):
     max_episodes = 50000        # max training episodes
     
     max_timesteps = 6           # max timesteps in one episode
-    update_timesteps = 120      # update policy every n timesteps
+    update_timesteps = 30       # update policy every n timesteps
     
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
@@ -294,10 +298,8 @@ def train_ppo(args, surrogate_model, env):
         if time_step > update_timesteps:
             print("\n\nupdating ppo @ episode %d..." % i_episode)
             time_step = 0
-            ppo.update(memory)
+            ppo.update(memory, save_dir)
             memory.clear_memory()
-            # save running model
-            torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
 
         writer.add_scalar("EpSurrogate", -1*surr_reward, i_episode-1)
         rewbuffer_env.append(reward)
@@ -314,7 +316,7 @@ def train_ppo(args, surrogate_model, env):
 
         # save every 500 episodes
         if (i_episode-1) % save_interval == 0:
-            torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_gcpn.pth'.format(i_episode)))
+            torch.save(ppo.policy.state_dict(), os.path.join(save_dir, '{:05d}_gcpn.pth'.format(i_episode)))
 
         # logging
         if i_episode % log_interval == 0:
