@@ -146,6 +146,7 @@ class PPO_GCPN(nn.Module):
     def __init__(self,
                  lr,
                  betas,
+                 eps,
                  gamma,
                  eta,
                  upsilon,
@@ -159,8 +160,6 @@ class PPO_GCPN(nn.Module):
                  mlp_nb_layers,
                  mlp_nb_hidden):
         super(PPO_GCPN, self).__init__()
-        self.lr = lr
-        self.betas = betas
         self.gamma = gamma
         self.eta = eta
         self.upsilon = upsilon
@@ -174,7 +173,7 @@ class PPO_GCPN(nn.Module):
                                       gnn_nb_hidden,
                                       mlp_nb_layers,
                                       mlp_nb_hidden)
-        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
+        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas, eps=eps)
         
         self.policy_old = ActorCriticGCPN(input_dim,
                                           emb_dim,
@@ -415,9 +414,10 @@ def train_ppo(args, surrogate_model, env):
 
     lr = 0.0001                 # parameters for Adam optimizer
     betas = (0.9, 0.999)
+    eps = 0.01
+    print("lr:", lr, "beta:", betas, "eps:", eps)
 
     #############################################
-    print("lr:", lr, "beta:", betas)
 
     print('Creating %d processes' % args.nb_procs)
     samplers = [Sampler(args, env, tasks, results, max_episodes, max_timesteps, update_timesteps)
@@ -436,6 +436,7 @@ def train_ppo(args, surrogate_model, env):
 
     ppo = PPO_GCPN(lr,
                    betas,
+                   eps,
                    gamma,
                    args.eta,
                    args.upsilon,

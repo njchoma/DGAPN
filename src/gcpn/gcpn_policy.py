@@ -14,15 +14,21 @@ from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, de
 #####################################################
 #                   HELPER MODULES                  #
 #####################################################
+EPS = 1e-4
+
 def sample_from_probs(p, action=None):
-    m = Categorical(p)
+    m = Categorical(p * (p > EPS))
     a = m.sample() if action is None else action
     return a.item(), p[a]
 
 def batched_softmax(logits, batch):
+    logit_max = pyg.nn.global_max_pool(logits, batch)
+    logit_max = torch.index_select(logit_max, 0, batch)
+
+    logits = logits - logit_max
     logits = torch.exp(logits)
 
-    logit_sum = pyg.nn.global_add_pool(logits, batch)
+    logit_sum = pyg.nn.global_add_pool(logits, batch) + EPS
     logit_sum = torch.index_select(logit_sum, 0, batch)
     probs = torch.div(logits, logit_sum)
     return probs
