@@ -1,0 +1,24 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "main_gcpn",
+            "type": "python",
+            "request": "launch",
+            "program": "src/main_gcpn.py",
+            "subProcess": true,
+            "args": [
+                "--name", "crem_serial",
+                "--data_path", "src/dataset",
+                "--artifact_path", "test_run/gcpn",
+                "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.sorted.4col.csv",
+                "--gpu", "0",
+                "--surrogate_model_path", "artifact/best_model.pth"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}
