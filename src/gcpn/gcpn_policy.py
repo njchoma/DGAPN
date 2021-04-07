@@ -15,6 +15,20 @@ from utils.graph_utils import get_batch_shift
 #####################################################
 #                   HELPER MODULES                  #
 #####################################################
+
+def get_surrogate_dims(surrogate_model):
+    state_dict = surrogate_model.state_dict()
+    layers_name = [s for s in state_dict.keys() if re.compile('^layers\.[0-9]+\.weight$').match(s)]
+    input_dim = state_dict[layers_name[0]].size(0)
+    emb_dim = state_dict[layers_name[0]].size(-1)
+    nb_edge_types = 1
+    nb_layer = len(layers_name)
+    nb_hidden = state_dict[layers_name[-1]].size(-1)
+    return input_dim, emb_dim, nb_edge_types, nb_layer, nb_hidden
+
+#####################################################
+#                 BATCHED OPERATIONS                #
+#####################################################
 EPS = 1e-4
 
 def batched_sample(probs, batch):
@@ -42,16 +56,104 @@ def batched_softmax(logits, batch):
 #                       CREM                        #
 #####################################################
 
-class GCPN_CReM(nn.Module):
+class ActorCriticGCPN(nn.Module):
     def __init__(self,
-                 input_dim,
+                 lr,
+                 betas,
+                 eps,
+                 eta,
+                 emb_model=None,
+                 input_dim=None,
+                 emb_dim=None,
+                 nb_edge_types=None,
+                 gnn_nb_layers=None,
+                 gnn_nb_hidden=None,
+                 mlp_nb_layers=None,
+                 mlp_nb_hidden=None):
+        super(ActorCriticGCPN, self).__init__()
+        if emb_model is not None:
+            input_dim, emb_dim, nb_edge_types, gnn_nb_layers, gnn_nb_hidden = get_surrogate_dims(emb_model)
+
+        # actor
+        self.actor = GCPN_Actor(lr,
+                                betas,
+                                eps,
+                                eta,
+                                emb_model,
+                                emb_dim,
+                                mlp_nb_layers,
+                                mlp_nb_hidden)
+        # critic
+        self.critic = GCPN_Critic(lr,
+                                  betas,
+                                  eps,
+                                  emb_dim,
+                                  mlp_nb_layers,
+                                  mlp_nb_hidden)
+
+    def forward(self):
+        raise NotImplementedError
+
+    def select_action(self, states, candidates, batch_idx):
+        return self.actor.select_action(states, candidates, batch_idx)
+
+
+class GCPN_Critic(nn.Module):
+    def __init__(self,
+                 lr,
+                 betas,
+                 eps,
                  emb_dim,
-                 nb_edge_types,
-                 gnn_nb_layers,
-                 gnn_nb_hidden,
+                 nb_layers,
+                 nb_hidden):
+        super(GCPN_Critic, self).__init__()
+        layers = [nn.Linear(emb_dim, nb_hidden)]
+        for _ in range(nb_layers-1):
+            layers.append(nn.Linear(nb_hidden, nb_hidden))
+
+        self.layers = nn.ModuleList(layers)
+        self.final_layer = nn.Linear(nb_hidden, 1)
+        self.act = nn.ReLU()
+
+        self.MseLoss = nn.MSELoss()
+
+        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas, eps=eps)
+
+    def forward(self, g_emb):
+        X = g_emb
+        for i, l in enumerate(self.layers):
+            X = self.act(l(X))
+        return self.final_layer(X).squeeze(1)
+
+    def get_value(self, g_emb):
+        with torch.autograd.no_grad():
+            values = self(g_emb)
+        return values.detach()
+
+    def update(self, g_emb, rewards):
+        values = self(g_emb)
+        loss = self.MseLoss(values, rewards)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        return loss.item()
+
+
+class GCPN_Actor(nn.Module):
+    def __init__(self,
+                 lr,
+                 betas,
+                 eps,
+                 eta,
+                 emb_model,
+                 emb_dim,
                  mlp_nb_layers,
                  mlp_nb_hidden):
-        super(GCPN_CReM, self).__init__()
+        super(GCPN_Actor, self).__init__()
+        self.eta = eta
+        self.emb_model = emb_model
 
         layers = [nn.Linear(2*emb_dim, mlp_nb_hidden)]
         for _ in range(mlp_nb_layers-1):
@@ -62,12 +164,14 @@ class GCPN_CReM(nn.Module):
         self.act = nn.ReLU()
         self.softmax = nn.Softmax(0)
 
-    def get_embedding(self, g, surrogate_model):
-        return surrogate_model.get_embedding(g).detach()
+    def get_embedding(self, g):
+        with torch.autograd.no_grad():
+            g_emb = self.emb_model.get_embedding(g)
+        return g_emb.detach()
 
-    def forward(self, g, g_candidates, surrogate_model, batch_idx):
-        g_emb = self.get_embedding(g, surrogate_model)
-        g_candidates_emb = self.get_embedding(g_candidates, surrogate_model)
+    def forward(self, g, g_candidates, batch_idx):
+        g_emb = self.get_embedding(g)
+        g_candidates_emb = self.get_embedding(g_candidates)
 
         X = torch.repeat_interleave(g_emb, torch.bincount(batch_idx), dim=0)
         X = torch.cat((X, g_candidates_emb), dim=1)
@@ -83,8 +187,8 @@ class GCPN_CReM(nn.Module):
         action_logprobs = torch.log(p)
         return g_emb, X_states, probs, action_logprobs, actions, shifted_actions
 
-    def select_action(self, g, g_candidates, surrogate_model, batch_idx):
-        g_emb, X_states, probs, action_logprobs, actions, shifted_actions = self(g, g_candidates, surrogate_model, batch_idx)
+    def select_action(self, g, g_candidates, batch_idx):
+        g_emb, X_states, probs, action_logprobs, actions, shifted_actions = self(g, g_candidates, batch_idx)
 
         g_emb = g_emb.detach().cpu()
         X_states = X_states.detach().cpu()
@@ -99,15 +203,39 @@ class GCPN_CReM(nn.Module):
         else:
             return g_emb, X_states, probs
 
-    def evaluate(self, candidates, actions):
-        emb = candidates.x
+    def evaluate(self, X_states, actions):
+        emb = X_states.x
         for i, l in enumerate(self.layers):
             emb = self.act(l(emb))
 
         logits = self.final_layer(emb).squeeze(1)
-        probs = batched_softmax(logits, candidates.batch)
+        probs = batched_softmax(logits, X_states.batch)
 
-        batch_shift = get_batch_shift(candidates.batch)
+        batch_shift = get_batch_shift(X_states.batch)
         shifted_actions = actions + batch_shift
         return probs[shifted_actions]
+
+    def update(self, X_states, actions, old_logprobs, state_values, rewards):
+        probs = self.actor.evaluate(X_states, actions)
+        logprobs = torch.log(probs)
+        entropies = probs * logprobs
+
+        # Finding the ratio (pi_theta / pi_theta_old):
+        ratios = torch.exp(logprobs - old_logprobs)
+        advantages = rewards - state_values
+
+        surr1 = ratios * advantages
+        surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
+        loss = -torch.min(surr1, surr2)
+        if torch.isnan(loss).any():
+            print("found nan in loss")
+            exit()
+
+        loss += self.eta * entropies
+
+        self.optimizer.zero_grad()
+        loss.mean().backward()
+        self.optimizer.step()
+
+        return loss.item()
 

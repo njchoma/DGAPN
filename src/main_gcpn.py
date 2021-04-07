@@ -30,17 +30,20 @@ def molecule_arg_parser():
     add_arg('--warm_start_dataset_path', default='')
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_model_path', default='')
-    add_arg('--surrogate_reward_timestep_delay', type=int, default=0)
+
+    add_arg('--surrogate_reward_episode_delay', type=int, default=0)
+    add_arg('--exploration_reward_episode_delay', type=int, default=1000)
+    add_arg('--adversarial_reward_episode_cutoff', type=int, default=100)
 
     # ENVIRONMENT PARAMETERS
-    #add_arg('--dataset', type=str, default='zinc',help='caveman; grid; ba; zinc; gdb')
+    #add_arg('--dataset', type=str, default='zinc', help='caveman; grid; ba; zinc; gdb')
     #add_arg('--logp_ratio', type=float, default=1)
     #add_arg('--qed_ratio', type=float, default=1)
     #add_arg('--sa_ratio', type=float, default=1)
     #add_arg('--reward_step_total', type=float, default=0.5)
     #add_arg('--normalize_adj', type=int, default=0)
-    #add_arg('--reward_type', type=str, default='qed',help='logppen;logp_target;qed;qedsa;qed_target;mw_target;gan')
-    #add_arg('--reward_target', type=float, default=0.5,help='target reward value')
+    #add_arg('--reward_type', type=str, default='qed', help='logppen;logp_target;qed;qedsa;qed_target;mw_target;gan')
+    #add_arg('--reward_target', type=float, default=0.5, help='target reward value')
     #add_arg('--has_feature', type=int, default=0)
     #add_arg('--is_conditional', type=int, default=0) # default 0
     #add_arg('--conditional', type=str, default='low') # default 0
@@ -50,15 +53,12 @@ def molecule_arg_parser():
     # NETWORK PARAMETERS
     #add_arg('--input_size', type=int, default=256)
     #add_arg('--emb_size', type=int, default=256) # default 64
+    add_arg('--output_size', type=int, default=8, help='output size of RND')
     #add_arg('--nb_edge_types', type=int, default=1)
-    #add_arg('--layer_num_g', type=int, default=4)
-    #add_arg('--num_hidden_g', type=int, default=512)
-    add_arg('--mlp_num_layer', type=int, default=3)
+    #add_arg('--gnn_nb_layers', type=int, default=4)
+    #add_arg('--gnn_nb_hidden', type=int, default=512)
+    add_arg('--mlp_num_layers', type=int, default=3)
     add_arg('--mlp_num_hidden', type=int, default=128)
-
-    # LOSS PARAMETERS
-    add_arg('--eta', type=float, default=0.01, help='relative weight for entropy loss')
-    add_arg('--upsilon', type=float, default=0.5, help='relative weight for baseline loss')
 
     return parser
 
@@ -73,16 +73,6 @@ def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_pat
     print("Surrogate model loaded")
     return surrogate_model
 
-def get_surrogate_dims(surrogate_model):
-    state_dict = surrogate_model.state_dict()
-    layers_name = [s for s in state_dict.keys() if re.compile('^layers\.[0-9]+\.weight$').match(s)]
-    input_dim = state_dict[layers_name[0]].size(0)
-    emb_dim = state_dict[layers_name[0]].size(-1)
-    nb_edge_types = 1
-    nb_hidden = state_dict[layers_name[-1]].size(-1)
-    nb_layer = len(layers_name)
-    return input_dim, emb_dim, nb_edge_types, nb_hidden, nb_layer
-
 def main():
     args = molecule_arg_parser().parse_args()
     #args.nb_procs = mp.cpu_count()
@@ -90,7 +80,7 @@ def main():
     surrogate_model = load_surrogate_model(args.artifact_path,
                                            args.surrogate_model_url,
                                            args.surrogate_model_path)
-    args.input_size, args.emb_size, args.nb_edge_types, args.num_hidden_g, args.layer_num_g = get_surrogate_dims(surrogate_model)
+    args.input_size, args.emb_size, args.nb_edge_types, args.gnn_nb_layers, args.gnn_nb_hidden = None, None, None, None, None
 
     env = CReM_Env(args.data_path, args.warm_start_dataset_path, mode='mol')
     #ob, _, _ = env.reset()
@@ -98,7 +88,7 @@ def main():
 
     print("====args====\n", args)
     print("{} episodes before surrogate model as final reward".format(
-                    args.surrogate_reward_timestep_delay))
+                    args.surrogate_reward_episode_delay))
 
     train_ppo(args, surrogate_model, env)
 

@@ -14,7 +14,8 @@ from torch.utils.tensorboard import SummaryWriter
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils import dense_to_sparse
 
-from .gcpn_policy import GCPN_CReM
+from .gcpn_policy import ActorCriticGCPN
+from .rnd_explore import RNDistillation
 
 from utils.general_utils import get_current_datetime
 from utils.graph_utils import mol_to_pyg_graph, get_batch_shift
@@ -48,111 +49,48 @@ class Memory:
 #                   GCPN PPO                    #
 #################################################
 
-class GCPN_Critic(nn.Module):
-    def __init__(self, emb_dim, nb_layers, nb_hidden):
-        super(GCPN_Critic, self).__init__()
-        layers = [nn.Linear(emb_dim, nb_hidden)]
-        for _ in range(nb_layers-1):
-            layers.append(nn.Linear(nb_hidden, nb_hidden))
-
-        self.layers = nn.ModuleList(layers)
-        self.final_layer = nn.Linear(nb_hidden, 1)
-        self.act = nn.ReLU()
-
-    def forward(self, X):
-        for i, l in enumerate(self.layers):
-            X = self.act(l(X))
-        return self.final_layer(X).squeeze(1)
-
-
-class ActorCriticGCPN(nn.Module):
-    def __init__(self,
-                 input_dim,
-                 emb_dim,
-                 nb_edge_types,
-                 gnn_nb_layers,
-                 gnn_nb_hidden,
-                 mlp_nb_layers,
-                 mlp_nb_hidden):
-        super(ActorCriticGCPN, self).__init__()
-
-        # action mean range -1 to 1
-        self.actor = GCPN_CReM(input_dim,
-                               emb_dim,
-                               nb_edge_types,
-                               gnn_nb_layers,
-                               gnn_nb_hidden,
-                               mlp_nb_layers,
-                               mlp_nb_hidden)
-        # critic
-        self.critic = GCPN_Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
-
-    def forward(self):
-        raise NotImplementedError
-
-    def select_action(self, states, candidates, surrogate_model, batch_idx):
-        return self.actor.select_action(states, candidates, surrogate_model, batch_idx)
-
-    def evaluate(self, states, candidates, actions):   
-        probs = self.actor.evaluate(candidates, actions)
-
-        action_logprobs = torch.log(probs)
-        state_value = self.critic(states)
-
-        entropy = probs * action_logprobs
-
-        return action_logprobs, state_value, entropy
-
-
-def wrap_state(ob):
-    adj = ob['adj']
-    nodes = ob['node'].squeeze()
-
-    adj = torch.Tensor(adj)
-    nodes = torch.Tensor(nodes)
-
-    adj = [dense_to_sparse(a) for a in adj]
-    data = Data(x=nodes, edge_index=adj[0][0], edge_attr=adj[0][1])
-    return data
-
-
 class PPO_GCPN(nn.Module):
     def __init__(self,
                  lr,
                  betas,
                  eps,
-                 gamma,
                  eta,
-                 upsilon,
+                 gamma,
                  K_epochs,
                  eps_clip,
-                 input_dim,
-                 emb_dim,
-                 nb_edge_types,
-                 gnn_nb_layers,
-                 gnn_nb_hidden,
-                 mlp_nb_layers,
-                 mlp_nb_hidden):
+                 emb_model=None,
+                 input_dim=None,
+                 emb_dim=None,
+                 output_dim=None,
+                 nb_edge_types=None,
+                 gnn_nb_layers=None,
+                 gnn_nb_hidden=None,
+                 mlp_nb_layers=None,
+                 mlp_nb_hidden=None):
         super(PPO_GCPN, self).__init__()
-        self.lr = lr
-        self.betas = betas
-        self.eps = eps
         self.gamma = gamma
-        self.eta = eta
-        self.upsilon = upsilon
-        self.eps_clip = eps_clip
         self.K_epochs = K_epochs
-        
-        self.policy = ActorCriticGCPN(input_dim,
+        self.eps_clip = eps_clip
+
+        self.policy = ActorCriticGCPN(lr[0],
+                                      betas,
+                                      eps,
+                                      eta,
+                                      emb_model,
+                                      input_dim,
                                       emb_dim,
                                       nb_edge_types,
                                       gnn_nb_layers,
                                       gnn_nb_hidden,
                                       mlp_nb_layers,
                                       mlp_nb_hidden)
-        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas, eps=eps)
-        
-        self.policy_old = ActorCriticGCPN(input_dim,
+
+        self.policy_old = ActorCriticGCPN(lr[0],
+                                          betas,
+                                          eps,
+                                          eta,
+                                          emb_model,
+                                          input_dim,
                                           emb_dim,
                                           nb_edge_types,
                                           gnn_nb_layers,
@@ -160,14 +98,21 @@ class PPO_GCPN(nn.Module):
                                           mlp_nb_layers,
                                           mlp_nb_hidden)
         self.policy_old.load_state_dict(self.policy.state_dict())
-        
-        self.MseLoss = nn.MSELoss()
+
+        self.explore_critic = RNDistillation(lr[1],
+                                             betas,
+                                             eps,
+                                             emb_dim,
+                                             output_dim,
+                                             mlp_nb_layers,
+                                             mlp_nb_hidden)
 
         self.device = torch.device("cpu")
 
     def to_device(self, device):
         self.policy.to(device)
         self.policy_old.to(device)
+        self.explore_critic.to(device)
         self.device = device
 
     def forward(self):
@@ -210,41 +155,27 @@ class PPO_GCPN(nn.Module):
         old_actions = torch.tensor(memory.actions).to(self.device)
         old_logprobs = torch.tensor(memory.logprobs).to(self.device)
 
+        old_values = self.policy_old.critic.get_value(old_states)
+
         # Optimize policy for K epochs:
         print("Optimizing...")
 
         for i in range(self.K_epochs):
-            # Evaluating old actions and values :
-            logprobs, state_values, entropies = self.policy.evaluate(old_states,
-                                                                     old_candidates,
-                                                                     old_actions)
+            # Update actor
+            loss = self.policy.actor.update(old_states, old_actions, old_logprobs, old_values, rewards)
+            # Update critic
+            baseline_loss = self.policy.critic.update(old_states, rewards)
 
-            # Finding the ratio (pi_theta / pi_theta__old):
-            ratios = torch.exp(logprobs - old_logprobs)
-            advantages = rewards - state_values.detach()
-
-            # loss
-            ## policy
-            surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2)
-            if torch.isnan(loss).any():
-                print("found nan in loss")
-                exit()
-            ## entropy
-            loss += self.eta * entropies
-            ## baseline
-            loss = loss.mean() + self.upsilon*self.MseLoss(state_values, rewards)
-
-            ## take gradient step
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
             if (i%10)==0:
-                print("  {:3d}: Loss: {:7.3f}".format(i, loss))
+                print("  {:3d}: Actor Loss: {:7.3f}".format(i, loss))
+                print("  {:3d}: Critic Loss: {:7.3f}".format(i, baseline_loss))
+        # update RND
+        rnd_loss = self.explore_critic.update(old_states)
+        print("  RND Loss: {:7.3f}".format(rnd_loss))
 
         # save running model
         torch.save(self.policy.state_dict(), os.path.join(save_dir, 'running_gcpn.pth'))
+        torch.save(self.explore_critic.state_dict(), os.path.join(save_dir, 'running_rnd.pth'))
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
 
@@ -253,21 +184,30 @@ class PPO_GCPN(nn.Module):
 
 
 #####################################################
-#                   FINAL REWARDS                   #
+#                      REWARDS                      #
 #####################################################
 
-def get_reward(states, surrogate_model, device, done_idx=None):
+def get_surr_reward(states, surrogate_model, device):
     if not isinstance(states, list):
         states = [states]
-    if done_idx is None:
-        done_idx = range(len(states))
 
     states = [mol_to_pyg_graph(state)[0] for state in states]
     g = Batch().from_data_list(states).to(device)
+
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
     return (-pred_docking_score).tolist()
 
+def get_expl_reward(states, emb_model, explore_critic, device):
+    if not isinstance(states, list):
+        states = [states]
+    
+    states = [mol_to_pyg_graph(state)[0] for state in states]
+    g = Batch().from_data_list(states).to(device)
+
+    X = emb_model.get_embedding(g)
+    scores = explore_critic.get_score(X)
+    return scores.tolist()
 
 #####################################################
 #                   TRAINING LOOP                   #
@@ -347,6 +287,7 @@ class Result(object):
 #############################################
 
 def train_ppo(args, surrogate_model, env):
+
     ############## Hyperparameters ##############
     render = True
     solved_reward = 100         # stop training if avg_reward > solved_reward
@@ -360,8 +301,11 @@ def train_ppo(args, surrogate_model, env):
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
     gamma = 0.99                # discount factor
+    eta = 0.01                  # relative weight for entropy loss
 
-    lr = 0.0001                 # parameters for Adam optimizer
+    upsilon = 0.1               # relative weight for exploration reward
+
+    lr = (0.0001, 0.001)        # parameters for Adam optimizer
     betas = (0.9, 0.999)
     eps = 0.01
     print("lr:", lr, "beta:", betas, "eps:", eps)
@@ -382,27 +326,28 @@ def train_ppo(args, surrogate_model, env):
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
 
-    ppo = PPO_GCPN(lr,
-                   betas,
-                   eps,
-                   gamma,
-                   args.eta,
-                   args.upsilon,
-                   K_epochs,
-                   eps_clip,
-                   args.input_size,
-                   args.emb_size,
-                   args.nb_edge_types,
-                   args.layer_num_g,
-                   args.num_hidden_g,
-                   args.mlp_num_layer,
-                   args.mlp_num_hidden)
-    ppo.to_device(device)
-    print(ppo)
-
     surrogate_model.to(device)
     surrogate_model.eval()
     print(surrogate_model)
+
+    ppo = PPO_GCPN(lr,
+                   betas,
+                   eps,
+                   eta,
+                   gamma,
+                   K_epochs,
+                   eps_clip,
+                   surrogate_model,
+                   args.input_size,
+                   args.emb_size,
+                   args.output_size,
+                   args.nb_edge_types,
+                   args.gnn_nb_layers,
+                   args.gnn_nb_hidden,
+                   args.mlp_num_layers,
+                   args.mlp_num_hidden)
+    ppo.to_device(device)
+    print(ppo)
 
     sample_count = 0
     episode_count = 0
@@ -442,7 +387,7 @@ def train_ppo(args, surrogate_model, env):
                 state_embs, action_logprobs, actions, shifted_actions = ppo.select_action(
                     [mol_to_pyg_graph(mols[idx])[0] for idx in notdone_idx], 
                     [mol_to_pyg_graph(cand)[0] for cand in candidates], 
-                    surrogate_model, batch_idx, return_shifted=True)
+                    batch_idx, return_shifted=True)
             else:
                 if sample_count >= update_timesteps:
                     break
@@ -475,11 +420,11 @@ def train_ppo(args, surrogate_model, env):
                     candidates.extend(cands)
                     batch_idx.extend([index]*len(cands))
             batch_idx = torch.LongTensor(batch_idx)
-            # get rewards (for done)
+            # get final rewards (for previously not done but now done)
             nowdone_idx = [idx for idx in notdone_idx if idx in new_done_idx]
             stillnotdone_idx = [idx for idx in notdone_idx if idx in new_notdone_idx]
             if len(nowdone_idx) > 0:
-                surr_rewards = get_reward(
+                surr_rewards = get_surr_reward(
                     [mols[idx] for idx in nowdone_idx],
                     surrogate_model, device)
 
@@ -500,6 +445,18 @@ def train_ppo(args, surrogate_model, env):
 
                 memories[idx].rewards.append(0)
                 memories[idx].is_terminals.append(False)
+            # get exploration rewards
+            if len(notdone_idx) > 0:
+                expl_rewards = get_expl_reward(
+                    [mols[idx] for idx in notdone_idx],
+                    surrogate_model, ppo.explore_critic, device)
+                expl_rewards = upsilon * expl_rewards
+
+            for i, idx in enumerate(notdone_idx):
+                running_reward += expl_rewards[i]
+
+                memories[idx].rewards[-1] += expl_rewards[i]
+
 
             sample_count += len(notdone_idx)
             done_idx = new_done_idx

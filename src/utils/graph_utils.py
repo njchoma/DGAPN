@@ -159,6 +159,17 @@ def state_to_pyg(atoms, bonds):
         raise TypeError("Mol is None.")
     return mol_to_pyg_graph(mol)
 
+def wrap_state(ob):
+    adj = ob['adj']
+    nodes = ob['node'].squeeze()
+
+    adj = torch.Tensor(adj)
+    nodes = torch.Tensor(nodes)
+
+    adj = [dense_to_sparse(a) for a in adj]
+    data = Data(x=nodes, edge_index=adj[0][0], edge_attr=adj[0][1])
+    return data
+
 def get_batch_shift(pyg_batch):
     unique = torch.flip(torch.unique(pyg_batch.cpu(), sorted=False).to(pyg_batch.device), dims=(0,)) # temp fix due to torch.unique bug
     batch_num_nodes = torch.bincount(pyg_batch)
