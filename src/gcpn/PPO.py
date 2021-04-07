@@ -17,11 +17,9 @@ from torch_geometric.utils import dense_to_sparse
 from .gcpn_policy import GCPN_CReM
 
 from utils.general_utils import get_current_datetime
-from utils.graph_utils import state_to_pyg
+from utils.graph_utils import mol_to_pyg_graph, get_batch_shift
 
 from gnn_surrogate.model import GNN_MyGAT
-
-from datetime import datetime
 
 class Memory:
     def __init__(self):
@@ -44,19 +42,6 @@ class Memory:
         del self.logprobs[:]
         del self.rewards[:]
         del self.is_terminals[:]
-
-class Log:
-    def __init__(self):
-        self.ep_surrogates = []
-        self.ep_rewards = []
-
-    def extend(self, log):
-        self.ep_surrogates.extend(log.ep_surrogates)
-        self.ep_rewards.extend(log.ep_rewards)
-
-    def clear(self):
-        del self.ep_surrogates[:]
-        del self.ep_rewards[:]
 
 
 #################################################
@@ -105,19 +90,8 @@ class ActorCriticGCPN(nn.Module):
     def forward(self):
         raise NotImplementedError
 
-    def act(self, state, candidates, memory, surrogate_model):
-        state = Batch.from_data_list([state])
-        with torch.autograd.no_grad():
-            state, new_states, action, prob = self.actor(state, candidates, surrogate_model)
-
-        action_logprob = torch.log(prob).item()
-        state = [state.cpu(), Data(x=new_states.cpu())]
-
-        memory.states.append(state)
-        memory.actions.append(action)
-        memory.logprobs.append(action_logprob)
-
-        return action
+    def select_action(self, states, candidates, surrogate_model, batch_idx):
+        return self.actor.select_action(states, candidates, surrogate_model, batch_idx)
 
     def evaluate(self, states, candidates, actions):   
         probs = self.actor.evaluate(candidates, actions)
@@ -196,11 +170,25 @@ class PPO_GCPN(nn.Module):
         self.policy_old.to(device)
         self.device = device
 
-    def select_action(self, state, candidates, memory, surrogate_model):
-        g = state.to(self.device)
-        g_candidates = candidates.to(self.device)
-        action = self.policy_old.act(g, g_candidates, memory, surrogate_model)
-        return action
+    def forward(self):
+        raise NotImplementedError
+
+    def select_action(self, states, candidates, surrogate_model, batch_idx=None, return_shifted=False):
+        if not isinstance(states, list):
+            states = [states]
+        if batch_idx is None:
+            batch_idx = torch.empty(len(candidates), dtype=torch.long).fill_(0)
+        batch_idx = batch_idx.to(self.device)
+
+        g = Batch.from_data_list(states).to(self.device)
+        g_candidates = Batch.from_data_list(candidates).to(self.device)
+        with torch.autograd.no_grad():
+            g_emb, X_states, action_logprobs, actions, shifted_actions = self.policy_old.select_action(g, g_candidates, surrogate_model, batch_idx)
+
+        if return_shifted:
+            return [g_emb, X_states], action_logprobs, actions, shifted_actions
+        else:
+            return [g_emb, X_states], action_logprobs, actions
 
     def update(self, memory, save_dir):
         # Monte Carlo estimate of rewards:
@@ -218,7 +206,7 @@ class PPO_GCPN(nn.Module):
 
         # convert list to tensor
         old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(self.device)
-        old_candidates = Batch().from_data_list([m[1] for m in memory.states]).to(self.device)
+        old_candidates = Batch().from_data_list([Data(x=m[1]) for m in memory.states]).to(self.device)
         old_actions = torch.tensor(memory.actions).to(self.device)
         old_logprobs = torch.tensor(memory.logprobs).to(self.device)
 
@@ -233,29 +221,18 @@ class PPO_GCPN(nn.Module):
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs)
+            advantages = rewards - state_values.detach()
 
             # loss
-            advantages = rewards - state_values.detach()   
-            loss = []
-
-            ratios = ratios.unsqueeze(1)
-            for j in range(ratios.shape[1]):
-                r = ratios[:,j]
-                surr1 = r * advantages
-                surr2 = torch.clamp(r, 1-self.eps_clip, 1+self.eps_clip) * advantages
-                l = -torch.min(surr1, surr2)
-
-                if torch.isnan(l).any():
-                    print("found nan in loss")
-                    print(l)
-                    print(torch.isnan(surr1).any())
-                    print(torch.isnan(surr2).any())
-                    print(torch.isnan(advantages).any())
-                    exit()
-                loss.append(l)
-            loss = torch.stack(loss, 0).sum(0)
+            ## policy
+            surr1 = ratios * advantages
+            surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
+            loss = -torch.min(surr1, surr2)
+            if torch.isnan(loss).any():
+                print("found nan in loss")
+                exit()
             ## entropy
-            loss += self.eta*entropies
+            loss += self.eta * entropies
             ## baseline
             loss = loss.mean() + self.upsilon*self.MseLoss(state_values, rewards)
 
@@ -279,114 +256,97 @@ class PPO_GCPN(nn.Module):
 #                   FINAL REWARDS                   #
 #####################################################
 
-def get_reward(state, surrogate_model):
-    device = next(surrogate_model.parameters()).device
+def get_reward(states, surrogate_model, device, done_idx=None):
+    if not isinstance(states, list):
+        states = [states]
+    if done_idx is None:
+        done_idx = range(len(states))
 
-    g = Batch().from_data_list([state])
-    g = g.to(device)
+    states = [mol_to_pyg_graph(state)[0] for state in states]
+    g = Batch().from_data_list(states).to(device)
     with torch.autograd.no_grad():
         pred_docking_score = surrogate_model(g, None)
-    reward = pred_docking_score.item() * -1
-    return reward
+    return (-pred_docking_score).tolist()
 
 
 #####################################################
 #                   TRAINING LOOP                   #
 #####################################################
 
-class Sampler(mp.Process):
-    def __init__(self, ppo, surrogate, env, 
-                lock, task_queue, result_queue, episode_count, sample_count, running_reward, avg_length, 
-                max_episodes, max_timesteps, update_timesteps):
-        super(Sampler, self).__init__()
+################## Process ##################
+tasks = mp.JoinableQueue()
+results = mp.Queue()
+
+# logging variables
+running_reward = mp.Value("f", 0)
+avg_length = mp.Value("i", 0)
+
+class Worker(mp.Process):
+    def __init__(self, env, task_queue, result_queue, max_timesteps):
+        super(Worker, self).__init__()
         self.task_queue = task_queue
         self.result_queue = result_queue
-        self.lock = lock
-        self.episode_count = episode_count
-        self.sample_count = sample_count
-        self.running_reward = running_reward
-        self.avg_length = avg_length
-
-        self.max_episodes = max_episodes
-        self.max_timesteps = max_timesteps
-        self.update_timesteps = update_timesteps
 
         self.env = env
-        self.ppo = ppo
-        self.surrogate = surrogate
 
-        self.memory = Memory()
-        self.log = Log()
+        self.max_timesteps = max_timesteps
+        self.timestep_counter = 0
+
+        np.random.seed(self.pid)
 
     def run(self):
         proc_name = self.name
         while True:
             next_task = self.task_queue.get()
-            signal = next_task()
-            if signal is None:
+            if next_task == None:
                 # Poison pill means shutdown
                 print('%s: Exiting' % proc_name)
                 self.task_queue.task_done()
                 break
 
-            self.memory.clear()
-            self.log.clear()
+            index, mol, done = next_task
+            if index is None:
+                self.result_queue.put((None, None, None, True))
+                self.task_queue.task_done()
+                continue
+            #print('%s: Working' % proc_name)
+            if done:
+                self.timestep_counter = 0
+                mol, candidates, done = self.env.reset()
+            else:
+                self.timestep_counter += 1
+                mol, candidates, done = self.env.reset(mol)
+                if self.timestep_counter >= self.max_timesteps:
+                    done = True
 
-            print('%s: Sampling' % proc_name)
-            state, candidates, done = self.env.reset()
-
-            while self.sample_count.value < self.update_timesteps and self.episode_count.value < self.max_episodes:
-                n_step = 0
-                for t in range(self.max_timesteps):
-                    n_step += 1
-                    # Running policy_old:
-                    action = self.ppo.select_action(state, candidates, self.memory, self.surrogate)
-                    state, candidates, done = self.env.step(action)
-
-                    reward = 0
-                    if (t==(self.max_timesteps-1)) or done:
-                        surr_reward = get_reward(state, self.surrogate)
-                        reward = surr_reward
-
-                    # Saving reward and is_terminals:
-                    self.memory.rewards.append(reward)
-                    self.memory.is_terminals.append(done)
-
-                    if done:
-                        break
-
-                with self.lock:
-                    self.sample_count.value += n_step
-                    self.episode_count.value += 1
-
-                    self.running_reward.value += sum(self.memory.rewards)
-                    self.avg_length.value += t
-
-                self.log.ep_surrogates.append(-1*surr_reward)
-                self.log.ep_rewards.append(reward)
-
-            self.result_queue.put(Result(self.memory, self.log))
+            self.result_queue.put((index, mol, candidates, done))
             self.task_queue.task_done()
         return
-
+'''
 class Task(object):
-    def __init__(self, signal=None):
-        self.signal = signal
+    def __init__(self, index, action, done):
+        self.index = index
+        self.action = action
+        self.done = done
     def __call__(self):
-        return self.signal
-    #def __str__(self):
-    #    return '%s * %s' % (self.a, self.b)
+        return (self.action, self.done)
+    def __str__(self):
+        return '%d' % self.index
 
 class Result(object):
-    def __init__(self, memory, log):
-        self.memory = memory
-        self.log = log
+    def __init__(self, index, state, candidates, done):
+        self.index = index
+        self.state = state
+        self.candidates = candidates
+        self.done = done
     def __call__(self):
-        return (self.memory, self.log)
-    #def __str__(self):
-    #    return '%s * %s' % (self.a, self.b)
+        return (self.state, self.candidates, self.done)
+    def __str__(self):
+        return '%d' % self.index
+'''
+#############################################
 
-def train_ppo(args, ppo, surrogate_model, env, manager):
+def train_ppo(args, surrogate_model, env):
     ############## Hyperparameters ##############
     render = True
     solved_reward = 100         # stop training if avg_reward > solved_reward
@@ -395,29 +355,22 @@ def train_ppo(args, ppo, surrogate_model, env, manager):
 
     max_episodes = 50000        # max training episodes
     max_timesteps = 6           # max timesteps in one episode
-    update_timesteps = 500       # update policy every n timesteps
+    update_timesteps = 500      # update policy every n timesteps
 
-    #############################################
+    K_epochs = 80               # update policy for K epochs
+    eps_clip = 0.2              # clip parameter for PPO
+    gamma = 0.99                # discount factor
 
-    ################## Process ##################
-    lock = manager.Lock()
-    tasks = manager.JoinableQueue()
-    results = manager.Queue()
+    lr = 0.0001                 # parameters for Adam optimizer
+    betas = (0.9, 0.999)
+    eps = 0.01
+    print("lr:", lr, "beta:", betas, "eps:", eps)
 
-    episode_count = manager.Value("i", 0)
-    sample_count = manager.Value("i", 0)
-
-    # logging variables
-    running_reward = manager.Value("f", 0)
-    avg_length = manager.Value("i", 0)
     #############################################
 
     print('Creating %d processes' % args.nb_procs)
-    samplers = [Sampler(ppo, surrogate_model, env, 
-                        lock, tasks, results, episode_count, sample_count, running_reward, avg_length, 
-                        max_episodes, max_timesteps, update_timesteps)
-                for i in range(args.nb_procs)]
-    for w in samplers:
+    workers = [Worker(env, tasks, results, max_timesteps) for i in range(args.nb_procs)]
+    for w in workers:
         w.start()
 
     # logging variables
@@ -426,47 +379,143 @@ def train_ppo(args, ppo, surrogate_model, env, manager):
     save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + '_' + dt)
     os.makedirs(save_dir, exist_ok=True)
 
+    device = torch.device("cpu") if args.use_cpu else torch.device(
+        'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
+
+    ppo = PPO_GCPN(lr,
+                   betas,
+                   eps,
+                   gamma,
+                   args.eta,
+                   args.upsilon,
+                   K_epochs,
+                   eps_clip,
+                   args.input_size,
+                   args.emb_size,
+                   args.nb_edge_types,
+                   args.layer_num_g,
+                   args.num_hidden_g,
+                   args.mlp_num_layer,
+                   args.mlp_num_hidden)
+    ppo.to_device(device)
+    print(ppo)
+
+    surrogate_model.to(device)
+    surrogate_model.eval()
+    print(surrogate_model)
+
+    sample_count = 0
+    episode_count = 0
     update_count = 0 # for adversarial
     save_counter = 0
     log_counter = 0
 
+    avg_length = 0
+    running_reward = 0
+
     memory = Memory()
-    log = Log()
+    memories = [Memory() for _ in range(args.nb_procs)]
     rewbuffer_env = deque(maxlen=100)
     # training loop
     i_episode = 0
     while i_episode < max_episodes:
         print("collecting rollouts")
-        #start=datetime.now()
-        # Enqueue jobs
         for i in range(args.nb_procs):
-            tasks.put(Task("sample"))
-        # Wait for all of the tasks to finish
+            tasks.put((i, None, True))
         tasks.join()
-        print("rollouts collected")
-        # Start unpacking results
+        # unpack results
+        mols = [None]*args.nb_procs
+        done_idx = []
+        notdone_idx, candidates, batch_idx = [], [], []
         for i in range(args.nb_procs):
-            result = results.get()
-            memory.extend(result.memory)
-            log.extend(result.log)
+            index, mol, cands, done = results.get()
 
-        i_episode += episode_count.value
+            mols[index] = mol
 
-        #print(datetime.now() - start)
-        # write to Tensorboard
-        for i in reversed(range(episode_count.value)):
-            rewbuffer_env.append(log.ep_rewards[i])
-            writer.add_scalar("EpSurrogate", log.ep_surrogates[i], i_episode - i)
-            writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode - i)
-        log.clear()
+            notdone_idx.append(index)
+            candidates.extend(cands)
+            batch_idx.extend([index]*len(cands))
+        batch_idx = torch.LongTensor(batch_idx)
+        while True:
+            # action selections (for not done)
+            if len(notdone_idx) > 0:
+                state_embs, action_logprobs, actions, shifted_actions = ppo.select_action(
+                    [mol_to_pyg_graph(mols[idx])[0] for idx in notdone_idx], 
+                    [mol_to_pyg_graph(cand)[0] for cand in candidates], 
+                    surrogate_model, batch_idx, return_shifted=True)
+            else:
+                if sample_count >= update_timesteps:
+                    break
+
+            for i, idx in enumerate(notdone_idx):
+                tasks.put((idx, candidates[shifted_actions[i]], False))
+
+                memories[idx].states.append([state_embs[0][[i], :], state_embs[1][batch_idx == idx, :]])
+                memories[idx].actions.append(actions[i])
+                memories[idx].logprobs.append(action_logprobs[i])
+            for idx in done_idx:
+                if sample_count >= update_timesteps:
+                    tasks.put((None, None, True))
+                else:
+                    tasks.put((idx, None, True))
+            tasks.join()
+            # unpack results
+            mols = [None]*args.nb_procs
+            new_done_idx = []
+            new_notdone_idx, candidates, batch_idx = [], [], []
+            for i in range(args.nb_procs):
+                index, mol, cands, done = results.get()
+
+                if index is not None:
+                    mols[index] = mol
+                if done:
+                    new_done_idx.append(index)
+                else:
+                    new_notdone_idx.append(index)
+                    candidates.extend(cands)
+                    batch_idx.extend([index]*len(cands))
+            batch_idx = torch.LongTensor(batch_idx)
+            # get rewards (for done)
+            nowdone_idx = [idx for idx in notdone_idx if idx in new_done_idx]
+            stillnotdone_idx = [idx for idx in notdone_idx if idx in new_notdone_idx]
+            if len(nowdone_idx) > 0:
+                surr_rewards = get_reward(
+                    [mols[idx] for idx in nowdone_idx],
+                    surrogate_model, device)
+
+            for i, idx in enumerate(nowdone_idx):
+                i_episode += 1
+                episode_count += 1
+                avg_length += 1
+                running_reward += surr_rewards[i]
+                writer.add_scalar("EpSurrogate", -1*surr_rewards[i], i_episode-1)
+                rewbuffer_env.append(surr_rewards[i])
+                writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode-1)
+
+                memories[idx].rewards.append(surr_rewards[i])
+                memories[idx].is_terminals.append(True)
+            for idx in stillnotdone_idx:
+                avg_length += 1
+                running_reward += 0
+
+                memories[idx].rewards.append(0)
+                memories[idx].is_terminals.append(False)
+
+            sample_count += len(notdone_idx)
+            done_idx = new_done_idx
+            notdone_idx = new_notdone_idx
+
+        for m in memories:
+            memory.extend(m)
+            m.clear()
         # update model
         print("\n\nupdating ppo @ episode %d..." % i_episode)
         ppo.update(memory, save_dir)
         memory.clear()
 
         update_count += 1
-        save_counter += episode_count.value
-        log_counter += episode_count.value
+        save_counter += episode_count
+        log_counter += episode_count
 
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > solved_reward:
@@ -479,21 +528,20 @@ def train_ppo(args, ppo, surrogate_model, env, manager):
             torch.save(ppo.policy.state_dict(), os.path.join(save_dir, '{:05d}_gcpn.pth'.format(i_episode)))
             save_counter -= save_interval
 
-        # logging
         if log_counter > log_interval:
-            avg_length.value = int(avg_length.value/log_counter)
-            running_reward.value = running_reward.value/log_counter
+            avg_length = int(avg_length/log_counter)
+            running_reward = running_reward/log_counter
             
-            print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length.value, running_reward.value))
-            running_reward.value = 0
-            avg_length.value = 0
-            log_counter = 0
+            print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
+            running_reward = 0
+            avg_length = 0
+            log_counter -= log_interval
 
-        episode_count.value = 0
-        sample_count.value = 0
+        episode_count = 0
+        sample_count = 0
 
     # Add a poison pill for each process
     for i in range(args.nb_procs):
-        tasks.put(Task())
+        tasks.put(None)
     tasks.join()
 

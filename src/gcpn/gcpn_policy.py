@@ -10,16 +10,21 @@ import torch_geometric as pyg
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
 
+from utils.graph_utils import get_batch_shift
 
 #####################################################
 #                   HELPER MODULES                  #
 #####################################################
 EPS = 1e-4
 
-def sample_from_probs(p, action=None):
+def batched_sample(probs, batch):
+    unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), dims=(0,)) # temp fix due to torch.unique bug
+    mask = batch.unsqueeze(0) == unique.unsqueeze(1)
+
+    p = probs * mask
     m = Categorical(p * (p > EPS))
-    a = m.sample() if action is None else action
-    return a.item(), p[a]
+    a = m.sample()
+    return a, probs[a]
 
 def batched_softmax(logits, batch):
     logit_max = pyg.nn.global_max_pool(logits, batch)
@@ -32,15 +37,6 @@ def batched_softmax(logits, batch):
     logit_sum = torch.index_select(logit_sum, 0, batch)
     probs = torch.div(logits, logit_sum)
     return probs
-
-def get_batch_shift(pyg_batch):
-    batch_num_nodes = torch.bincount(pyg_batch)
-
-    # shift batch
-    zero = torch.LongTensor([0]).to(batch_num_nodes.device)
-    offset = torch.cat((zero, torch.cumsum(batch_num_nodes, dim=0)[:-1]))
-
-    return offset
 
 #####################################################
 #                       CREM                        #
@@ -66,30 +62,42 @@ class GCPN_CReM(nn.Module):
         self.act = nn.ReLU()
         self.softmax = nn.Softmax(0)
 
-    def forward(self, g, g_candidates, surrogate_model):
+    def get_embedding(self, g, surrogate_model):
+        return surrogate_model.get_embedding(g).detach()
+
+    def forward(self, g, g_candidates, surrogate_model, batch_idx):
         g_emb = self.get_embedding(g, surrogate_model)
         g_candidates_emb = self.get_embedding(g_candidates, surrogate_model)
 
-        nb_candidates = g_candidates_emb.shape[0]
-        X = g_emb.repeat(nb_candidates, 1)
+        X = torch.repeat_interleave(g_emb, torch.bincount(batch_idx), dim=0)
         X = torch.cat((X, g_candidates_emb), dim=1)
         X_states = X
 
         for i, l in enumerate(self.layers):
             X = self.act(l(X))
         X = self.final_layer(X).squeeze(1)
-        probs = self.softmax(X)
+        probs = batched_softmax(X, batch_idx)
+
+        shifted_actions, p = batched_sample(probs, batch_idx)
+        actions = shifted_actions - get_batch_shift(batch_idx)
+        action_logprobs = torch.log(p)
+        return g_emb, X_states, probs, action_logprobs, actions, shifted_actions
+
+    def select_action(self, g, g_candidates, surrogate_model, batch_idx):
+        g_emb, X_states, probs, action_logprobs, actions, shifted_actions = self(g, g_candidates, surrogate_model, batch_idx)
+
+        g_emb = g_emb.detach().cpu()
+        X_states = X_states.detach().cpu()
+
+        probs = probs.squeeze_().tolist()
+        action_logprobs = action_logprobs.squeeze_().tolist()
+        actions = actions.squeeze_().tolist()
+        shifted_actions = shifted_actions.squeeze_().tolist()
 
         if self.training:
-            a, p = sample_from_probs(probs)
-            return g_emb, X_states, a, p
+            return g_emb, X_states, action_logprobs, actions, shifted_actions
         else:
             return g_emb, X_states, probs
-
-    def get_embedding(self, g, surrogate_model):
-        with torch.autograd.no_grad():
-            emb = surrogate_model.get_embedding(g)
-        return emb
 
     def evaluate(self, candidates, actions):
         emb = candidates.x
@@ -98,8 +106,8 @@ class GCPN_CReM(nn.Module):
 
         logits = self.final_layer(emb).squeeze(1)
         probs = batched_softmax(logits, candidates.batch)
-        
+
         batch_shift = get_batch_shift(candidates.batch)
-        shifted_actions = actions+batch_shift
+        shifted_actions = actions + batch_shift
         return probs[shifted_actions]
 
