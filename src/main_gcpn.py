@@ -6,7 +6,7 @@ import argparse
 import torch
 import torch.multiprocessing as mp
 
-from gcpn.PPO import train_ppo
+from gcpn.PPO import train_ppo, PPO_GCPN
 
 from utils.general_utils import maybe_download_file
 from gnn_surrogate import model
@@ -83,7 +83,10 @@ def get_surrogate_dims(surrogate_model):
     nb_layer = len(layers_name)
     return input_dim, emb_dim, nb_edge_types, nb_hidden, nb_layer
 
-def main():
+if __name__ == '__main__':
+    mp.set_start_method('spawn', force=True)
+    manager = mp.Manager()
+
     args = molecule_arg_parser().parse_args()
     #args.nb_procs = mp.cpu_count()
 
@@ -100,8 +103,42 @@ def main():
     print("{} episodes before surrogate model as final reward".format(
                     args.surrogate_reward_timestep_delay))
 
-    train_ppo(args, surrogate_model, env)
+    ############## Hyperparameters ##############
+    K_epochs = 80               # update policy for K epochs
+    eps_clip = 0.2              # clip parameter for PPO
+    gamma = 0.99                # discount factor
+    lr = 0.0001                 # parameters for Adam optimizer
+    betas = (0.9, 0.999)
+    eps = 0.01
+    print("lr:", lr, "beta:", betas, "eps:", eps)
 
-if __name__ == '__main__':
-    mp.set_start_method('fork', force=True)
-    main()
+    #############################################
+
+    device = torch.device("cpu") if args.use_cpu else torch.device(
+        'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
+
+    ppo= PPO_GCPN(lr,
+                betas,
+                eps,
+                gamma,
+                args.eta,
+                args.upsilon,
+                K_epochs,
+                eps_clip,
+                args.input_size,
+                args.emb_size,
+                args.nb_edge_types,
+                args.layer_num_g,
+                args.num_hidden_g,
+                args.mlp_num_layer,
+                args.mlp_num_hidden)
+    ppo.to_device(device)
+    ppo.share_memory()
+    print(ppo)
+
+    surrogate_model.eval()
+    surrogate_model.to(device)
+    surrogate_model.share_memory()
+    print(surrogate_model)
+
+    train_ppo(args, ppo, surrogate_model, env, manager)

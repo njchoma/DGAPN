@@ -11,12 +11,12 @@
             "program": "src/main_gcpn.py",
             "subProcess": true,
             "args": [
-                "--name", "crem_simplified_parallel", 
-                "--data_path", "src/dataset", 
+                "--name", "crem_serial",
+                "--data_path", "src/dataset",
                 "--artifact_path", "test_run/gcpn",
                 "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.sorted.4col.csv",
                 "--gpu", "0",
-                "--surrogate_model_path", "artifact/surrogate_model.pth"
+                "--surrogate_model_path", "artifact/best_model.pth"
             ],
             "console": "integratedTerminal"
         }
