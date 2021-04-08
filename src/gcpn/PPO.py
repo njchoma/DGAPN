@@ -46,10 +46,10 @@ class Memory:
 
 
 #################################################
-#                   GCPN PPO                    #
+#                    UPDATE                     #
 #################################################
 
-class PPO_GCPN(nn.Module):
+class DGCPN(nn.Module):
     def __init__(self,
                  lr,
                  betas,
@@ -67,7 +67,7 @@ class PPO_GCPN(nn.Module):
                  gnn_nb_hidden=None,
                  mlp_nb_layers=None,
                  mlp_nb_hidden=None):
-        super(PPO_GCPN, self).__init__()
+        super(DGCPN, self).__init__()
         self.gamma = gamma
         self.K_epochs = K_epochs
         self.eps_clip = eps_clip
@@ -155,17 +155,13 @@ class PPO_GCPN(nn.Module):
         old_actions = torch.tensor(memory.actions).to(self.device)
         old_logprobs = torch.tensor(memory.logprobs).to(self.device)
 
-        old_values = self.policy_old.critic.get_value(old_states)
+        old_values = self.policy_old.get_value(old_states)
 
         # Optimize policy for K epochs:
         print("Optimizing...")
 
         for i in range(self.K_epochs):
-            # Update actor
-            loss = self.policy.actor.update(old_states, old_actions, old_logprobs, old_values, rewards)
-            # Update critic
-            baseline_loss = self.policy.critic.update(old_states, rewards)
-
+            loss, baseline_loss = self.policy.update(old_states, old_actions, old_logprobs, old_values, rewards)
             if (i%10)==0:
                 print("  {:3d}: Actor Loss: {:7.3f}".format(i, loss))
                 print("  {:3d}: Critic Loss: {:7.3f}".format(i, baseline_loss))
@@ -303,8 +299,6 @@ def train_ppo(args, surrogate_model, env):
     gamma = 0.99                # discount factor
     eta = 0.01                  # relative weight for entropy loss
 
-    upsilon = 0.1               # relative weight for exploration reward
-
     lr = (0.0001, 0.001)        # parameters for Adam optimizer
     betas = (0.9, 0.999)
     eps = 0.01
@@ -330,22 +324,22 @@ def train_ppo(args, surrogate_model, env):
     surrogate_model.eval()
     print(surrogate_model)
 
-    ppo = PPO_GCPN(lr,
-                   betas,
-                   eps,
-                   eta,
-                   gamma,
-                   K_epochs,
-                   eps_clip,
-                   surrogate_model,
-                   args.input_size,
-                   args.emb_size,
-                   args.output_size,
-                   args.nb_edge_types,
-                   args.gnn_nb_layers,
-                   args.gnn_nb_hidden,
-                   args.mlp_num_layers,
-                   args.mlp_num_hidden)
+    ppo = DGCPN(lr,
+                betas,
+                eps,
+                eta,
+                gamma,
+                K_epochs,
+                eps_clip,
+                surrogate_model,
+                args.input_size,
+                args.emb_size,
+                args.output_size,
+                args.nb_edge_types,
+                args.gnn_nb_layers,
+                args.gnn_nb_hidden,
+                args.mlp_num_layers,
+                args.mlp_num_hidden)
     ppo.to_device(device)
     print(ppo)
 
@@ -450,7 +444,7 @@ def train_ppo(args, surrogate_model, env):
                 expl_rewards = get_expl_reward(
                     [mols[idx] for idx in notdone_idx],
                     surrogate_model, ppo.explore_critic, device)
-                expl_rewards = upsilon * expl_rewards
+                expl_rewards = args.iota * expl_rewards
 
             for i, idx in enumerate(notdone_idx):
                 running_reward += expl_rewards[i]

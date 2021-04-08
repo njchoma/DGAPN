@@ -1,3 +1,4 @@
+import re
 import time
 import numpy as np
 
@@ -32,7 +33,8 @@ def get_surrogate_dims(surrogate_model):
 EPS = 1e-4
 
 def batched_sample(probs, batch):
-    unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), dims=(0,)) # temp fix due to torch.unique bug
+    unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), 
+                        dims=(0,)) # temp fix due to torch.unique bug
     mask = batch.unsqueeze(0) == unique.unsqueeze(1)
 
     p = probs * mask
@@ -53,7 +55,7 @@ def batched_softmax(logits, batch):
     return probs
 
 #####################################################
-#                       CREM                        #
+#                       GCPN                        #
 #####################################################
 
 class ActorCriticGCPN(nn.Module):
@@ -75,21 +77,17 @@ class ActorCriticGCPN(nn.Module):
             input_dim, emb_dim, nb_edge_types, gnn_nb_layers, gnn_nb_hidden = get_surrogate_dims(emb_model)
 
         # actor
-        self.actor = GCPN_Actor(lr,
-                                betas,
-                                eps,
-                                eta,
+        self.actor = GCPN_Actor(eta,
                                 emb_model,
                                 emb_dim,
                                 mlp_nb_layers,
                                 mlp_nb_hidden)
+        self.optimizer_actor = torch.optim.Adam(self.actor.parameters(), lr=lr, betas=betas, eps=eps)
         # critic
-        self.critic = GCPN_Critic(lr,
-                                  betas,
-                                  eps,
-                                  emb_dim,
+        self.critic = GCPN_Critic(emb_dim,
                                   mlp_nb_layers,
                                   mlp_nb_hidden)
+        self.optimizer_critic = torch.optim.Adam(self.critic.parameters(), lr=lr, betas=betas, eps=eps)
 
     def forward(self):
         raise NotImplementedError
@@ -97,12 +95,29 @@ class ActorCriticGCPN(nn.Module):
     def select_action(self, states, candidates, batch_idx):
         return self.actor.select_action(states, candidates, batch_idx)
 
+    def get_value(self, g_emb):
+        return self.critic.get_value(g_emb)
+
+    def update(self, old_states, old_actions, old_logprobs, old_values, rewards):
+        # Update actor
+        loss = self.actor.loss(old_states, old_actions, old_logprobs, old_values, rewards)
+
+        self.optimizer_actor.zero_grad()
+        loss.backward()
+        self.optimizer_actor.step()
+
+        # Update critic
+        baseline_loss = self.critic.loss(old_states, rewards)
+
+        self.optimizer_critic.zero_grad()
+        baseline_loss.backward()
+        self.optimizer_critic.step()
+
+        return loss.item(), baseline_loss.item()
+
 
 class GCPN_Critic(nn.Module):
     def __init__(self,
-                 lr,
-                 betas,
-                 eps,
                  emb_dim,
                  nb_layers,
                  nb_hidden):
@@ -117,8 +132,6 @@ class GCPN_Critic(nn.Module):
 
         self.MseLoss = nn.MSELoss()
 
-        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas, eps=eps)
-
     def forward(self, g_emb):
         X = g_emb
         for i, l in enumerate(self.layers):
@@ -130,22 +143,15 @@ class GCPN_Critic(nn.Module):
             values = self(g_emb)
         return values.detach()
 
-    def update(self, g_emb, rewards):
+    def loss(self, g_emb, rewards):
         values = self(g_emb)
         loss = self.MseLoss(values, rewards)
 
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-
-        return loss.item()
+        return loss
 
 
 class GCPN_Actor(nn.Module):
     def __init__(self,
-                 lr,
-                 betas,
-                 eps,
                  eta,
                  emb_model,
                  emb_dim,
@@ -215,8 +221,8 @@ class GCPN_Actor(nn.Module):
         shifted_actions = actions + batch_shift
         return probs[shifted_actions]
 
-    def update(self, X_states, actions, old_logprobs, state_values, rewards):
-        probs = self.actor.evaluate(X_states, actions)
+    def loss(self, X_states, actions, old_logprobs, state_values, rewards):
+        probs = self.evaluate(X_states, actions)
         logprobs = torch.log(probs)
         entropies = probs * logprobs
 
@@ -233,9 +239,5 @@ class GCPN_Actor(nn.Module):
 
         loss += self.eta * entropies
 
-        self.optimizer.zero_grad()
-        loss.mean().backward()
-        self.optimizer.step()
-
-        return loss.item()
+        return loss.mean()
 
