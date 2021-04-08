@@ -318,7 +318,7 @@ def train_ppo(args, surrogate_model, env):
 
     max_episodes = 50000        # max training episodes
     max_timesteps = 6           # max timesteps in one episode
-    update_timesteps = 30       # update policy every n timesteps
+    update_timesteps = 500      # update policy every n timesteps
 
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO

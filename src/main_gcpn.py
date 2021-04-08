@@ -61,7 +61,7 @@ def molecule_arg_parser():
     add_arg('--acp_num_layers', type=int, default=4)
     add_arg('--acp_num_hidden', type=int, default=128, help='hidden size of Actor-Critic Policy')
     add_arg('--rnd_num_layers', type=int, default=2)
-    add_arg('--rnd_num_hidden', type=int, default=256, help='output size of Random Network Distillation')
+    add_arg('--rnd_num_hidden', type=int, default=256, help='hidden size of Random Network Distillation')
 
     return parser
 
