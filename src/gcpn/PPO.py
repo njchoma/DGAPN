@@ -468,15 +468,16 @@ def train_ppo(args, surrogate_model, env):
                 memories[idx].rewards.append(0)
                 memories[idx].is_terminals.append(False)
             # get exploration rewards
-            if len(notdone_idx) > 0:
-                expl_rewards = get_expl_reward(
-                    [mols[idx] for idx in notdone_idx],
-                    surrogate_model, ppo.explore_critic, device)
+            if args.iota > 0 and i_episode > args.innovation_reward_episode_delay:
+                if len(notdone_idx) > 0:
+                    expl_rewards = get_expl_reward(
+                        [mols[idx] for idx in notdone_idx],
+                        surrogate_model, ppo.explore_critic, device)
 
-            for i, idx in enumerate(notdone_idx):
-                running_reward += args.iota * expl_rewards[i]
+                for i, idx in enumerate(notdone_idx):
+                    running_reward += args.iota * expl_rewards[i]
 
-                memories[idx].rewards[-1] += args.iota * expl_rewards[i]
+                    memories[idx].rewards[-1] += args.iota * expl_rewards[i]
 
 
             sample_count += len(notdone_idx)
