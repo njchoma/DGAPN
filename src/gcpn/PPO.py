@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import gym
 import copy
@@ -21,6 +22,10 @@ from utils.general_utils import get_current_datetime
 from utils.graph_utils import mol_to_pyg_graph, get_batch_shift
 
 from gnn_surrogate.model import GNN_MyGAT
+
+#####################################################
+#                   HELPER MODULES                  #
+#####################################################
 
 class Memory:
     def __init__(self):
@@ -45,6 +50,16 @@ class Memory:
         del self.is_terminals[:]
 
 
+def get_surrogate_dims(surrogate_model):
+    state_dict = surrogate_model.state_dict()
+    layers_name = [s for s in state_dict.keys() if re.compile('^layers\.[0-9]+\.weight$').match(s)]
+    input_dim = state_dict[layers_name[0]].size(0)
+    emb_dim = state_dict[layers_name[0]].size(-1)
+    nb_edge_types = 1
+    nb_layer = len(layers_name)
+    nb_hidden = state_dict[layers_name[-1]].size(-1)
+    return input_dim, emb_dim, nb_edge_types, nb_layer, nb_hidden
+
 #################################################
 #                    UPDATE                     #
 #################################################
@@ -65,12 +80,17 @@ class DGCPN(nn.Module):
                  nb_edge_types=None,
                  gnn_nb_layers=None,
                  gnn_nb_hidden=None,
-                 mlp_nb_layers=None,
-                 mlp_nb_hidden=None):
+                 acp_nb_layers=None,
+                 acp_nb_hidden=None,
+                 rnd_nb_layers=None,
+                 rnd_nb_hidden=None):
         super(DGCPN, self).__init__()
         self.gamma = gamma
         self.K_epochs = K_epochs
         self.eps_clip = eps_clip
+
+        if emb_model is not None:
+            input_dim, emb_dim, nb_edge_types, gnn_nb_layers, gnn_nb_hidden = get_surrogate_dims(emb_model)
 
         self.policy = ActorCriticGCPN(lr[0],
                                       betas,
@@ -82,8 +102,8 @@ class DGCPN(nn.Module):
                                       nb_edge_types,
                                       gnn_nb_layers,
                                       gnn_nb_hidden,
-                                      mlp_nb_layers,
-                                      mlp_nb_hidden)
+                                      acp_nb_layers,
+                                      acp_nb_hidden)
 
         self.policy_old = ActorCriticGCPN(lr[0],
                                           betas,
@@ -95,17 +115,21 @@ class DGCPN(nn.Module):
                                           nb_edge_types,
                                           gnn_nb_layers,
                                           gnn_nb_hidden,
-                                          mlp_nb_layers,
-                                          mlp_nb_hidden)
+                                          acp_nb_layers,
+                                          acp_nb_hidden)
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.explore_critic = RNDistillation(lr[1],
                                              betas,
                                              eps,
+                                             input_dim,
                                              emb_dim,
                                              output_dim,
-                                             mlp_nb_layers,
-                                             mlp_nb_hidden)
+                                             nb_edge_types,
+                                             gnn_nb_layers,
+                                             gnn_nb_hidden,
+                                             rnd_nb_layers,
+                                             rnd_nb_hidden)
 
         self.device = torch.device("cpu")
 
@@ -118,7 +142,7 @@ class DGCPN(nn.Module):
     def forward(self):
         raise NotImplementedError
 
-    def select_action(self, states, candidates, surrogate_model, batch_idx=None, return_shifted=False):
+    def select_action(self, states, candidates, batch_idx=None, return_shifted=False):
         if not isinstance(states, list):
             states = [states]
         if batch_idx is None:
@@ -128,12 +152,13 @@ class DGCPN(nn.Module):
         g = Batch.from_data_list(states).to(self.device)
         g_candidates = Batch.from_data_list(candidates).to(self.device)
         with torch.autograd.no_grad():
-            g_emb, X_states, action_logprobs, actions, shifted_actions = self.policy_old.select_action(g, g_candidates, surrogate_model, batch_idx)
+            g_emb, g_next_emb, X_states, action_logprobs, actions, shifted_actions = self.policy_old.select_action(
+                g, g_candidates, batch_idx)
 
         if return_shifted:
-            return [g_emb, X_states], action_logprobs, actions, shifted_actions
+            return [g_emb, g_next_emb, X_states], action_logprobs, actions, shifted_actions
         else:
-            return [g_emb, X_states], action_logprobs, actions
+            return [g_emb, g_next_emb, X_states], action_logprobs, actions
 
     def update(self, memory, save_dir):
         # Monte Carlo estimate of rewards:
@@ -151,7 +176,8 @@ class DGCPN(nn.Module):
 
         # convert list to tensor
         old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(self.device)
-        old_candidates = Batch().from_data_list([Data(x=m[1]) for m in memory.states]).to(self.device)
+        old_next_states = torch.cat(([m[1] for m in memory.states]),dim=0).to(self.device)
+        old_candidates = Batch().from_data_list([Data(x=m[2]) for m in memory.states]).to(self.device)
         old_actions = torch.tensor(memory.actions).to(self.device)
         old_logprobs = torch.tensor(memory.logprobs).to(self.device)
 
@@ -161,12 +187,12 @@ class DGCPN(nn.Module):
         print("Optimizing...")
 
         for i in range(self.K_epochs):
-            loss, baseline_loss = self.policy.update(old_states, old_actions, old_logprobs, old_values, rewards)
+            loss, baseline_loss = self.policy.update(old_states, old_candidates, old_actions, old_logprobs, old_values, rewards)
             if (i%10)==0:
                 print("  {:3d}: Actor Loss: {:7.3f}".format(i, loss))
                 print("  {:3d}: Critic Loss: {:7.3f}".format(i, baseline_loss))
         # update RND
-        rnd_loss = self.explore_critic.update(old_states)
+        rnd_loss = self.explore_critic.update(old_next_states)
         print("  RND Loss: {:7.3f}".format(rnd_loss))
 
         # save running model
@@ -176,7 +202,7 @@ class DGCPN(nn.Module):
         self.policy_old.load_state_dict(self.policy.state_dict())
 
     def __repr__(self):
-        return "{}\n{}".format(repr(self.policy), repr(self.optimizer))
+        return "{}\n".format(repr(self.policy))
 
 
 #####################################################
@@ -203,7 +229,7 @@ def get_expl_reward(states, emb_model, explore_critic, device):
 
     X = emb_model.get_embedding(g)
     scores = explore_critic.get_score(X)
-    return scores.tolist()
+    return scores
 
 #####################################################
 #                   TRAINING LOOP                   #
@@ -292,17 +318,17 @@ def train_ppo(args, surrogate_model, env):
 
     max_episodes = 50000        # max training episodes
     max_timesteps = 6           # max timesteps in one episode
-    update_timesteps = 500      # update policy every n timesteps
+    update_timesteps = 30       # update policy every n timesteps
 
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
     gamma = 0.99                # discount factor
     eta = 0.01                  # relative weight for entropy loss
 
-    lr = (0.0001, 0.001)        # parameters for Adam optimizer
+    lr = (0.0001, 0.001)        # learning rate for ACP and RND
     betas = (0.9, 0.999)
     eps = 0.01
-    print("lr:", lr, "beta:", betas, "eps:", eps)
+    print("lr:", lr, "beta:", betas, "eps:", eps) # parameters for Adam optimizer
 
     #############################################
 
@@ -338,8 +364,10 @@ def train_ppo(args, surrogate_model, env):
                 args.nb_edge_types,
                 args.gnn_nb_layers,
                 args.gnn_nb_hidden,
-                args.mlp_num_layers,
-                args.mlp_num_hidden)
+                args.acp_num_layers,
+                args.acp_num_hidden,
+                args.rnd_num_layers,
+                args.rnd_num_hidden)
     ppo.to_device(device)
     print(ppo)
 
@@ -389,7 +417,7 @@ def train_ppo(args, surrogate_model, env):
             for i, idx in enumerate(notdone_idx):
                 tasks.put((idx, candidates[shifted_actions[i]], False))
 
-                memories[idx].states.append([state_embs[0][[i], :], state_embs[1][batch_idx == idx, :]])
+                memories[idx].states.append([state_embs[0][[i], :], state_embs[1][[i], :], state_embs[2][batch_idx == idx, :]])
                 memories[idx].actions.append(actions[i])
                 memories[idx].logprobs.append(action_logprobs[i])
             for idx in done_idx:

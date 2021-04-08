@@ -30,7 +30,7 @@ def molecule_arg_parser():
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_model_path', default='')
 
-    add_arg('--iota', type=float, default=0.1, help='relative weight for exploration reward')
+    add_arg('--iota', type=float, default=0.5, help='relative weight for exploration reward')
     add_arg('--innovation_reward_episode_delay', type=int, default=1000)
 
     add_arg('--alpha', type=float, default=5., help='relative weight for adversarial reward')
@@ -53,13 +53,15 @@ def molecule_arg_parser():
 
     # NETWORK PARAMETERS
     #add_arg('--input_size', type=int, default=256)
-    #add_arg('--emb_size', type=int, default=256) # default 64
-    add_arg('--output_size', type=int, default=8, help='output size of RND')
+    #add_arg('--emb_size', type=int, default=256)
+    add_arg('--output_size', type=int, default=4, help='output size of RND')
     #add_arg('--nb_edge_types', type=int, default=1)
     #add_arg('--gnn_nb_layers', type=int, default=4)
-    #add_arg('--gnn_nb_hidden', type=int, default=512)
-    add_arg('--mlp_num_layers', type=int, default=3)
-    add_arg('--mlp_num_hidden', type=int, default=128)
+    #add_arg('--gnn_nb_hidden', type=int, default=512, help='hidden size of Graph Neural Network')
+    add_arg('--acp_num_layers', type=int, default=4)
+    add_arg('--acp_num_hidden', type=int, default=128, help='hidden size of Actor-Critic Policy')
+    add_arg('--rnd_num_layers', type=int, default=2)
+    add_arg('--rnd_num_hidden', type=int, default=256, help='output size of Random Network Distillation')
 
     return parser
 

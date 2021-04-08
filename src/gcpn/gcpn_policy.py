@@ -1,4 +1,3 @@
-import re
 import time
 import numpy as np
 
@@ -14,20 +13,6 @@ from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, de
 from utils.graph_utils import get_batch_shift
 
 #####################################################
-#                   HELPER MODULES                  #
-#####################################################
-
-def get_surrogate_dims(surrogate_model):
-    state_dict = surrogate_model.state_dict()
-    layers_name = [s for s in state_dict.keys() if re.compile('^layers\.[0-9]+\.weight$').match(s)]
-    input_dim = state_dict[layers_name[0]].size(0)
-    emb_dim = state_dict[layers_name[0]].size(-1)
-    nb_edge_types = 1
-    nb_layer = len(layers_name)
-    nb_hidden = state_dict[layers_name[-1]].size(-1)
-    return input_dim, emb_dim, nb_edge_types, nb_layer, nb_hidden
-
-#####################################################
 #                 BATCHED OPERATIONS                #
 #####################################################
 EPS = 1e-4
@@ -40,7 +25,7 @@ def batched_sample(probs, batch):
     p = probs * mask
     m = Categorical(p * (p > EPS))
     a = m.sample()
-    return a, probs[a]
+    return a
 
 def batched_softmax(logits, batch):
     logit_max = pyg.nn.global_max_pool(logits, batch)
@@ -70,23 +55,20 @@ class ActorCriticGCPN(nn.Module):
                  nb_edge_types=None,
                  gnn_nb_layers=None,
                  gnn_nb_hidden=None,
-                 mlp_nb_layers=None,
-                 mlp_nb_hidden=None):
+                 acp_nb_layers=None,
+                 acp_nb_hidden=None):
         super(ActorCriticGCPN, self).__init__()
-        if emb_model is not None:
-            input_dim, emb_dim, nb_edge_types, gnn_nb_layers, gnn_nb_hidden = get_surrogate_dims(emb_model)
-
         # actor
         self.actor = GCPN_Actor(eta,
                                 emb_model,
                                 emb_dim,
-                                mlp_nb_layers,
-                                mlp_nb_hidden)
+                                acp_nb_layers,
+                                acp_nb_hidden)
         self.optimizer_actor = torch.optim.Adam(self.actor.parameters(), lr=lr, betas=betas, eps=eps)
         # critic
         self.critic = GCPN_Critic(emb_dim,
-                                  mlp_nb_layers,
-                                  mlp_nb_hidden)
+                                  acp_nb_layers,
+                                  acp_nb_hidden)
         self.optimizer_critic = torch.optim.Adam(self.critic.parameters(), lr=lr, betas=betas, eps=eps)
 
     def forward(self):
@@ -98,9 +80,9 @@ class ActorCriticGCPN(nn.Module):
     def get_value(self, g_emb):
         return self.critic.get_value(g_emb)
 
-    def update(self, old_states, old_actions, old_logprobs, old_values, rewards):
+    def update(self, old_states, old_candidates, old_actions, old_logprobs, old_values, rewards):
         # Update actor
-        loss = self.actor.loss(old_states, old_actions, old_logprobs, old_values, rewards)
+        loss = self.actor.loss(old_candidates, old_actions, old_logprobs, old_values, rewards)
 
         self.optimizer_actor.zero_grad()
         loss.backward()
@@ -155,18 +137,18 @@ class GCPN_Actor(nn.Module):
                  eta,
                  emb_model,
                  emb_dim,
-                 mlp_nb_layers,
-                 mlp_nb_hidden):
+                 nb_layers,
+                 nb_hidden):
         super(GCPN_Actor, self).__init__()
         self.eta = eta
         self.emb_model = emb_model
 
-        layers = [nn.Linear(2*emb_dim, mlp_nb_hidden)]
-        for _ in range(mlp_nb_layers-1):
-            layers.append(nn.Linear(mlp_nb_hidden, mlp_nb_hidden))
+        layers = [nn.Linear(2*emb_dim, nb_hidden)]
+        for _ in range(nb_layers-1):
+            layers.append(nn.Linear(nb_hidden, nb_hidden))
 
         self.layers = nn.ModuleList(layers)
-        self.final_layer = nn.Linear(mlp_nb_hidden, 1)
+        self.final_layer = nn.Linear(nb_hidden, 1)
         self.act = nn.ReLU()
         self.softmax = nn.Softmax(0)
 
@@ -186,17 +168,20 @@ class GCPN_Actor(nn.Module):
         for i, l in enumerate(self.layers):
             X = self.act(l(X))
         X = self.final_layer(X).squeeze(1)
-        probs = batched_softmax(X, batch_idx)
 
-        shifted_actions, p = batched_sample(probs, batch_idx)
+        probs = batched_softmax(X, batch_idx)
+        shifted_actions = batched_sample(probs, batch_idx)
         actions = shifted_actions - get_batch_shift(batch_idx)
-        action_logprobs = torch.log(p)
-        return g_emb, X_states, probs, action_logprobs, actions, shifted_actions
+        action_logprobs = torch.log(probs[shifted_actions])
+        g_next_emb = g_candidates_emb[shifted_actions]
+
+        return g_emb, g_next_emb, X_states, probs, action_logprobs, actions, shifted_actions
 
     def select_action(self, g, g_candidates, batch_idx):
-        g_emb, X_states, probs, action_logprobs, actions, shifted_actions = self(g, g_candidates, batch_idx)
+        g_emb, g_next_emb, X_states, probs, action_logprobs, actions, shifted_actions = self(g, g_candidates, batch_idx)
 
         g_emb = g_emb.detach().cpu()
+        g_next_emb = g_next_emb.detach().cpu()
         X_states = X_states.detach().cpu()
 
         probs = probs.squeeze_().tolist()
@@ -205,7 +190,7 @@ class GCPN_Actor(nn.Module):
         shifted_actions = shifted_actions.squeeze_().tolist()
 
         if self.training:
-            return g_emb, X_states, action_logprobs, actions, shifted_actions
+            return g_emb, g_next_emb, X_states, action_logprobs, actions, shifted_actions
         else:
             return g_emb, X_states, probs
 
