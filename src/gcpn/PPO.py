@@ -87,15 +87,15 @@ class DGCPN(nn.Module):
         super(DGCPN, self).__init__()
         self.gamma = gamma
         self.K_epochs = K_epochs
-        self.eps_clip = eps_clip
 
         if emb_model is not None:
             input_dim, emb_dim, nb_edge_types, gnn_nb_layers, gnn_nb_hidden = get_surrogate_dims(emb_model)
 
-        self.policy = ActorCriticGCPN(lr[0],
+        self.policy = ActorCriticGCPN(lr[:2],
                                       betas,
                                       eps,
                                       eta,
+                                      eps_clip,
                                       emb_model,
                                       input_dim,
                                       emb_dim,
@@ -105,10 +105,11 @@ class DGCPN(nn.Module):
                                       acp_nb_layers,
                                       acp_nb_hidden)
 
-        self.policy_old = ActorCriticGCPN(lr[0],
+        self.policy_old = ActorCriticGCPN(lr[:2],
                                           betas,
                                           eps,
                                           eta,
+                                          eps_clip,
                                           emb_model,
                                           input_dim,
                                           emb_dim,
@@ -119,7 +120,7 @@ class DGCPN(nn.Module):
                                           acp_nb_hidden)
         self.policy_old.load_state_dict(self.policy.state_dict())
 
-        self.explore_critic = RNDistillation(lr[1],
+        self.explore_critic = RNDistillation(lr[2],
                                              betas,
                                              eps,
                                              input_dim,
@@ -160,7 +161,7 @@ class DGCPN(nn.Module):
         else:
             return [g_emb, g_next_emb, X_states], action_logprobs, actions
 
-    def update(self, memory, save_dir):
+    def update(self, memory, save_dir, eps=1e-5):
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
@@ -172,7 +173,7 @@ class DGCPN(nn.Module):
 
         # Normalizing the rewards:
         rewards = torch.tensor(rewards).to(self.device)
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
+        rewards = (rewards - rewards.mean()) / (rewards.std() + eps)
 
         # convert list to tensor
         old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(self.device)
@@ -189,8 +190,7 @@ class DGCPN(nn.Module):
         for i in range(self.K_epochs):
             loss, baseline_loss = self.policy.update(old_states, old_candidates, old_actions, old_logprobs, old_values, rewards)
             if (i%10)==0:
-                print("  {:3d}: Actor Loss: {:7.3f}".format(i, loss))
-                print("  {:3d}: Critic Loss: {:7.3f}".format(i, baseline_loss))
+                print("  {:3d}: Actor Loss: {:7.3f}, Critic Loss: {:7.3f}".format(i, loss, baseline_loss))
         # update RND
         rnd_loss = self.explore_critic.update(old_next_states)
         print("  RND Loss: {:7.3f}".format(rnd_loss))
@@ -229,7 +229,7 @@ def get_expl_reward(states, emb_model, explore_critic, device):
 
     X = emb_model.get_embedding(g)
     scores = explore_critic.get_score(X)
-    return scores
+    return scores.tolist()
 
 #####################################################
 #                   TRAINING LOOP                   #
@@ -325,12 +325,12 @@ def train_ppo(args, surrogate_model, env):
     gamma = 0.99                # discount factor
     eta = 0.01                  # relative weight for entropy loss
 
-    lr = (0.0001, 0.001)        # learning rate for ACP and RND
+    lr = (5e-4, 1e-4, 2e-6)        # learning rate for actor, critic and random network
     betas = (0.9, 0.999)
     eps = 0.01
-    print("lr:", lr, "beta:", betas, "eps:", eps) # parameters for Adam optimizer
 
     #############################################
+    print("lr:", lr, "beta:", betas, "eps:", eps) # parameters for Adam optimizer
 
     print('Creating %d processes' % args.nb_procs)
     workers = [Worker(env, tasks, results, max_timesteps) for i in range(args.nb_procs)]
@@ -472,12 +472,11 @@ def train_ppo(args, surrogate_model, env):
                 expl_rewards = get_expl_reward(
                     [mols[idx] for idx in notdone_idx],
                     surrogate_model, ppo.explore_critic, device)
-                expl_rewards = args.iota * expl_rewards
 
             for i, idx in enumerate(notdone_idx):
-                running_reward += expl_rewards[i]
+                running_reward += args.iota * expl_rewards[i]
 
-                memories[idx].rewards[-1] += expl_rewards[i]
+                memories[idx].rewards[-1] += args.iota * expl_rewards[i]
 
 
             sample_count += len(notdone_idx)

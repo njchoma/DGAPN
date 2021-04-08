@@ -49,6 +49,7 @@ class ActorCriticGCPN(nn.Module):
                  betas,
                  eps,
                  eta,
+                 eps_clip,
                  emb_model=None,
                  input_dim=None,
                  emb_dim=None,
@@ -60,16 +61,17 @@ class ActorCriticGCPN(nn.Module):
         super(ActorCriticGCPN, self).__init__()
         # actor
         self.actor = GCPN_Actor(eta,
+                                eps_clip,
                                 emb_model,
                                 emb_dim,
                                 acp_nb_layers,
                                 acp_nb_hidden)
-        self.optimizer_actor = torch.optim.Adam(self.actor.parameters(), lr=lr, betas=betas, eps=eps)
+        self.optimizer_actor = torch.optim.Adam(self.actor.parameters(), lr=lr[0], betas=betas, eps=eps)
         # critic
         self.critic = GCPN_Critic(emb_dim,
                                   acp_nb_layers,
                                   acp_nb_hidden)
-        self.optimizer_critic = torch.optim.Adam(self.critic.parameters(), lr=lr, betas=betas, eps=eps)
+        self.optimizer_critic = torch.optim.Adam(self.critic.parameters(), lr=lr[1], betas=betas, eps=eps)
 
     def forward(self):
         raise NotImplementedError
@@ -135,12 +137,14 @@ class GCPN_Critic(nn.Module):
 class GCPN_Actor(nn.Module):
     def __init__(self,
                  eta,
+                 eps_clip,
                  emb_model,
                  emb_dim,
                  nb_layers,
                  nb_hidden):
         super(GCPN_Actor, self).__init__()
         self.eta = eta
+        self.eps_clip = eps_clip
         self.emb_model = emb_model
 
         layers = [nn.Linear(2*emb_dim, nb_hidden)]
