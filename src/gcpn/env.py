@@ -1,7 +1,8 @@
 import os
+import random
 import numpy as np
 from rdkit import Chem
-from crem.crem import mutate_mol
+from crem.crem import mutate_mol, grow_mol
 
 from torch_geometric.data import Batch
 
@@ -34,9 +35,14 @@ class CReM_Env(object):
 
     def reset(self, mol=None, include_current_state=True):
         if mol is None:
-            idx = np.random.randint(len(self.scores))
-            mol = Chem.MolFromSmiles(self.smiles[idx])
+            carbon = Chem.MolFromSmiles("C")
+            smiles = list(grow_mol(carbon, db_name='replacements02_sc2.db'))
+            mol = Chem.MolFromSmiles(random.choice(smiles))
         return self.mol_to_candidates(mol, include_current_state)
+        #if mol is None:
+        #    idx = np.random.randint(len(self.scores))
+        #    mol = Chem.MolFromSmiles(self.smiles[idx])
+        #return self.mol_to_candidates(mol, include_current_state)
 
     def step(self, action, include_current_state=True):
         mol = self.new_mols[action]

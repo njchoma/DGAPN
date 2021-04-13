@@ -449,6 +449,7 @@ def train_ppo(args, surrogate_model, env):
                 surr_rewards = get_surr_reward(
                     [mols[idx] for idx in nowdone_idx],
                     surrogate_model, device)
+                print("Surr_Rewards ", surr_rewards)
 
             for i, idx in enumerate(nowdone_idx):
                 i_episode += 1
@@ -500,11 +501,13 @@ def train_ppo(args, surrogate_model, env):
         if np.mean(rewbuffer_env) > solved_reward:
             print("########## Solved! ##########")
             torch.save(ppo.policy.state_dict(), os.path.join(save_dir, 'PPO_continuous_solved_{}.pth'.format('test')))
+            torch.save(ppo.policy.actor.state_dict(), os.path.join(save_dir, 'gcpn_actor_{}.pth'.format('test')))
             break
 
         # save every 500 episodes
         if save_counter > save_interval:
             torch.save(ppo.policy.state_dict(), os.path.join(save_dir, '{:05d}_gcpn.pth'.format(i_episode)))
+            torch.save(ppo.policy.actor.state_dict(), os.path.join(save_dir, '{:05d}_gcpn_actor.pth'.format(i_episode)))
             save_counter -= save_interval
 
         if log_counter > log_interval:
