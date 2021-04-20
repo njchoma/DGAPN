@@ -4,6 +4,14 @@ This project aims to:
 
 1. Generate molecules for successful interactions with covid 19 proteins, in developing molecules for a covid 19 treatment.
 
+Final product wish list:
+
+1. 3d representation with large drop-out
+
+2. Retrieval system attention mechanism
+
+3. User-specified number of GNN layers to share
+
 ## Getting Started:
 1. Create conda environment
 ```bash
