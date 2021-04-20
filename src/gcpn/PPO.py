@@ -254,8 +254,6 @@ class Worker(mp.Process):
         self.max_timesteps = max_timesteps
         self.timestep_counter = 0
 
-        np.random.seed(self.pid)
-
     def run(self):
         proc_name = self.name
         while True:
