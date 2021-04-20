@@ -21,21 +21,21 @@ class RNDistillation(nn.Module):
                  eps,
                  input_dim,
                  emb_dim,
-                 output_dim,
                  nb_edge_types,
                  gnn_nb_layers,
                  gnn_nb_hidden,
                  rnd_nb_layers,
-                 rnd_nb_hidden):
+                 rnd_nb_hidden,
+                 rnd_nb_output):
         super(RNDistillation, self).__init__()
 
         self.f = RandomNetwork(emb_dim,
-                               output_dim,
+                               rnd_nb_output,
                                rnd_nb_layers,
                                rnd_nb_hidden,
                                init_method=init_method_1)
         self.f_hat = RandomNetwork(emb_dim,
-                                   output_dim,
+                                   rnd_nb_output,
                                    rnd_nb_layers,
                                    rnd_nb_hidden,
                                    init_method=init_method_2)

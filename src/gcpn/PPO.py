@@ -76,14 +76,15 @@ class DGCPN(nn.Module):
                  emb_model=None,
                  input_dim=None,
                  emb_dim=None,
-                 output_dim=None,
                  nb_edge_types=None,
                  gnn_nb_layers=None,
                  gnn_nb_hidden=None,
-                 acp_nb_layers=None,
-                 acp_nb_hidden=None,
+                 enc_nb_layers=None,
+                 enc_nb_hidden=None,
+                 enc_nb_output=None,
                  rnd_nb_layers=None,
-                 rnd_nb_hidden=None):
+                 rnd_nb_hidden=None,
+                 rnd_nb_output=None):
         super(DGCPN, self).__init__()
         self.gamma = gamma
         self.K_epochs = K_epochs
@@ -102,8 +103,9 @@ class DGCPN(nn.Module):
                                       nb_edge_types,
                                       gnn_nb_layers,
                                       gnn_nb_hidden,
-                                      acp_nb_layers,
-                                      acp_nb_hidden)
+                                      enc_nb_layers,
+                                      enc_nb_hidden,
+                                      enc_nb_output)
 
         self.policy_old = ActorCriticGCPN(lr[:2],
                                           betas,
@@ -116,8 +118,9 @@ class DGCPN(nn.Module):
                                           nb_edge_types,
                                           gnn_nb_layers,
                                           gnn_nb_hidden,
-                                          acp_nb_layers,
-                                          acp_nb_hidden)
+                                          enc_nb_layers,
+                                          enc_nb_hidden,
+                                          enc_nb_output)
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.explore_critic = RNDistillation(lr[2],
@@ -125,12 +128,12 @@ class DGCPN(nn.Module):
                                              eps,
                                              input_dim,
                                              emb_dim,
-                                             output_dim,
                                              nb_edge_types,
                                              gnn_nb_layers,
                                              gnn_nb_hidden,
                                              rnd_nb_layers,
-                                             rnd_nb_hidden)
+                                             rnd_nb_hidden,
+                                             rnd_nb_output)
 
         self.device = torch.device("cpu")
 
@@ -316,7 +319,7 @@ def train_ppo(args, surrogate_model, env):
 
     max_episodes = 50000        # max training episodes
     max_timesteps = 6           # max timesteps in one episode
-    update_timesteps = 500      # update policy every n timesteps
+    update_timesteps = 30      # update policy every n timesteps
 
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
@@ -358,14 +361,15 @@ def train_ppo(args, surrogate_model, env):
                 surrogate_model,
                 args.input_size,
                 args.emb_size,
-                args.output_size,
                 args.nb_edge_types,
                 args.gnn_nb_layers,
                 args.gnn_nb_hidden,
-                args.acp_num_layers,
-                args.acp_num_hidden,
+                args.enc_num_layers,
+                args.enc_num_hidden,
+                args.enc_num_output,
                 args.rnd_num_layers,
-                args.rnd_num_hidden)
+                args.rnd_num_hidden,
+                args.rnd_num_output)
     ppo.to_device(device)
     print(ppo)
 
