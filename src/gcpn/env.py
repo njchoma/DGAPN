@@ -1,5 +1,5 @@
 import os
-import numpy as np
+import random
 from rdkit import Chem
 from crem.crem import mutate_mol
 
@@ -34,7 +34,7 @@ class CReM_Env(object):
 
     def reset(self, mol=None, include_current_state=True):
         if mol is None:
-            idx = np.random.randint(len(self.scores))
+            idx = random.randrange(len(self.scores))
             mol = Chem.MolFromSmiles(self.smiles[idx])
         return self.mol_to_candidates(mol, include_current_state)
 
