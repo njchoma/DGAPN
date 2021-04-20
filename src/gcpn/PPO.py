@@ -156,13 +156,13 @@ class DGCPN(nn.Module):
         g = Batch.from_data_list(states).to(self.device)
         g_candidates = Batch.from_data_list(candidates).to(self.device)
         with torch.autograd.no_grad():
-            g_emb, g_next_emb, X_states, action_logprobs, actions, shifted_actions = self.policy_old.select_action(
+            g_emb, g_next_emb, g_candidates_emb, action_logprobs, actions, shifted_actions = self.policy_old.select_action(
                 g, g_candidates, batch_idx)
 
         if return_shifted:
-            return [g_emb, g_next_emb, X_states], action_logprobs, actions, shifted_actions
+            return [g_emb, g_next_emb, g_candidates_emb], action_logprobs, actions, shifted_actions
         else:
-            return [g_emb, g_next_emb, X_states], action_logprobs, actions
+            return [g_emb, g_next_emb, g_candidates_emb], action_logprobs, actions
 
     def update(self, memory, save_dir, eps=1e-5):
         # Monte Carlo estimate of rewards:
