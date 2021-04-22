@@ -1,7 +1,9 @@
 import numpy as np
+from rdkit import Chem
 
 import torch
 from torch_geometric.data import Batch
+from utils.graph_utils import mol_to_pyg_graph
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -17,20 +19,23 @@ def gcpn_crem_rollout(policy,
                       K,
                       max_rollout=5):
     g_start, g_candidates, done = env.reset()
-
-    g = Batch.from_data_list([g_start])
+    g_start = mol_to_pyg_graph(g_start)[0]
+    g = Batch().from_data_list([g_start])
     best_rew = get_rewards(g, surrogate_guide)
     steps_remaining = K
-
+    new_rew=0
+    smile=""
 
     for i in range(max_rollout):
         print("  {:3d} {:2d} {:4.1f}".format(i+1, steps_remaining, best_rew))
         steps_remaining -= 1
-        next_rewards = get_rewards(g_candidates, surrogate_guide)
+        pyg_graphs = [mol_to_pyg_graph(cand)[0] for cand in g_candidates]
+        pyg_batch = Batch().from_data_list(pyg_graphs)
+        next_rewards = get_rewards(pyg_batch, surrogate_guide)
         # action = np.argmax(next_rewards)
 
         with torch.autograd.no_grad():
-            _, _, probs = policy(g, g_candidates, surrogate_guide)
+            _, _, _, probs, _, _, _ = policy(g, pyg_batch, torch.empty(len(g_candidates), dtype=torch.long).fill_(0))
         max_action = np.argmax(probs.cpu().numpy())
         min_action = np.argmin(probs.cpu().numpy())
 
@@ -44,7 +49,7 @@ def gcpn_crem_rollout(policy,
         #     print("{:5.3f} {:4.1f}".format(s[0], s[1]))
         # # print(c)
         # exit()
-        
+
         try:
             new_rew = next_rewards[action]
         except Exception as e:
@@ -53,16 +58,27 @@ def gcpn_crem_rollout(policy,
 
 
         g, g_candidates, done = env.step(action, include_current_state=False)
-        g = Batch.from_data_list([g]).to(DEVICE)
+        g = Batch.from_data_list([mol_to_pyg_graph(g)[0]]).to(DEVICE)
 
         if new_rew > best_rew:
             best_rew = new_rew
             steps_remaining = K
-        
-        if (steps_remaining == 0) or done:
-            break
 
-        
+        if (steps_remaining == 0) or done:
+            print("Writing SMILE molecules!")
+            with open('molecule_gen/' + 'test.csv', 'a') as f:
+                smile = Chem.MolToSmiles(g_candidates[0], isomericSmiles=False)
+                row = ''.join(['{},'] * 2)[:-1] + '\n'
+                f.write(row.format(smile, new_rew))
+
+    with open('molecule_gen/' + 'test.csv', 'a') as f:
+        print("Writing SMILE molecules!")
+
+        smile = Chem.MolToSmiles(g_candidates[0], isomericSmiles=False)
+        print(smile, new_rew)
+        row = ''.join(['{},'] * 2)[:-1] + '\n'
+        f.write(row.format(smile, new_rew))
+
     start_rew = get_rewards(Batch.from_data_list([g_start]), surrogate_eval)
     final_rew = get_rewards(g, surrogate_eval)
     return start_rew, final_rew
@@ -74,8 +90,8 @@ def eval_gcpn_crem(policy, surrogate_guide, surrogate_eval, env, N=120, K=1):
     surrogate_eval = surrogate_eval.to(DEVICE)
     surrogate_eval.eval()
     
-    policy = policy.to(DEVICE)
-    policy.eval()
+    #policy = policy.to(DEVICE)
+    #policy.eval()
 
     print("\nStarting gcpn_crem eval...\n")
     avg_improvement = []
@@ -87,6 +103,7 @@ def eval_gcpn_crem(policy, surrogate_guide, surrogate_eval, env, N=120, K=1):
                                                 surrogate_eval,
                                                 K)
         improvement = best_rew - start_rew
+        print("Improvement ", improvement)
         print("{:2d}: {:4.1f} {:4.1f} {:4.1f}".format(i+1,
                                                       start_rew,
                                                       best_rew,

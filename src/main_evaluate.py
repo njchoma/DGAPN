@@ -20,7 +20,8 @@ def molecule_arg_parser():
     add_arg = parser.add_argument
 
     # EXPERIMENT PARAMETERS
-    add_arg('--data_path', required=True)
+    add_arg('--data_path', default='dataset')
+    add_arg('--warm_start_dataset_path', required=True)
     add_arg('--artifact_path', required=True)
 
     add_arg('--surrogate_model_url', default='')
@@ -30,7 +31,7 @@ def molecule_arg_parser():
 
     add_arg('--nb_sample_crem', type=int, default=128)
 
-    add_arg('--nb_test', type=int, default=120)
+    add_arg('--nb_test', type=int, default=50)
     add_arg('--nb_bad_steps', type=int, default=5)
 
     return parser
@@ -52,10 +53,10 @@ def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_pat
     print("Surrogate model loaded")
     return surrogate_model
 
-def load_gcpn(gcpn_path):
-    gcpn_model = torch.load(gcpn_path, map_location='cpu')
+def load_gcpn(model_class, gcpn_path):
+    model_class.load_state_dict(torch.load(gcpn_path, map_location='cpu'))
     print("GCPN model loaded")
-    return gcpn_model
+    return model_class
 
 def main():
     args = molecule_arg_parser().parse_args()
@@ -71,26 +72,34 @@ def main():
                                            args.surrogate_eval_path)
 
     env = CReM_Env(args.data_path,
-                   nb_sample_crem = args.nb_sample_crem)
+                   args.warm_start_dataset_path,
+                   nb_sample_crem = args.nb_sample_crem,
+                   mode='mol')
 
     print(surrogate_guide)
 
     # Greedy
-    eval_greedy(surrogate_guide,
-                surrogate_eval,
-                env,
-                N = args.nb_test,
-                K = args.nb_bad_steps)
+    #eval_greedy(surrogate_guide,
+    #            surrogate_eval,
+    #            env,
+    #            N = args.nb_test,
+    #            K = args.nb_bad_steps)
 
-
-    policy = load_gcpn(args.gcpn_path)
+    actor = GCPN_Actor(eta=0.01,
+                        eps_clip=0.2,
+                        emb_model=surrogate_guide,
+                        emb_dim=512,
+                        nb_layers=4,
+                        nb_hidden=128)
+    policy = load_gcpn(actor, args.gcpn_path)
+    print(policy)
     # GCPN_CReM
-    # eval_gcpn_crem(policy,
-    #                surrogate_guide,
-    #                surrogate_eval,
-    #                env,
-    #                N = args.nb_test,
-    #                K = args.nb_bad_steps)
+    eval_gcpn_crem(policy,
+                    surrogate_guide,
+                    surrogate_eval,
+                    env,
+                    N = args.nb_test,
+                    K = args.nb_bad_steps)
 
 
 if __name__ == '__main__':
