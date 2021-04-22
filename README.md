@@ -14,6 +14,8 @@ Final product wish list:
 
 4. Fix multi-head (done)
 
+5. Adversarial
+
 ## Getting Started:
 1. Create conda environment
 ```bash

@@ -39,10 +39,11 @@ class GNN_MyGAT(nn.Module):
 
 
 import math
-from torch.nn import Parameter
+from torch.nn import Parameter, BatchNorm1d
 import torch.nn.functional as F
 from torch_geometric.nn.conv import MessagePassing
-from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
+from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
+from torch_scatter import scatter_add
 
 def glorot(tensor):
     if tensor is not None:
@@ -86,7 +87,7 @@ class MyGATConv(MessagePassing):
 
         if self.batch_norm:
             # self.norm = MyInstanceNorm(in_channels, track_running_stats=False)
-            self.norm = MyBatchNorm(in_channels)
+            self.norm = BatchNorm1d(in_channels)
 
         if bias and concat:
             self.bias = Parameter(torch.zeros(heads * out_channels))
@@ -195,7 +196,7 @@ class MyHGATConv(MessagePassing):
 
         if self.batch_norm:
             # self.norm = MyInstanceNorm(in_channels, track_running_stats=False)
-            self.norm = MyBatchNorm(in_channels)
+            self.norm = BatchNorm1d(in_channels)
 
         if bias and concat:
             self.bias = Parameter(torch.zeros(heads * out_channels))
@@ -241,12 +242,12 @@ class MyHGATConv(MessagePassing):
         if hyperedge_weight is not None:
             B = B * hyperedge_weight
 
-        if self.norm_mode is "row":
+        if self.norm_mode == "row":
             self.flow = 'source_to_target'
             out = self.propagate(hyperedge_index, x=x, norm=B, alpha=alpha)
             self.flow = 'target_to_source'
             out = self.propagate(hyperedge_index, x=out, norm=D, alpha=alpha)
-        elif self.norm_mode is "col":
+        elif self.norm_mode == "col":
             self.flow = 'source_to_target'
             out = self.propagate(hyperedge_index, x=D.view(-1, 1, 1) * x, norm=B, alpha=alpha)
             self.flow = 'target_to_source'
@@ -277,5 +278,48 @@ class MyHGATConv(MessagePassing):
         out = norm[edge_index_i].view(-1, 1, 1) * x_j
         if alpha is not None:
             out = alpha.view(-1, self.heads, 1) * out
+        return out
+
+
+
+from torch.nn.modules.instancenorm import _InstanceNorm
+
+
+class MyInstanceNorm(_InstanceNorm):
+    def __init__(self, in_channels, eps=1e-5, momentum=0.1, affine=False,
+                 track_running_stats=False):
+        super(MyInstanceNorm, self).__init__(in_channels, eps, momentum, affine,
+                                             track_running_stats)
+
+    def forward(self, x, batch=None):
+        if batch is None:
+            batch = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
+
+        batch_size = batch.max().item() + 1
+
+        if self.training or not self.track_running_stats:
+            count = degree(batch, batch_size, dtype=x.dtype).view(-1, 1)
+            tmp = scatter_add(x, batch, dim=0, dim_size=batch_size)
+            mean = tmp / count.clamp(min=1)
+
+            tmp = (x - mean[batch])
+            tmp = scatter_add(tmp * tmp, batch, dim=0, dim_size=batch_size)
+            var = tmp / count.clamp(min=1)
+            unbiased_var = tmp / (count - 1).clamp(min=1)
+
+        if self.training and self.track_running_stats:
+            momentum = self.momentum
+            self.running_mean = (1 - momentum) * self.running_mean + momentum * mean.mean(dim=0)
+            self.running_var = (1 - momentum) * self.running_var + momentum * unbiased_var.mean(dim=0)
+
+        if not self.training and self.track_running_stats:
+            mean = self.running_mean.view(1, -1).expand(batch_size, -1)
+            var = self.running_var.view(1, -1).expand(batch_size, -1)
+
+        out = (x - mean[batch]) / torch.sqrt(var[batch] + self.eps)
+
+        if self.affine:
+            out = out * self.weight.view(1, -1) + self.bias.view(1, -1)
+
         return out
 
