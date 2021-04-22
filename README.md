@@ -8,9 +8,11 @@ Final product wish list:
 
 1. 3d representation with large drop-out
 
-2. Retrieval system attention mechanism
+2. Retrieval system attention mechanism (done)
 
 3. User-specified number of GNN layers to share
+
+4. Fix multi-head (done)
 
 ## Getting Started:
 1. Create conda environment
