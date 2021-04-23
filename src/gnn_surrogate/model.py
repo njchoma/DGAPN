@@ -15,7 +15,7 @@ class GNN_MyGAT(nn.Module):
                 layers.append(MyGATConv(nb_hidden, nb_hidden))
             layers.append(MyGATConv(nb_hidden, emb_dim))
         self.layers = nn.ModuleList(layers)
-        self.final_layer = nn.Linear(nb_hidden, 1)
+        self.final_layer = nn.Linear(emb_dim, 1)
         self.act = nn.ReLU()
 
     def forward(self, g, dense_edge_idx=None):
