@@ -6,6 +6,7 @@ import pickle
 import numpy as np
 
 import time
+from datetime import datetime
 
 from rdkit import Chem
 
@@ -24,24 +25,20 @@ torch.multiprocessing.set_sharing_strategy('file_system')
 #####################################################
 #                   MODEL HANDLING                  #
 #####################################################
-def load_current_model(artifact_path):
-    net = torch.load(os.path.join(artifact_path, 'current_model.pth'))
+def load_current_model(model_path):
+    net = torch.load(os.path.join(model_path, 'current_model.pth'))
     return net
 
-
-def load_best_model(artifact_path):
-    net = torch.load(os.path.join(artifact_path, 'best_model.pth'))
+def load_best_model(model_path):
+    net = torch.load(os.path.join(model_path, 'best_model.pth'))
 
     return net
 
+def save_current_model(net, model_path):
+    torch.save(net, os.path.join(model_path, 'current_model.pth'))
 
-def save_current_model(net, artifact_path):
-    torch.save(net, os.path.join(artifact_path, 'current_model.pth'))
-
-
-def save_best_model(net, artifact_path):
-    torch.save(net, os.path.join(artifact_path, 'best_model.pth'))
-
+def save_best_model(net, model_path):
+    torch.save(net, os.path.join(model_path, 'best_model.pth'))
 
 #############################################
 #            Custom Functions               #
@@ -307,12 +304,12 @@ def train(net,
         if valid_loss < best_loss:
             logging.info("Best performance on valid set")
             best_loss = valid_loss
-            save_best_model(net, artifact_path)
+            save_best_model(net, save_dir)
         logging.info("{:6.1f} seconds, this epoch".format(time.time() - t0))
 
         current_lr = optim.param_groups[0]['lr']
         arg_handler.update_args(current_lr, i + 1, best_loss)
-        save_current_model(net, artifact_path)
+        save_current_model(net, save_dir)
         if current_lr < lr_end:
             break
 
@@ -387,14 +384,15 @@ def main(artifact_path,
     else:
         DEVICE = 'cpu'
 
-    artifact_path = os.path.join(artifact_path, 'predict_logp')
-    os.makedirs(artifact_path, exist_ok=True)
+    # logging variables
+    dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
+    writer = SummaryWriter(log_dir=os.path.join(artifact_path, 'runs/' + dt))
+    save_dir = os.path.join(artifact_path, 'saves/' + dt)
+    os.makedirs(save_dir, exist_ok=True)
+
     general_utils.initialize_logger(artifact_path)
 
     arg_handler = ArgumentHandler(artifact_path, lr)
-
-    writer = SummaryWriter(log_dir=os.path.join(artifact_path, 'runs'))
-    print("Writer initialized")
 
     train_data, valid_data, test_data = create_datasets(logp, smiles, use_3d)
     valid_data.compute_baseline_error()

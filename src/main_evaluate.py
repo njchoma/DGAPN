@@ -62,7 +62,7 @@ def main():
     print("====args====", args)
     dt = get_current_datetime()
     writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/'+dt))
-    
+
     surrogate_guide = load_surrogate_model(args.artifact_path,
                                            args.surrogate_model_url,
                                            args.surrogate_guide_path)
