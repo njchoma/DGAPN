@@ -97,7 +97,7 @@ class MyGATConv(MessagePassing):
 
         self.act = nn.ReLU()
 
-        self.reset_parameters()
+        #self.reset_parameters()
 
     def reset_parameters(self):
         glorot(self.linN)
@@ -205,8 +205,6 @@ class MyHGATConv(MessagePassing):
             self.register_parameter('bias', None)
 
         self.act = nn.ReLU()
-
-        # TODO(Yulun): reset params
 
     def forward(self, x, hyperedge_index, hyperedge_weight=None):
 
