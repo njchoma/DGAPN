@@ -53,15 +53,15 @@ def molecule_arg_parser():
 
     # NETWORK PARAMETERS
     #add_arg('--input_size', type=int, default=121)
-    #add_arg('--emb_size', type=int, default=256)
+    #add_arg('--emb_size', type=int, default=128)
     #add_arg('--nb_edge_types', type=int, default=1)
     #add_arg('--gnn_nb_layers', type=int, default=4)
-    #add_arg('--gnn_nb_hidden', type=int, default=512, help='hidden size of Graph Networks')
+    #add_arg('--gnn_nb_hidden', type=int, default=256, help='hidden size of Graph Networks')
     add_arg('--enc_num_layers', type=int, default=4)
     add_arg('--enc_num_hidden', type=int, default=128, help='hidden size of Encoding Networks')
     add_arg('--enc_num_output', type=int, default=64)
-    add_arg('--rnd_num_layers', type=int, default=2)
-    add_arg('--rnd_num_hidden', type=int, default=256, help='hidden size of Random Networks')
+    add_arg('--rnd_num_layers', type=int, default=3)
+    add_arg('--rnd_num_hidden', type=int, default=128, help='hidden size of Random Networks')
     add_arg('--rnd_num_output', type=int, default=4)
 
     return parser
