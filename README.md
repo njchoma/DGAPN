@@ -9,7 +9,7 @@ This project aims to:
 ```bash
 conda create -n my-mol-env python=3.8
 conda activate my-mol-env
-pip install wget gym tensorboard
+pip install wget pyyaml gym tensorboard
 ```
 2. Install learning library
 - Pytorch **1.8**.0 (https://pytorch.org/get-started/locally/)

@@ -5,6 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "main_predict_dock_score",
+            "type": "python",
+            "request": "launch",
+            "program": "src/main_predict_dock_score.py",
+            "subProcess": true,
+            "args": [
+                "--name", "predict_dock_score",
+                "--data_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.sorted.4col.csv",
+                "--artifact_path", "test_run/gcpn",
+                "--gpu", "0"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
             "name": "main_gcpn",
             "type": "python",
             "request": "launch",
