@@ -50,7 +50,6 @@ def glorot(tensor):
         stdv = math.sqrt(6.0 / (tensor.size(-2) + tensor.size(-1)))
         tensor.data.uniform_(-stdv, stdv)
 
-
 def zeros(tensor):
     if tensor is not None:
         tensor.data.fill_(0)
@@ -98,7 +97,7 @@ class MyGATConv(MessagePassing):
 
         self.act = nn.ReLU()
 
-        self.reset_parameters()
+        #self.reset_parameters()
 
     def reset_parameters(self):
         glorot(self.linN)
@@ -206,8 +205,6 @@ class MyHGATConv(MessagePassing):
             self.register_parameter('bias', None)
 
         self.act = nn.ReLU()
-
-        # TODO(Yulun): reset params
 
     def forward(self, x, hyperedge_index, hyperedge_weight=None):
 
