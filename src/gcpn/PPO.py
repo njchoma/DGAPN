@@ -6,6 +6,9 @@ import copy
 import numpy as np
 from collections import deque, OrderedDict
 
+import time
+from datetime import datetime
+
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
@@ -17,7 +20,6 @@ from torch_geometric.utils import dense_to_sparse
 from .gcpn_policy import ActorCriticGCPN
 from .rnd_explore import RNDistillation
 
-from utils.general_utils import get_current_datetime
 from utils.graph_utils import mol_to_pyg_graph, get_batch_shift
 
 from gnn_surrogate.model import GNN_MyGAT
@@ -253,7 +255,7 @@ def train_ppo(args, surrogate_model, env):
     print("lr:", lr, "beta:", betas, "eps:", eps) # parameters for Adam optimizer
 
     # logging variables
-    dt = get_current_datetime()
+    dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
     writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + '_' + dt))
     save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + '_' + dt)
     os.makedirs(save_dir, exist_ok=True)

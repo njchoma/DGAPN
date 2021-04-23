@@ -25,7 +25,7 @@
             "program": "src/main_gcpn.py",
             "subProcess": true,
             "args": [
-                "--name", "crem_parallel",
+                "--name", "gcpn",
                 "--data_path", "src/dataset",
                 "--artifact_path", "test_run/gcpn",
                 "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
