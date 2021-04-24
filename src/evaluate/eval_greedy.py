@@ -1,7 +1,15 @@
+import os
 import numpy as np
+
+import time
+from datetime import datetime
+
+from rdkit import Chem
 
 import torch
 from torch_geometric.data import Batch
+
+from utils.graph_utils import mol_to_pyg_graph
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -10,61 +18,69 @@ def get_rewards(g_batch, surrogate_model):
         scores = surrogate_model(g_batch.to(DEVICE))
     return scores.cpu().numpy()*-1
 
-def greedy_rollout(env, surrogate_guide, surrogate_eval, K, max_rollout=5):
-    g_start, g_candidates, done = env.reset()
-    g_best = g_start
+def greedy_rollout(save_path, env, surrogate_guide, surrogate_eval, K, max_rollout=6):
+    mol, mol_candidates, done = env.reset()
+    mol_start = mol
+    mol_best = mol
 
-    g = Batch.from_data_list([g_start])
-    best_rew = get_rewards(g, surrogate_guide)
-    new_rew = best_rew
+    g = Batch().from_data_list([mol_to_pyg_graph(mol)[0]])
+    new_rew = get_rewards(g, surrogate_guide)
+    start_rew = new_rew
+    best_rew = new_rew
     steps_remaining = K
-
 
     for i in range(max_rollout):
         print("  {:3d} {:2d} {:4.1f}".format(i+1,
                                              steps_remaining,
                                              new_rew))
         steps_remaining -= 1
+        g_candidates = Batch().from_data_list([mol_to_pyg_graph(cand)[0] for cand in mol_candidates])
         next_rewards = get_rewards(g_candidates, surrogate_guide)
+
         action = np.argmax(next_rewards)
-        
+
         try:
             new_rew = next_rewards[action]
         except Exception as e:
             print(e)
             break
 
-
-        g, g_candidates, done = env.step(action, include_current_state=False)
+        mol, mol_candidates, done = env.step(action, include_current_state=False)
+        g = Batch().from_data_list([mol_to_pyg_graph(mol)[0]])
 
         if new_rew > best_rew:
-            g_best = g
+            mol_best = mol
             best_rew = new_rew
             steps_remaining = K
-        
+
         if (steps_remaining == 0) or done:
             break
 
-        
-    start_rew = get_rewards(Batch.from_data_list([g_start]), surrogate_eval)
-    try:
-        final_rew = get_rewards(Batch.from_data_list([g_best]), surrogate_eval)
-    except Exception as e:
-        print(e)
-        final_rew = start_rew
-    return start_rew, final_rew
+    with open(save_path, 'a') as f:
+        print("Writing SMILE molecules!")
 
-def eval_greedy(surrogate_guide, surrogate_eval, env, N=30, K=1):
+        smile = Chem.MolToSmiles(mol_best, isomericSmiles=False)
+        print(smile, new_rew)
+        row = ''.join(['{},'] * 2)[:-1] + '\n'
+        f.write(row.format(smile, new_rew))
+
+    return start_rew, best_rew
+
+def eval_greedy(artifact_path, surrogate_guide, surrogate_eval, env, N=30, K=1):
+    # logging variables
+    dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
+    save_path = os.path.join(artifact_path, dt + '.csv')
 
     surrogate_guide = surrogate_guide.to(DEVICE)
     surrogate_guide.eval()
     surrogate_eval  = surrogate_eval.to(DEVICE)
     surrogate_eval.eval()
+
     print("\nStarting greedy...\n")
     avg_improvement = []
     avg_best = []
     for i in range(N):
-        start_rew, best_rew = greedy_rollout(env, surrogate_guide, surrogate_eval, K)
+        start_rew, best_rew = greedy_rollout(save_path, env, surrogate_guide, surrogate_eval, K)
         improvement = best_rew - start_rew
         print("{:2d}: {:4.1f} {:4.1f} {:4.1f}\n".format(i+1,
                                                       start_rew,
