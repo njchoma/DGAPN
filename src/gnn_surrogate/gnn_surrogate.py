@@ -108,10 +108,14 @@ class MolData(Dataset):
     def __len__(self):
         return len(self.logp)
 
-    def get_input_dim(self):
+    def get_graph_spec(self):
         g, y = self[0]
-        input_dim = g.x.shape[1]
-        return input_dim
+        nb_node_feats = g.x.shape[1]
+        try:
+            nb_edge_feats = g.edge_attr.shape[1]
+        except Exception as e:
+            nb_edge_feats = 1
+        return nb_node_feats, nb_edge_feats
 
     def compute_baseline_error(self):
         logp = np.array(self.logp)
@@ -368,7 +372,7 @@ def main(artifact_path,
          num_workers=12,
          emb_dim=512,
          nb_hidden=512,
-         nb_layer=7,
+         nb_layers=7,
          lr=0.001,
          store_preprocessed=False,
          data_path=None):
@@ -451,10 +455,12 @@ def main(artifact_path,
         net = load_current_model(save_dir)
         logging.info("Model restored")
     except Exception as e:
-        net = GNN_MyGAT(input_dim=train_data.get_input_dim(),
+        input_dim, nb_edge_types = train_data.get_graph_spec()
+        net = GNN_MyGAT(input_dim=input_dim,
                         emb_dim=emb_dim,
                         nb_hidden=nb_hidden,
-                        nb_layer=nb_layer,
+                        nb_layers=nb_layers,
+                        nb_edge_types=nb_edge_types,
                         use_3d=use_3d)
         logging.info(net)
         logging.info("New model created")
