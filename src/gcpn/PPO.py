@@ -3,6 +3,7 @@ import re
 import sys
 import gym
 import copy
+import yaml
 import numpy as np
 from collections import deque, OrderedDict
 
@@ -21,6 +22,7 @@ from torch_geometric.utils import dense_to_sparse
 from .gcpn_policy import ActorCriticGCPN
 from .rnd_explore import RNDistillation
 
+from utils.general_utils import initialize_logger
 from utils.graph_utils import mol_to_pyg_graph, get_batch_shift
 
 from gnn_surrogate.model import GNN_MyGAT
@@ -342,6 +344,7 @@ def train_ppo(args, surrogate_model, env):
     writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + '_' + dt))
     save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + '_' + dt)
     os.makedirs(save_dir, exist_ok=True)
+    initialize_logger(save_dir)
 
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
