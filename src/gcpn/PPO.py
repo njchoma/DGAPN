@@ -451,15 +451,20 @@ def train_ppo(args, surrogate_model, env):
                     surrogate_model, device)
 
             for i, idx in enumerate(nowdone_idx):
+                try:
+                    surr_reward = surr_rewards[i]
+                except Exception as e:
+                    surr_reward = surr_rewards
+
                 i_episode += 1
                 episode_count += 1
                 avg_length += 1
-                running_reward += surr_rewards[i]
-                writer.add_scalar("EpSurrogate", -1*surr_rewards[i], i_episode-1)
-                rewbuffer_env.append(surr_rewards[i])
+                running_reward += surr_reward
+                writer.add_scalar("EpSurrogate", -1*surr_reward, i_episode-1)
+                rewbuffer_env.append(surr_reward)
                 writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode-1)
 
-                memories[idx].rewards.append(surr_rewards[i])
+                memories[idx].rewards.append(surr_reward)
                 memories[idx].is_terminals.append(True)
             for idx in stillnotdone_idx:
                 avg_length += 1
