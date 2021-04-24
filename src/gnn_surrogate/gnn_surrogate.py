@@ -268,7 +268,7 @@ def train(net,
           valid_loader,
           optim,
           arg_handler,
-          artifact_path,
+          save_dir,
           writer):
     current_lr = optim.param_groups[0]['lr']
     lr_end = current_lr / 10 ** 3
@@ -388,10 +388,9 @@ def main(artifact_path,
     writer = SummaryWriter(log_dir=os.path.join(artifact_path, 'runs/' + dt))
     save_dir = os.path.join(artifact_path, 'saves/' + dt)
     os.makedirs(save_dir, exist_ok=True)
+    general_utils.initialize_logger(save_dir)
 
-    general_utils.initialize_logger(artifact_path)
-
-    arg_handler = ArgumentHandler(artifact_path, lr)
+    arg_handler = ArgumentHandler(save_dir, lr)
 
     train_data, valid_data, test_data = create_datasets(logp, smiles, use_3d)
     valid_data.compute_baseline_error()
@@ -448,7 +447,7 @@ def main(artifact_path,
 
 
     try:
-        net = load_current_model(artifact_path)
+        net = load_current_model(save_dir)
         logging.info("Model restored")
     except Exception as e:
         net = GNN_MyGAT(input_dim=train_data.get_input_dim(),
@@ -479,9 +478,9 @@ def main(artifact_path,
           valid_loader,
           optim,
           arg_handler,
-          artifact_path,
+          save_dir,
           writer)
 
     general_utils.close_logger()
     writer.close()
-    return load_best_model(artifact_path)
+    return load_best_model(save_dir)
