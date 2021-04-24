@@ -38,7 +38,7 @@ def main():
                        upsample=args.upsample,
                        exp_loss=args.exp_loss,
                        nb_hidden=args.hidden,
-                       nb_layer=args.layers,
+                       nb_layers=args.layers,
                        use_3d=args.use_3d,
                        store_preprocessed=args.store_preprocessed,
                        data_path = args.data_path)

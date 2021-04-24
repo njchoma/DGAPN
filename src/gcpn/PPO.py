@@ -45,17 +45,6 @@ class Memory:
         del self.rewards[:]
         del self.is_terminals[:]
 
-
-def get_surrogate_dims(surrogate_model):
-    state_dict = surrogate_model.state_dict()
-    layers_name = [s for s in state_dict.keys() if re.compile('^layers\.[0-9]+\.weight$').match(s)]
-    input_dim = state_dict[layers_name[0]].size(0)
-    emb_dim = state_dict[layers_name[0]].size(-1)
-    nb_edge_types = 1
-    nb_layer = len(layers_name)
-    nb_hidden = state_dict[layers_name[-1]].size(-1)
-    return input_dim, emb_dim, nb_edge_types, nb_layer, nb_hidden
-
 #################################################
 #                   GCPN PPO                    #
 #################################################
@@ -85,7 +74,11 @@ class DGCPN(nn.Module):
         self.K_epochs = K_epochs
 
         if emb_model is not None:
-            input_dim, emb_dim, nb_edge_types, gnn_nb_layers, gnn_nb_hidden = get_surrogate_dims(emb_model)
+            input_dim = emb_model.input_dim
+            emb_dim = emb_model.emb_dim
+            nb_edge_types = emb_model.nb_edge_types
+            gnn_nb_layers = emb_model.nb_layers
+            gnn_nb_hidden = emb_model.nb_hidden
 
         self.policy = ActorCriticGCPN(lr[:2],
                                       betas,

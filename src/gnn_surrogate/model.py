@@ -5,15 +5,21 @@ import torch_geometric as pyg
 
 
 class GNN_MyGAT(nn.Module):
-    def __init__(self, input_dim, emb_dim, nb_hidden, nb_layer, use_3d=False):
+    def __init__(self, input_dim, emb_dim, nb_hidden, nb_layers, nb_edge_types, use_3d=False):
         super(GNN_MyGAT, self).__init__()
-        if nb_layer == 1:
-            layers = [MyGATConv(input_dim, emb_dim)]
+        self.input_dim = input_dim
+        self.emb_dim = emb_dim
+        self.nb_hidden = nb_hidden
+        self.nb_layers = nb_layers
+        self.nb_edge_types = nb_edge_types
+
+        if nb_layers == 1:
+            layers = [MyGATConv(input_dim, emb_dim, nb_edge_types)]
         else:
-            layers = [MyGATConv(input_dim, nb_hidden)]
-            for _ in range(nb_layer-2):
-                layers.append(MyGATConv(nb_hidden, nb_hidden))
-            layers.append(MyGATConv(nb_hidden, emb_dim))
+            layers = [MyGATConv(input_dim, nb_hidden, nb_edge_types)]
+            for _ in range(nb_layers-2):
+                layers.append(MyGATConv(nb_hidden, nb_hidden, nb_edge_types))
+            layers.append(MyGATConv(nb_hidden, emb_dim, nb_edge_types))
         self.layers = nn.ModuleList(layers)
         self.final_layer = nn.Linear(emb_dim, 1)
         self.act = nn.ReLU()
@@ -56,8 +62,8 @@ def zeros(tensor):
 
 
 class MyGATConv(MessagePassing):
-    def __init__(self, in_channels, out_channels, batch_norm=False, res=True,
-                 use_attention=True, heads=2, nb_edge_attr=1, concat=False, negative_slope=0.2, dropout=0, bias=True,
+    def __init__(self, in_channels, out_channels, nb_edge_attr=1, batch_norm=False, res=True,
+                 use_attention=True, heads=2, concat=False, negative_slope=0.2, dropout=0, bias=True,
                  **kwargs):
         super(MyGATConv, self).__init__(aggr='add', node_dim=0, **kwargs)  # "Add" aggregation.
         self.in_channels = in_channels
