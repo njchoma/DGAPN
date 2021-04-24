@@ -186,11 +186,9 @@ class DGCPN(nn.Module):
 
         for i in range(self.K_epochs):
             loss, baseline_loss = self.policy.update(old_states, old_candidates, old_actions, old_logprobs, old_values, rewards)
+            rnd_loss = self.explore_critic.update(old_next_states)
             if (i%10)==0:
-                print("  {:3d}: Actor Loss: {:7.3f}, Critic Loss: {:7.3f}".format(i, loss, baseline_loss))
-        # update RND
-        rnd_loss = self.explore_critic.update(old_next_states)
-        print("  RND Loss: {:7.3f}".format(rnd_loss))
+                print("  {:3d}: Actor Loss: {:7.3f}, Critic Loss: {:7.3f}, RND Loss: {:7.3f}".format(i, loss, baseline_loss, rnd_loss))
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -317,7 +315,7 @@ def train_ppo(args, surrogate_model, env):
     gamma = 0.99                # discount factor
     eta = 0.01                  # relative weight for entropy loss
 
-    lr = (5e-4, 1e-4, 2e-6)     # learning rate for actor, critic and random network
+    lr = (5e-4, 1e-4, 2e-3)     # learning rate for actor, critic and random network
     betas = (0.9, 0.999)
     eps = 0.01
 
@@ -504,7 +502,7 @@ def train_ppo(args, surrogate_model, env):
         if save_counter > save_interval:
             torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_gcpn.pth'.format(i_episode)))
             save_counter -= save_interval
-        
+
         # save running model
         torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
 
