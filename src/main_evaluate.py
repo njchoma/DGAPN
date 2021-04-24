@@ -1,15 +1,15 @@
 import os
 import argparse
-from datetime import datetime
 
 import torch
 
-from torch.utils.tensorboard import SummaryWriter
-
 from utils.general_utils import maybe_download_file
+
 from gnn_surrogate import model
+
 from gcpn.env import CReM_Env
-from gcpn.gcpn_policy import GCPN_CReM
+from gcpn.gcpn_policy import GCPN_Actor
+
 from evaluate.eval_gcpn_crem import eval_gcpn_crem
 from evaluate.eval_greedy import eval_greedy
 
@@ -20,9 +20,11 @@ def molecule_arg_parser():
     add_arg = parser.add_argument
 
     # EXPERIMENT PARAMETERS
-    add_arg('--data_path', default='dataset')
+    add_arg('--data_path', required=True)
     add_arg('--warm_start_dataset_path', required=True)
     add_arg('--artifact_path', required=True)
+    add_arg('--name', default='default_run')
+    add_arg('--greedy', action='store_true')
 
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_guide_path', default='')
@@ -32,15 +34,9 @@ def molecule_arg_parser():
     add_arg('--nb_sample_crem', type=int, default=128)
 
     add_arg('--nb_test', type=int, default=50)
-    add_arg('--nb_bad_steps', type=int, default=5)
+    add_arg('--nb_bad_steps', type=int, default=6) # match max_timesteps in ppo
 
     return parser
-
-
-def get_current_datetime():
-    now = datetime.now()
-    dt_string = now.strftime("%Y.%m.%d_%H:%M:%S")
-    return dt_string
 
 def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_path):
     if surrogate_model_url != '':
@@ -53,16 +49,19 @@ def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_pat
     print("Surrogate model loaded")
     return surrogate_model
 
-def load_gcpn(model_class, gcpn_path):
-    model_class.load_state_dict(torch.load(gcpn_path, map_location='cpu'))
+def load_gcpn(gcpn_path):
+    gcpn_model = torch.load(gcpn_path, map_location='cpu')
     print("GCPN model loaded")
-    return model_class
+    return gcpn_model
 
 def main():
     args = molecule_arg_parser().parse_args()
-    print("====args====", args)
-    dt = get_current_datetime()
-    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/'+dt))
+    print("====args====\n", args)
+
+    env = CReM_Env(args.data_path,
+                args.warm_start_dataset_path,
+                nb_sample_crem = args.nb_sample_crem,
+                mode='mol')
 
     surrogate_guide = load_surrogate_model(args.artifact_path,
                                            args.surrogate_model_url,
@@ -70,36 +69,30 @@ def main():
     surrogate_eval  = load_surrogate_model(args.artifact_path,
                                            '',
                                            args.surrogate_eval_path)
-
-    env = CReM_Env(args.data_path,
-                   args.warm_start_dataset_path,
-                   nb_sample_crem = args.nb_sample_crem,
-                   mode='mol')
-
     print(surrogate_guide)
 
-    # Greedy
-    #eval_greedy(surrogate_guide,
-    #            surrogate_eval,
-    #            env,
-    #            N = args.nb_test,
-    #            K = args.nb_bad_steps)
+    artifact_path = os.path.join(args.artifact_path, args.name)
+    os.makedirs(artifact_path, exist_ok=True)
 
-    actor = GCPN_Actor(eta=0.01,
-                        eps_clip=0.2,
-                        emb_model=surrogate_guide,
-                        emb_dim=512,
-                        nb_layers=4,
-                        nb_hidden=128)
-    policy = load_gcpn(actor, args.gcpn_path)
-    print(policy)
-    # GCPN_CReM
-    eval_gcpn_crem(policy,
+    if args.greedy is True:
+        # Greedy
+        eval_greedy(artifact_path,
                     surrogate_guide,
                     surrogate_eval,
                     env,
                     N = args.nb_test,
                     K = args.nb_bad_steps)
+    else:
+        # GCPN_CReM
+        policy = load_gcpn(args.gcpn_path)
+        print(policy)
+        eval_gcpn_crem(artifact_path,
+                        policy,
+                        surrogate_guide,
+                        surrogate_eval,
+                        env,
+                        N = args.nb_test,
+                        K = args.nb_bad_steps)
 
 
 if __name__ == '__main__':
