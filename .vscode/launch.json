@@ -33,6 +33,23 @@
                 "--surrogate_model_path", "artifact/test_surrogate.pth"
             ],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "main_evaluate",
+            "type": "python",
+            "request": "launch",
+            "program": "src/main_evaluate.py",
+            "subProcess": true,
+            "args": [
+                "--name", "eval",
+                "--data_path", "src/dataset",
+                "--artifact_path", "test_run/gcpn",
+                "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
+                "--surrogate_guide_path", "artifact/test_surrogate.pth",
+                "--surrogate_eval_path", "artifact/test_surrogate.pth",
+                "--gcpn_path", "artifact/test_gcpn.pth"
+            ],
+            "console": "integratedTerminal"
         }
     ]
 }
