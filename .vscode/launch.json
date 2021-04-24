@@ -30,7 +30,7 @@
                 "--artifact_path", "test_run/gcpn",
                 "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
                 "--gpu", "0",
-                "--surrogate_model_path", "artifact/test_model.pth"
+                "--surrogate_model_path", "artifact/test_surrogate.pth"
             ],
             "console": "integratedTerminal"
         }
