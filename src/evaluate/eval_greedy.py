@@ -23,7 +23,7 @@ def greedy_rollout(save_path, env, surrogate_guide, surrogate_eval, K, max_rollo
     mol_start = mol
     mol_best = mol
 
-    g = Batch().from_data_list([mol_to_pyg_graph(mol)[0]])
+    g = Batch().from_data_list([mol_to_pyg_graph(mol)[0]]).to(DEVICE)
     new_rew = get_rewards(g, surrogate_guide)
     start_rew = new_rew
     best_rew = new_rew
@@ -34,7 +34,7 @@ def greedy_rollout(save_path, env, surrogate_guide, surrogate_eval, K, max_rollo
                                              steps_remaining,
                                              new_rew))
         steps_remaining -= 1
-        g_candidates = Batch().from_data_list([mol_to_pyg_graph(cand)[0] for cand in mol_candidates])
+        g_candidates = Batch().from_data_list([mol_to_pyg_graph(cand)[0] for cand in mol_candidates]).to(DEVICE)
         next_rewards = get_rewards(g_candidates, surrogate_guide)
 
         action = np.argmax(next_rewards)
@@ -46,7 +46,7 @@ def greedy_rollout(save_path, env, surrogate_guide, surrogate_eval, K, max_rollo
             break
 
         mol, mol_candidates, done = env.step(action, include_current_state=False)
-        g = Batch().from_data_list([mol_to_pyg_graph(mol)[0]])
+        g = Batch().from_data_list([mol_to_pyg_graph(mol)[0]]).to(DEVICE)
 
         if new_rew > best_rew:
             mol_best = mol
