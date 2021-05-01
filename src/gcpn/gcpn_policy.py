@@ -17,6 +17,13 @@ from utils.graph_utils import get_batch_shift
 #####################################################
 EPS = 1e-4
 
+def batched_expand(emb, batch):
+    unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), 
+                        dims=(0,)) # temp fix due to torch.unique bug
+
+    X = torch.repeat_interleave(emb, torch.bincount(batch)[unique], dim=0)
+    return X
+
 def batched_sample(probs, batch):
     unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), 
                         dims=(0,)) # temp fix due to torch.unique bug
@@ -165,7 +172,7 @@ class GCPN_Actor(nn.Module):
         g_emb = self.get_embedding(g)
         g_candidates_emb = self.get_embedding(g_candidates)
 
-        X = torch.repeat_interleave(g_emb, torch.bincount(batch_idx), dim=0)
+        X = batched_expand(g_emb, batch_idx)
         X = torch.cat((X, g_candidates_emb), dim=1)
         X_states = X
 
