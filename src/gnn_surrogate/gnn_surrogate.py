@@ -79,8 +79,6 @@ class MolData(Dataset):
         self.logp = logp
         self.smiles = smiles
         self.use_3d = use_3d
-        if use_3d:
-            print("WARNING: USING 3D GRAPH ONLY")
 
     def __getitem__(self, index):
         logp = self.logp[index]
@@ -95,21 +93,16 @@ class MolData(Dataset):
             print("Invalid SMILE encountered. Using first row instead.")
 
         g = graph_utils.mol_to_pyg_graph(mol, self.use_3d)
-        g = g[1] if self.use_3d else g[0]
-
-        # nb_nodes = len(g.x)
-        # dense_edges = get_dense_edges(len(g.x))
-        # g2 = pyg.data.Data(edge_index=dense_edges)
-        # g2.num_nodes = nb_nodes
-
-        # return g, torch.FloatTensor([logp]), g2
-        return g, torch.FloatTensor([logp])
+        if self.use_3d:
+            return torch.FloatTensor([logp]), g[0], g[1]
+        else:
+            return torch.FloatTensor([logp]), g[0], None
 
     def __len__(self):
         return len(self.logp)
 
     def get_graph_spec(self):
-        g, y = self[0]
+        y, g, _ = self[0]
         nb_node_feats = g.x.shape[1]
         try:
             nb_edge_feats = g.edge_attr.shape[1]
@@ -148,15 +141,17 @@ def create_datasets(logp, smiles, use_3d, np_seed=0):
 
 
 def my_collate(samples):
-    g1 = [s[0] for s in samples]
-    y = [s[1] for s in samples]
-    # g2 = [s[2] for s in samples]
+    y = [s[0] for s in samples]
+    g1 = [s[1] for s in samples]
+    g2 = [s[2] for s in samples]
 
-    G1 = pyg.data.Batch().from_data_list(g1)
-    # G2 = pyg.data.Batch().from_data_list(g2)
     y = torch.cat(y, dim=0)
-    # return G1, y, G2
-    return G1, y
+    G1 = pyg.data.Batch().from_data_list(g1)
+    if None in g2:
+        return y, G1, None
+    else:
+        G2 = pyg.data.Batch().from_data_list(g2)
+        return y, G1, G2
 
 
 
@@ -237,16 +232,15 @@ def proc_one_epoch(net,
 
     t0 = time.time()
     logging.info("  {} batches, {} samples".format(nb_batch, nb_samples))
-    for i, (G1, y) in enumerate(loader):
+    for i, (y, G1, G2) in enumerate(loader):
         t1 = time.time()
         if train:
             optim.zero_grad()
         y = y.to(DEVICE, non_blocking=True)
         G1 = G1.to(DEVICE)
-        # G2 = G2.to(DEVICE)
+        G2 = G2.to(DEVICE) if G2 is not None else None
 
-        # y_pred = net(G1, G2.edge_index)
-        y_pred = net(G1)
+        y_pred = net(G1, G2)
 
         loss = criterion(y_pred, y)
         with torch.autograd.set_detect_anomaly(True):
@@ -370,9 +364,9 @@ def main(artifact_path,
          use_3d=False,
          batch_size=128,
          num_workers=12,
-         emb_dim=512,
-         nb_hidden=512,
-         nb_layers=7,
+         emb_dim=128,
+         nb_hidden=256,
+         nb_layers=4,
          lr=0.001,
          store_preprocessed=False,
          data_path=None):

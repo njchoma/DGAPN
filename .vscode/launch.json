@@ -14,6 +14,7 @@
                 "--name", "predict_dock_score",
                 "--data_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
                 "--artifact_path", "test_run/gcpn",
+                "--use_3d",
                 "--gpu", "0"
             ],
             "console": "integratedTerminal"
@@ -29,8 +30,8 @@
                 "--data_path", "src/dataset",
                 "--artifact_path", "test_run/gcpn",
                 "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
-                "--gpu", "0",
-                "--surrogate_model_path", "artifact/test_surrogate.pth"
+                "--surrogate_model_path", "artifact/test_surrogate.pth",
+                "--gpu", "0"
             ],
             "console": "integratedTerminal"
         },

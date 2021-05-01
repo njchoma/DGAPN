@@ -73,7 +73,7 @@ def construct_graph(nodes, edges):
     g = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
     return g
 
-def mol_to_pyg_graph(mol, idm=False):
+def mol_to_pyg_graph(mol, idm=False, ratio=2.):
     nodes = []
     for atom in mol.GetAtoms():
         nodes.append(atom_to_node(atom))
@@ -93,8 +93,13 @@ def mol_to_pyg_graph(mol, idm=False):
         if AllChem.EmbedMolecule(mol, randomSeed=0xf00d) == -1:  # optional random seed for reproducibility)
             AllChem.Compute2DCoords(mol)
         # mol = Chem.RemoveHs(mol)
-        W = 1. / Chem.rdmolops.Get3DDistanceMatrix(mol)
+        with np.errstate(divide='ignore'):
+            W = 1. / Chem.rdmolops.Get3DDistanceMatrix(mol)
         W[np.isinf(W)] = 0
+        # preserve top ratio*n entries
+        threshold = np.sort(W, axis=None)[::-1][min(int(ratio*len(W))+1, len(W)**2) -1]
+        W[W<threshold] = 0
+        # convert to sparse representation
         W_spr = dense_to_sparse(torch.FloatTensor(W))
         g_idm = Data(x=g_adj.x, edge_index=W_spr[0], edge_attr=W_spr[1])
 

@@ -12,6 +12,7 @@ class GNN_MyGAT(nn.Module):
         self.nb_hidden = nb_hidden
         self.nb_layers = nb_layers
         self.nb_edge_types = nb_edge_types
+        self.use_3d = use_3d
 
         if nb_layers == 1:
             layers = [MyGATConv(input_dim, emb_dim, nb_edge_types)]
@@ -21,23 +22,41 @@ class GNN_MyGAT(nn.Module):
                 layers.append(MyGATConv(nb_hidden, nb_hidden, nb_edge_types))
             layers.append(MyGATConv(nb_hidden, emb_dim, nb_edge_types))
         self.layers = nn.ModuleList(layers)
+
+        if use_3d:
+            if nb_layers == 1:
+                layers3D = [MyGCNConv(input_dim, emb_dim)]
+            else:
+                layers3D = [MyGCNConv(input_dim, nb_hidden)]
+                for _ in range(nb_layers-2):
+                    layers3D.append(MyGCNConv(nb_hidden, nb_hidden))
+                layers3D.append(MyGCNConv(nb_hidden, emb_dim))
+            self.layers3D = nn.ModuleList(layers3D)
+
         self.final_layer = nn.Linear(emb_dim, 1)
 
-    def forward(self, g, dense_edge_idx=None):
-        x = self.get_embedding(g)
-        #x = torch.sum(x, dim=0)
+    def forward(self, gA, gG=None):
+        x = self.get_embedding(gA, gG)
         y = self.final_layer(x).squeeze()
         return y
 
-    def get_embedding(self, g):
-        x = g.x
-        edge_index = g.edge_index
-        edge_attr  = g.edge_attr
-        for i, l in enumerate(self.layers):
-            x, edge_attr = l(x, edge_index, edge_attr)
-            # if i==2:
-            #     x = nn.functional.dropout(x, training=self.training)
-        x = pyg.nn.global_add_pool(x, g.batch)
+    def get_embedding(self, gA, gG=None, aggr=True):
+        x = gA.x
+        edge_index = gA.edge_index
+        edge_attr  = gA.edge_attr
+        if gG is None:
+            for i, l in enumerate(self.layers):
+                x, edge_attr = l(x, edge_index, edge_attr)
+        else:
+            geom_index = gG.edge_index
+            geom_attr = gG.edge_attr
+            for l, l3D in zip(self.layers, self.layers3D):
+                x1, edge_attr = l(x, edge_index, edge_attr)
+                x2 = l3D(x, geom_index, geom_attr)
+                x = x1 + x2
+
+        if aggr is True:
+            x = pyg.nn.global_add_pool(x, gA.batch)
         return x
 
 
@@ -147,19 +166,19 @@ class MyGATConv(MessagePassing):
 
     def __repr__(self):
         return '{}({}, {}, heads={})'.format(self.__class__.__name__,
-                                             self.in_channels,
-                                             self.out_channels, self.heads)
+                                             self.in_channels, self.out_channels, self.heads)
 
 
 class MyGCNConv(MessagePassing):
     def __init__(self, in_channels, out_channels, batch_norm=False, res=False, 
-                 bias=True, **kwargs):
+                 dropout=0, bias=True, **kwargs):
         super(MyGCNConv, self).__init__(aggr='add', node_dim=0, **kwargs)  # "Add" aggregation.
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.batch_norm = batch_norm
         self.res = res
 
+        self.dropout = dropout
         self.weight = Parameter(torch.Tensor(in_channels, out_channels))
 
         if bias:
@@ -195,7 +214,7 @@ class MyGCNConv(MessagePassing):
             x += self.bias
 
         D = scatter_add(edge_weight[edge_index[1]],
-                    edge_index[0], dim=0, dim_size=num_nodes)
+                    edge_index[0], dim=0, dim_size=x.size(0))
         D = D.pow(-0.5)
         D[D == float("inf")] = 0
 
@@ -206,21 +225,21 @@ class MyGCNConv(MessagePassing):
 
         if self.res:
             out += node_attr
-        return out, edge_attr
+        return out
 
-    def message(self, x_j, norm):
+    def message(self, x_j, edge_index_i, norm=None):
         out = x_j
         if norm is not None:
-            out = norm[edge_index_i].view(-1, 1) * out
+            norm_i = F.dropout(norm[edge_index_i], p=self.dropout, training=self.training)
+            out = norm_i.view(-1, 1) * out
         return out
 
     def update(self, aggr_out):
         return aggr_out
 
     def __repr__(self):
-        return '{}({}, {}, heads={})'.format(self.__class__.__name__,
-                                             self.in_channels,
-                                             self.out_channels, self.heads)
+        return '{}({}, {})'.format(self.__class__.__name__,
+                                             self.in_channels, self.out_channels)
 
 
 class MyHGATConv(MessagePassing):
