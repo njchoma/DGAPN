@@ -17,9 +17,16 @@ from utils.graph_utils import get_batch_shift
 #####################################################
 EPS = 1e-4
 
+def batched_expand(emb, batch):
+    unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), 
+                        dims=(0,)) # TODO (Yulun): temp fix due to torch.unique bug
+
+    X = torch.repeat_interleave(emb, torch.bincount(batch)[unique], dim=0)
+    return X
+
 def batched_sample(probs, batch):
     unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), 
-                        dims=(0,)) # temp fix due to torch.unique bug
+                        dims=(0,)) # TODO (Yulun): temp fix due to torch.unique bug
     mask = batch.unsqueeze(0) == unique.unsqueeze(1)
 
     p = probs * mask
@@ -179,7 +186,7 @@ class GCPN_Actor(nn.Module):
         Q = self.Q_final_layer(Q)
         K = self.Q_final_layer(K)
 
-        Q = torch.repeat_interleave(Q, torch.bincount(batch_idx), dim=0)
+        Q = batched_expand(Q, batch_idx)
         logits = torch.sum(Q * K, dim=1) / self.d_k**.5
 
         probs = batched_softmax(logits, batch_idx)

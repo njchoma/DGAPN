@@ -22,7 +22,6 @@ class GNN_MyGAT(nn.Module):
             layers.append(MyGATConv(nb_hidden, emb_dim, nb_edge_types))
         self.layers = nn.ModuleList(layers)
         self.final_layer = nn.Linear(emb_dim, 1)
-        self.act = nn.ReLU()
 
     def forward(self, g, dense_edge_idx=None):
         x = self.get_embedding(g)
@@ -35,8 +34,7 @@ class GNN_MyGAT(nn.Module):
         edge_index = g.edge_index
         edge_attr  = g.edge_attr
         for i, l in enumerate(self.layers):
-            x = l(x, edge_index, edge_attr)
-            x = self.act(x)
+            x, edge_attr = l(x, edge_index, edge_attr)
             # if i==2:
             #     x = nn.functional.dropout(x, training=self.training)
         x = pyg.nn.global_add_pool(x, g.batch)
@@ -78,8 +76,6 @@ class MyGATConv(MessagePassing):
             self.concat = concat
             self.negative_slope = negative_slope
             self.dropout = dropout
-            self.linN = Parameter(
-                torch.randn(in_channels, heads * out_channels) * (heads * out_channels) ** (-0.5))
             self.linE = Parameter(
                 torch.randn(nb_edge_attr, heads * nb_edge_attr) * (heads * nb_edge_attr) ** (-0.5))
             self.att = Parameter(torch.randn(
@@ -87,19 +83,18 @@ class MyGATConv(MessagePassing):
         else:
             self.heads = 1
             self.concat = True
-            self.linN = Parameter(torch.randn(in_channels, out_channels) * out_channels ** (-0.5))
             self.register_parameter('linE', None)
+
+        self.linN = Parameter(
+            torch.randn(in_channels, heads * out_channels) * (heads * out_channels) ** (-0.5))
+        if bias:
+            self.bias = Parameter(torch.zeros(heads * out_channels))
+        else:
+            self.register_parameter('bias', None)
 
         if self.batch_norm:
             # self.norm = MyInstanceNorm(in_channels, track_running_stats=False)
             self.norm = BatchNorm1d(in_channels)
-
-        if bias and concat:
-            self.bias = Parameter(torch.zeros(heads * out_channels))
-        elif bias and not concat:
-            self.bias = Parameter(torch.zeros(out_channels))
-        else:
-            self.register_parameter('bias', None)
 
         self.act = nn.ReLU()
 
@@ -118,7 +113,7 @@ class MyGATConv(MessagePassing):
         if self.batch_norm:
             x = self.norm(x)
 
-        if size is None and torch.is_tensor(x):
+        if not self.use_attention and size is None:
             edge_index, edge_attr = remove_self_loops(edge_index, edge_attr=edge_attr)
             edge_index, edge_attr = add_self_loops(edge_index,
                                                    edge_weight=edge_attr,
@@ -128,6 +123,8 @@ class MyGATConv(MessagePassing):
         edge_attr = edge_attr.view(-1, self.nb_edge_attr)
 
         x = torch.matmul(x, self.linN)
+        if self.bias is not None:
+            x += self.bias
         alpha = None
 
         x = x.view(-1, self.heads, self.out_channels)
@@ -143,21 +140,20 @@ class MyGATConv(MessagePassing):
 
         out = self.propagate(edge_index, x=x, alpha=alpha)
 
-        if self.concat is True:
-            x = x.view(-1, self.heads * self.out_channels)
-            out = out.view(-1, self.heads * self.out_channels)
-        else:
-            x = x.mean(dim=1)  # TODO(Yulun): simply extract one entry of dim 1.
-            out = out.mean(dim=1)
-
-        if self.bias is not None:
-            out = out + self.bias
-
-        if self.res:
+        if self.use_attention:
             out += x
 
+        if self.concat is True:
+            out = out.view(-1, self.heads * self.out_channels)
+            edge_attr = edge_attr.view(-1, self.heads * self.nb_edge_attr)
+        else:
+            # TODO (Yulun): Efficiency
+            out = out.mean(dim=1)
+            edge_attr = edge_attr.mean(dim=1)
+
         out = self.act(out)
-        return out
+        edge_attr = self.act(edge_attr)
+        return out, edge_attr
 
     def message(self, x_j, alpha):
         out = x_j
