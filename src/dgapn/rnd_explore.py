@@ -1,9 +1,14 @@
+from collections import deque
 import numpy as np
 
 import torch
 import torch.nn as nn
 
-from collections import deque
+import torch_geometric as pyg
+from torch_geometric.nn import MessagePassing
+from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
+
+from gnn_surrogate.model import GNN_MyGAT
 
 def init_method_1(model):
     model.weight.data.uniform_()

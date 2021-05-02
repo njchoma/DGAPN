@@ -5,11 +5,11 @@ import argparse
 import torch
 import torch.multiprocessing as mp
 
-from gcpn.PPO import train_ppo
+from dgapn.DGAPN import train_gpu_sync
 
 from utils.general_utils import maybe_download_file
 from gnn_surrogate import model
-from gcpn.env import CReM_Env
+from dgapn.env import CReM_Env
 
 def molecule_arg_parser():
     parser = argparse.ArgumentParser(

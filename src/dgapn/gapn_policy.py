@@ -1,14 +1,12 @@
-import time
-import numpy as np
-
 import torch
 import torch.nn as nn
-from torch.distributions.bernoulli import Bernoulli
 from torch.distributions.categorical import Categorical
 
 import torch_geometric as pyg
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
+
+from gnn_surrogate.model import GNN_MyGAT
 
 from utils.graph_utils import get_batch_shift
 

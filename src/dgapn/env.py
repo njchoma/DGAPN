@@ -1,9 +1,7 @@
-import os
+import gym
 import random
 from rdkit import Chem
 from crem.crem import mutate_mol
-
-from torch_geometric.data import Batch
 
 from dataset.get_dataset import download_dataset, unpack_dataset
 from dataset import preprocess

@@ -7,8 +7,8 @@ from utils.general_utils import maybe_download_file
 
 from gnn_surrogate import model
 
-from gcpn.env import CReM_Env
-from gcpn.gcpn_policy import GCPN_Actor
+from dgapn.env import CReM_Env
+from dgapn.gapn_policy import GCPN_Actor
 
 from evaluate.eval_gcpn_crem import eval_gcpn_crem
 from evaluate.eval_greedy import eval_greedy

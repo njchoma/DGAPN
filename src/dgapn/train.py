@@ -1,9 +1,5 @@
 import os
-import re
-import sys
 import gym
-import copy
-import yaml
 import numpy as np
 from collections import deque, OrderedDict
 
@@ -12,213 +8,12 @@ from datetime import datetime
 
 import torch
 import torch.multiprocessing as mp
-import torch.nn as nn
-from torch.distributions import MultivariateNormal
 from torch.utils.tensorboard import SummaryWriter
 
-from torch_geometric.data import Data, Batch
-from torch_geometric.utils import dense_to_sparse
-
-from .gcpn_policy import ActorCriticGCPN
-from .rnd_explore import RNDistillation
+from .DGAPN import Memory, DGCPN, get_surr_reward, get_expl_reward
 
 from utils.general_utils import initialize_logger
 from utils.graph_utils import mols_to_pyg_batch
-
-from gnn_surrogate.model import GNN_MyGAT
-
-#####################################################
-#                   HELPER MODULES                  #
-#####################################################
-
-class Memory:
-    def __init__(self):
-        self.actions = []
-        self.states = []
-        self.logprobs = []
-        self.rewards = []
-        self.is_terminals = []
-
-    def extend(self, memory):
-        self.actions.extend(memory.actions)
-        self.states.extend(memory.states)
-        self.logprobs.extend(memory.logprobs)
-        self.rewards.extend(memory.rewards)
-        self.is_terminals.extend(memory.is_terminals)
-
-    def clear(self):
-        del self.actions[:]
-        del self.states[:]
-        del self.logprobs[:]
-        del self.rewards[:]
-        del self.is_terminals[:]
-
-#################################################
-#                    UPDATE                     #
-#################################################
-
-class DGCPN(nn.Module):
-    def __init__(self,
-                 lr,
-                 betas,
-                 eps,
-                 eta,
-                 gamma,
-                 K_epochs,
-                 eps_clip,
-                 emb_model=None,
-                 input_dim=None,
-                 emb_dim=None,
-                 nb_edge_types=None,
-                 gnn_nb_layers=None,
-                 gnn_nb_hidden=None,
-                 use_3d=None,
-                 enc_nb_layers=None,
-                 enc_nb_hidden=None,
-                 enc_nb_output=None,
-                 rnd_nb_layers=None,
-                 rnd_nb_hidden=None,
-                 rnd_nb_output=None):
-        super(DGCPN, self).__init__()
-        self.gamma = gamma
-        self.K_epochs = K_epochs
-
-        if emb_model is not None:
-            input_dim = emb_model.input_dim
-            emb_dim = emb_model.emb_dim
-            nb_edge_types = emb_model.nb_edge_types
-            gnn_nb_layers = emb_model.nb_layers
-            gnn_nb_hidden = emb_model.nb_hidden
-            use_3d = emb_model.use_3d
-
-        self.policy = ActorCriticGCPN(lr[:2],
-                                      betas,
-                                      eps,
-                                      eta,
-                                      eps_clip,
-                                      emb_model,
-                                      input_dim,
-                                      emb_dim,
-                                      nb_edge_types,
-                                      gnn_nb_layers,
-                                      gnn_nb_hidden,
-                                      use_3d,
-                                      enc_nb_layers,
-                                      enc_nb_hidden,
-                                      enc_nb_output)
-
-        self.policy_old = ActorCriticGCPN(lr[:2],
-                                          betas,
-                                          eps,
-                                          eta,
-                                          eps_clip,
-                                          emb_model,
-                                          input_dim,
-                                          emb_dim,
-                                          nb_edge_types,
-                                          gnn_nb_layers,
-                                          gnn_nb_hidden,
-                                          use_3d,
-                                          enc_nb_layers,
-                                          enc_nb_hidden,
-                                          enc_nb_output)
-        self.policy_old.load_state_dict(self.policy.state_dict())
-
-        self.explore_critic = RNDistillation(lr[2],
-                                             betas,
-                                             eps,
-                                             input_dim,
-                                             emb_dim,
-                                             nb_edge_types,
-                                             gnn_nb_layers,
-                                             gnn_nb_hidden,
-                                             use_3d,
-                                             rnd_nb_layers,
-                                             rnd_nb_hidden,
-                                             rnd_nb_output)
-
-        self.device = torch.device("cpu")
-
-    def to_device(self, device):
-        self.policy.to(device)
-        self.policy_old.to(device)
-        self.explore_critic.to(device)
-        self.device = device
-
-    def forward(self):
-        raise NotImplementedError
-
-    def select_action(self, states, candidates, batch_idx=None, return_shifted=False):
-        if batch_idx is None:
-            batch_idx = torch.zeros(len(torch.unique(candidates[0].batch)), dtype=torch.long)
-        batch_idx = batch_idx.to(self.device)
-
-        with torch.autograd.no_grad():
-            g_emb, g_next_emb, g_candidates_emb, action_logprobs, actions, shifted_actions = self.policy_old.select_action(
-                states, candidates, batch_idx)
-
-        if return_shifted:
-            return [g_emb, g_next_emb, g_candidates_emb], action_logprobs, actions, shifted_actions
-        else:
-            return [g_emb, g_next_emb, g_candidates_emb], action_logprobs, actions
-
-    def update(self, memory, eps=1e-5):
-        # Monte Carlo estimate of rewards:
-        rewards = []
-        discounted_reward = 0
-        for reward, is_terminal in zip(reversed(memory.rewards), reversed(memory.is_terminals)):
-            if is_terminal:
-                discounted_reward = 0
-            discounted_reward = reward + (self.gamma * discounted_reward)
-            rewards.insert(0, discounted_reward)
-
-        # Normalizing the rewards:
-        rewards = torch.tensor(rewards).to(self.device)
-        rewards = (rewards - rewards.mean()) / (rewards.std() + eps)
-
-        # convert list to tensor
-        old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(self.device)
-        old_next_states = torch.cat(([m[1] for m in memory.states]),dim=0).to(self.device)
-        old_candidates = Batch().from_data_list([Data(x=m[2]) for m in memory.states]).to(self.device)
-        old_actions = torch.tensor(memory.actions).to(self.device)
-        old_logprobs = torch.tensor(memory.logprobs).to(self.device)
-
-        old_values = self.policy_old.get_value(old_states)
-
-        # Optimize policy for K epochs:
-        print("Optimizing...")
-
-        for i in range(self.K_epochs):
-            loss, baseline_loss = self.policy.update(old_states, old_candidates, old_actions, old_logprobs, old_values, rewards)
-            rnd_loss = self.explore_critic.update(old_next_states)
-            if (i%10)==0:
-                print("  {:3d}: Actor Loss: {:7.3f}, Critic Loss: {:7.3f}, RND Loss: {:7.3f}".format(i, loss, baseline_loss, rnd_loss))
-
-        # Copy new weights into old policy:
-        self.policy_old.load_state_dict(self.policy.state_dict())
-
-    def __repr__(self):
-        return "{}\n".format(repr(self.policy))
-
-
-#####################################################
-#                      REWARDS                      #
-#####################################################
-
-def get_surr_reward(states, surrogate_model, device):
-    g = mols_to_pyg_batch(states, surrogate_model.use_3d, device=device)
-
-    with torch.autograd.no_grad():
-        pred_docking_score = surrogate_model(g)
-    return (-pred_docking_score).tolist()
-
-def get_expl_reward(states, emb_model, explore_critic, device):
-    g = mols_to_pyg_batch(states, emb_model.use_3d, device=device)
-
-    with torch.autograd.no_grad():
-        X = emb_model.get_embedding(g)
-    scores = explore_critic.get_score(X)
-    return scores.tolist()
 
 #####################################################
 #                   TRAINING LOOP                   #
@@ -231,6 +26,7 @@ results = mp.Queue()
 # logging variables
 running_reward = mp.Value("f", 0)
 avg_length = mp.Value("i", 0)
+
 
 class Worker(mp.Process):
     def __init__(self, env, task_queue, result_queue, max_timesteps):
@@ -258,7 +54,7 @@ class Worker(mp.Process):
                 self.result_queue.put((None, None, None, True))
                 self.task_queue.task_done()
                 continue
-            #print('%s: Working' % proc_name)
+            # print('%s: Working' % proc_name)
             if done:
                 self.timestep_counter = 0
                 mol, candidates, done = self.env.reset()
@@ -271,6 +67,7 @@ class Worker(mp.Process):
             self.result_queue.put((index, mol, candidates, done))
             self.task_queue.task_done()
         return
+
 '''
 class Task(object):
     def __init__(self, index, action, done):
@@ -295,8 +92,7 @@ class Result(object):
 '''
 #############################################
 
-def train_ppo(args, surrogate_model, env):
-
+def train_gpu_sync(args, surrogate_model, env):
     ############## Hyperparameters ##############
     render = True
     solved_reward = 100         # stop training if avg_reward > solved_reward
@@ -317,7 +113,7 @@ def train_ppo(args, surrogate_model, env):
     eps = 0.01
 
     #############################################
-    print("lr:", lr, "beta:", betas, "eps:", eps) # parameters for Adam optimizer
+    print("lr:", lr, "beta:", betas, "eps:", eps)  # parameters for Adam optimizer
 
     print('Creating %d processes' % args.nb_procs)
     workers = [Worker(env, tasks, results, max_timesteps) for i in range(args.nb_procs)]
@@ -363,7 +159,7 @@ def train_ppo(args, surrogate_model, env):
 
     sample_count = 0
     episode_count = 0
-    update_count = 0 # for adversarial
+    update_count = 0  # for adversarial
     save_counter = 0
     log_counter = 0
 
@@ -381,7 +177,7 @@ def train_ppo(args, surrogate_model, env):
             tasks.put((i, None, True))
         tasks.join()
         # unpack results
-        mols = [None]*args.nb_procs
+        mols = [None] * args.nb_procs
         done_idx = []
         notdone_idx, candidates, batch_idx = [], [], []
         for i in range(args.nb_procs):
@@ -391,14 +187,14 @@ def train_ppo(args, surrogate_model, env):
 
             notdone_idx.append(index)
             candidates.extend(cands)
-            batch_idx.extend([index]*len(cands))
+            batch_idx.extend([index] * len(cands))
         batch_idx = torch.LongTensor(batch_idx)
         while True:
             # action selections (for not done)
             if len(notdone_idx) > 0:
                 state_embs, action_logprobs, actions, shifted_actions = ppo.select_action(
-                    mols_to_pyg_batch([mols[idx] for idx in notdone_idx], surrogate_model.use_3d, device=device), 
-                    mols_to_pyg_batch(candidates, surrogate_model.use_3d, device=device), 
+                    mols_to_pyg_batch([mols[idx] for idx in notdone_idx], surrogate_model.use_3d, device=device),
+                    mols_to_pyg_batch(candidates, surrogate_model.use_3d, device=device),
                     batch_idx, return_shifted=True)
             else:
                 if sample_count >= update_timesteps:
@@ -407,7 +203,8 @@ def train_ppo(args, surrogate_model, env):
             for i, idx in enumerate(notdone_idx):
                 tasks.put((idx, candidates[shifted_actions[i]], False))
 
-                memories[idx].states.append([state_embs[0][[i], :], state_embs[1][[i], :], state_embs[2][batch_idx == idx, :]])
+                memories[idx].states.append(
+                    [state_embs[0][[i], :], state_embs[1][[i], :], state_embs[2][batch_idx == idx, :]])
                 memories[idx].actions.append(actions[i])
                 memories[idx].logprobs.append(action_logprobs[i])
             for idx in done_idx:
@@ -417,7 +214,7 @@ def train_ppo(args, surrogate_model, env):
                     tasks.put((idx, None, True))
             tasks.join()
             # unpack results
-            mols = [None]*args.nb_procs
+            mols = [None] * args.nb_procs
             new_done_idx = []
             new_notdone_idx, candidates, batch_idx = [], [], []
             for i in range(args.nb_procs):
@@ -430,7 +227,7 @@ def train_ppo(args, surrogate_model, env):
                 else:
                     new_notdone_idx.append(index)
                     candidates.extend(cands)
-                    batch_idx.extend([index]*len(cands))
+                    batch_idx.extend([index] * len(cands))
             batch_idx = torch.LongTensor(batch_idx)
             # get final rewards (for previously not done but now done)
             nowdone_idx = [idx for idx in notdone_idx if idx in new_done_idx]
@@ -448,9 +245,9 @@ def train_ppo(args, surrogate_model, env):
 
                 i_episode += 1
                 running_reward += surr_reward
-                writer.add_scalar("EpSurrogate", -1*surr_reward, i_episode-1)
+                writer.add_scalar("EpSurrogate", -1 * surr_reward, i_episode - 1)
                 rewbuffer_env.append(surr_reward)
-                writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode-1)
+                writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode - 1)
 
                 memories[idx].rewards.append(surr_reward)
                 memories[idx].is_terminals.append(True)
@@ -470,7 +267,6 @@ def train_ppo(args, surrogate_model, env):
                     running_reward += args.iota * expl_rewards[i]
 
                     memories[idx].rewards[-1] += args.iota * expl_rewards[i]
-
 
             sample_count += len(notdone_idx)
             avg_length += len(notdone_idx)
@@ -498,17 +294,17 @@ def train_ppo(args, surrogate_model, env):
             break
 
         # save every 500 episodes
-        if save_counter > save_interval:
+        if save_counter >= save_interval:
             torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_gcpn.pth'.format(i_episode)))
             save_counter -= save_interval
 
         # save running model
         torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
 
-        if log_counter > log_interval:
-            avg_length = int(avg_length/log_counter)
-            running_reward = running_reward/log_counter
-            
+        if log_counter >= log_interval:
+            avg_length = int(avg_length / log_counter)
+            running_reward = running_reward / log_counter
+
             print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
             running_reward = 0
             avg_length = 0
