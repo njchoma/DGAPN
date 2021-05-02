@@ -69,7 +69,7 @@ def greedy_rollout(save_path, env, surrogate_guide, surrogate_eval, K, max_rollo
 def eval_greedy(artifact_path, surrogate_guide, surrogate_eval, env, N=30, K=1):
     # logging variables
     dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
-    save_path = os.path.join(artifact_path, dt + '.csv')
+    save_path = os.path.join(artifact_path, dt + '_greedy.csv')
 
     surrogate_guide = surrogate_guide.to(DEVICE)
     surrogate_guide.eval()

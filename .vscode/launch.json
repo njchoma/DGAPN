@@ -12,23 +12,23 @@
             "subProcess": true,
             "args": [
                 "--name", "predict_dock_score",
-                "--data_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
-                "--artifact_path", "test_run/gcpn",
                 "--use_3d",
+                "--data_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
+                "--artifact_path", "test_run/dgapn",
                 "--gpu", "0"
             ],
             "console": "integratedTerminal"
         },
         {
-            "name": "main_gcpn",
+            "name": "main_dgapn",
             "type": "python",
             "request": "launch",
-            "program": "src/main_gcpn.py",
+            "program": "src/main_dgapn.py",
             "subProcess": true,
             "args": [
                 "--name", "DGAPN",
                 "--data_path", "src/dataset",
-                "--artifact_path", "test_run/gcpn",
+                "--artifact_path", "test_run/dgapn",
                 "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
                 "--surrogate_model_path", "artifact/test_surrogate.pth",
                 "--gpu", "0"
@@ -43,12 +43,13 @@
             "subProcess": true,
             "args": [
                 "--name", "eval",
+                //"--greedy",
                 "--data_path", "src/dataset",
-                "--artifact_path", "test_run/gcpn",
+                "--artifact_path", "test_run/dgapn",
                 "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
                 "--surrogate_guide_path", "artifact/test_surrogate.pth",
                 "--surrogate_eval_path", "artifact/test_surrogate.pth",
-                "--gcpn_path", "artifact/test_gcpn.pth"
+                "--model_path", "artifact/test_dgapn.pth"
             ],
             "console": "integratedTerminal"
         }

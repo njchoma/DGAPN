@@ -6,7 +6,7 @@ from torch_geometric.data import Data, Batch
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
 
-from .gapn_policy import ActorCriticGCPN
+from .gapn_policy import ActorCriticGAPN
 from .rnd_explore import RNDistillation
 from gnn_surrogate.model import GNN_MyGAT
 
@@ -42,7 +42,7 @@ class Memory:
 #                  MAIN MODEL                   #
 #################################################
 
-class DGCPN(nn.Module):
+class DGAPN(nn.Module):
     def __init__(self,
                  lr,
                  betas,
@@ -64,7 +64,7 @@ class DGCPN(nn.Module):
                  rnd_nb_layers=None,
                  rnd_nb_hidden=None,
                  rnd_nb_output=None):
-        super(DGCPN, self).__init__()
+        super(DGAPN, self).__init__()
         self.gamma = gamma
         self.K_epochs = K_epochs
 
@@ -76,7 +76,7 @@ class DGCPN(nn.Module):
             gnn_nb_hidden = emb_model.nb_hidden
             use_3d = emb_model.use_3d
 
-        self.policy = ActorCriticGCPN(lr[:2],
+        self.policy = ActorCriticGAPN(lr[:2],
                                       betas,
                                       eps,
                                       eta,
@@ -92,7 +92,7 @@ class DGCPN(nn.Module):
                                       enc_nb_hidden,
                                       enc_nb_output)
 
-        self.policy_old = ActorCriticGCPN(lr[:2],
+        self.policy_old = ActorCriticGAPN(lr[:2],
                                           betas,
                                           eps,
                                           eta,

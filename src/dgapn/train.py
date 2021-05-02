@@ -10,7 +10,7 @@ import torch
 import torch.multiprocessing as mp
 from torch.utils.tensorboard import SummaryWriter
 
-from .DGAPN import Memory, DGCPN, get_surr_reward, get_expl_reward
+from .DGAPN import Memory, DGAPN, get_surr_reward, get_expl_reward
 
 from utils.general_utils import initialize_logger
 from utils.graph_utils import mols_to_pyg_batch
@@ -134,7 +134,7 @@ def train_gpu_sync(args, surrogate_model, env):
     surrogate_model.eval()
     print(surrogate_model)
 
-    ppo = DGCPN(lr,
+    ppo = DGAPN(lr,
                 betas,
                 eps,
                 eta,
@@ -295,11 +295,11 @@ def train_gpu_sync(args, surrogate_model, env):
 
         # save every 500 episodes
         if save_counter >= save_interval:
-            torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_gcpn.pth'.format(i_episode)))
+            torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
             save_counter -= save_interval
 
         # save running model
-        torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
+        torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_dgapn.pth'))
 
         if log_counter >= log_interval:
             avg_length = int(avg_length / log_counter)

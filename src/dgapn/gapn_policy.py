@@ -45,10 +45,10 @@ def batched_softmax(logits, batch):
     return probs
 
 #####################################################
-#                       GCPN                        #
+#                       GAPN                        #
 #####################################################
 
-class ActorCriticGCPN(nn.Module):
+class ActorCriticGAPN(nn.Module):
     def __init__(self,
                  lr,
                  betas,
@@ -65,9 +65,9 @@ class ActorCriticGCPN(nn.Module):
                  enc_nb_layers=None,
                  enc_nb_hidden=None,
                  enc_nb_output=None):
-        super(ActorCriticGCPN, self).__init__()
+        super(ActorCriticGAPN, self).__init__()
         # actor
-        self.actor = GCPN_Actor(eta,
+        self.actor = GAPN_Actor(eta,
                                 eps_clip,
                                 emb_model,
                                 emb_dim,
@@ -76,7 +76,7 @@ class ActorCriticGCPN(nn.Module):
                                 enc_nb_output)
         self.optimizer_actor = torch.optim.Adam(self.actor.parameters(), lr=lr[0], betas=betas, eps=eps)
         # critic
-        self.critic = GCPN_Critic(emb_dim,
+        self.critic = GAPN_Critic(emb_dim,
                                   enc_nb_layers,
                                   enc_nb_hidden)
         self.optimizer_critic = torch.optim.Adam(self.critic.parameters(), lr=lr[1], betas=betas, eps=eps)
@@ -108,12 +108,12 @@ class ActorCriticGCPN(nn.Module):
         return loss.item(), baseline_loss.item()
 
 
-class GCPN_Critic(nn.Module):
+class GAPN_Critic(nn.Module):
     def __init__(self,
                  emb_dim,
                  nb_layers,
                  nb_hidden):
-        super(GCPN_Critic, self).__init__()
+        super(GAPN_Critic, self).__init__()
         layers = [nn.Linear(emb_dim, nb_hidden)]
         for _ in range(nb_layers-1):
             layers.append(nn.Linear(nb_hidden, nb_hidden))
@@ -142,7 +142,7 @@ class GCPN_Critic(nn.Module):
         return loss
 
 
-class GCPN_Actor(nn.Module):
+class GAPN_Actor(nn.Module):
     def __init__(self,
                  eta,
                  eps_clip,
@@ -151,7 +151,7 @@ class GCPN_Actor(nn.Module):
                  nb_layers,
                  nb_hidden,
                  nb_output):
-        super(GCPN_Actor, self).__init__()
+        super(GAPN_Actor, self).__init__()
         self.eta = eta
         self.eps_clip = eps_clip
         self.emb_model = emb_model

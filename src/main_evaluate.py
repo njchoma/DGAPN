@@ -8,9 +8,9 @@ from utils.general_utils import maybe_download_file
 from gnn_surrogate import model
 
 from dgapn.env import CReM_Env
-from dgapn.gapn_policy import GCPN_Actor
+from dgapn.gapn_policy import GAPN_Actor
 
-from evaluate.eval_gcpn_crem import eval_gcpn_crem
+from evaluate.eval_dgapn import eval_dgapn
 from evaluate.eval_greedy import eval_greedy
 
 def molecule_arg_parser():
@@ -29,7 +29,7 @@ def molecule_arg_parser():
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_guide_path', default='')
     add_arg('--surrogate_eval_path', default='')
-    add_arg('--gcpn_path', default='')
+    add_arg('--model_path', default='')
 
     add_arg('--nb_sample_crem', type=int, default=128)
 
@@ -49,10 +49,10 @@ def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_pat
     print("Surrogate model loaded")
     return surrogate_model
 
-def load_gcpn(gcpn_path):
-    gcpn_model = torch.load(gcpn_path, map_location='cpu')
-    print("GCPN model loaded")
-    return gcpn_model
+def load_dgapn(model_path):
+    dgapn_model = torch.load(model_path, map_location='cpu')
+    print("DGAPN model loaded")
+    return dgapn_model
 
 def main():
     args = molecule_arg_parser().parse_args()
@@ -83,16 +83,16 @@ def main():
                     N = args.nb_test,
                     K = args.nb_bad_steps)
     else:
-        # GCPN_CReM
-        policy = load_gcpn(args.gcpn_path)
+        # DGAPN
+        policy = load_dgapn(args.model_path)
         print(policy)
-        eval_gcpn_crem(artifact_path,
-                        policy,
-                        surrogate_guide,
-                        surrogate_eval,
-                        env,
-                        N = args.nb_test,
-                        K = args.nb_bad_steps)
+        eval_dgapn(artifact_path,
+                    policy,
+                    surrogate_guide,
+                    surrogate_eval,
+                    env,
+                    N = args.nb_test,
+                    K = args.nb_bad_steps)
 
 
 if __name__ == '__main__':

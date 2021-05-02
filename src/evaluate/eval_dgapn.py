@@ -18,13 +18,13 @@ def get_rewards(g_batch, surrogate_model):
         scores = surrogate_model(g_batch)
     return scores.cpu().numpy()*-1
 
-def gcpn_crem_rollout(save_path,
-                      policy,
-                      env,
-                      surrogate_guide,
-                      surrogate_eval,
-                      K,
-                      max_rollout=6):
+def dgapn_rollout(save_path,
+                    policy,
+                    env,
+                    surrogate_guide,
+                    surrogate_eval,
+                    K,
+                    max_rollout=6):
     mol, mol_candidates, done = env.reset()
     mol_start = mol
     mol_best = mol
@@ -84,10 +84,10 @@ def gcpn_crem_rollout(save_path,
 
     return start_rew, best_rew
 
-def eval_gcpn_crem(artifact_path, policy, surrogate_guide, surrogate_eval, env, N=120, K=1):
+def eval_dgapn(artifact_path, policy, surrogate_guide, surrogate_eval, env, N=120, K=1):
     # logging variables
     dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
-    save_path = os.path.join(artifact_path, dt + '.csv')
+    save_path = os.path.join(artifact_path, dt + '_dgapn.csv')
 
     surrogate_guide = surrogate_guide.to(DEVICE)
     surrogate_guide.eval()
@@ -97,16 +97,16 @@ def eval_gcpn_crem(artifact_path, policy, surrogate_guide, surrogate_eval, env, 
     policy = policy.to(DEVICE)
     policy.eval()
 
-    print("\nStarting gcpn_crem eval...\n")
+    print("\nStarting dgapn eval...\n")
     avg_improvement = []
     avg_best = []
     for i in range(N):
-        start_rew, best_rew = gcpn_crem_rollout(save_path,
-                                                policy,
-                                                env,
-                                                surrogate_guide,
-                                                surrogate_eval,
-                                                K)
+        start_rew, best_rew = dgapn_rollout(save_path,
+                                            policy,
+                                            env,
+                                            surrogate_guide,
+                                            surrogate_eval,
+                                            K)
         improvement = best_rew - start_rew
         print("Improvement ", improvement)
         print("{:2d}: {:4.1f} {:4.1f} {:4.1f}".format(i+1,
