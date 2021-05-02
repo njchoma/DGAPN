@@ -6,15 +6,13 @@ This project aims to:
 
 Final product wish list:
 
-1. 3d representation with large drop-out
+1. 3d representation with large drop-out (done)
 
 2. Retrieval system attention mechanism (done)
 
 3. User-specified number of GNN layers to share
 
 4. Fix multi-head (done)
-
-5. Adversarial
 
 ## Getting Started:
 1. Create conda environment
