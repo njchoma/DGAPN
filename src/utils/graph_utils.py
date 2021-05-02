@@ -7,7 +7,7 @@ from rdkit.Chem import GraphDescriptors
 
 import torch
 import torch_geometric as pyg
-from torch_geometric.data import Data
+from torch_geometric.data import Data, Batch
 from torch_geometric.utils import dense_to_sparse
 
 HIGHEST_ATOMIC_NUMBER=118
@@ -103,8 +103,25 @@ def mol_to_pyg_graph(mol, idm=False, ratio=2.):
         W_spr = dense_to_sparse(torch.FloatTensor(W))
         g_idm = Data(x=g_adj.x, edge_index=W_spr[0], edge_attr=W_spr[1])
 
-        return [g_adj, g_idm] 
-    return [g_adj]
+        return [g_adj, g_idm]
+    return [g_adj, None]
+
+def mols_to_pyg_batch(mols, idm=False, ratio=2., device=None):
+    if not isinstance(mols, list):
+            mols = [mols]
+    graphs = [mol_to_pyg_graph(mol, idm, ratio) for mol in mols]
+
+    g1 = Batch().from_data_list([graph[0] for graph in graphs])
+    if device is not None:
+        g1 = g1.to(device)
+
+    if idm:
+        g2 = Batch().from_data_list([graph[1] for graph in graphs]).to(device)
+        if device is not None:
+            g2 = g2.to(device)
+    else:
+        g2 = None
+    return [g1, g2]
 
 def add_reverse(orig_adj):
     adj = orig_adj.transpose()

@@ -9,13 +9,13 @@ from rdkit import Chem
 import torch
 from torch_geometric.data import Batch
 
-from utils.graph_utils import mol_to_pyg_graph
+from utils.graph_utils import mols_to_pyg_batch
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def get_rewards(g_batch, surrogate_model):
     with torch.autograd.no_grad():
-        scores = surrogate_model(g_batch.to(DEVICE))
+        scores = surrogate_model(g_batch)
     return scores.cpu().numpy()*-1
 
 def gcpn_crem_rollout(save_path,
@@ -29,7 +29,7 @@ def gcpn_crem_rollout(save_path,
     mol_start = mol
     mol_best = mol
 
-    g = Batch().from_data_list([mol_to_pyg_graph(mol)[0]]).to(DEVICE)
+    g = mols_to_pyg_batch(mol, surrogate_guide.use_3d, device=DEVICE)
     new_rew = get_rewards(g, surrogate_guide)
     start_rew = new_rew
     best_rew = new_rew
@@ -38,11 +38,11 @@ def gcpn_crem_rollout(save_path,
     for i in range(max_rollout):
         print("  {:3d} {:2d} {:4.1f}".format(i+1, steps_remaining, best_rew))
         steps_remaining -= 1
-        g_candidates = Batch().from_data_list([mol_to_pyg_graph(cand)[0] for cand in mol_candidates]).to(DEVICE)
+        g_candidates = mols_to_pyg_batch(mol_candidates, surrogate_guide.use_3d, device=DEVICE)
         next_rewards = get_rewards(g_candidates, surrogate_guide)
 
         with torch.autograd.no_grad():
-            _, _, _, probs, _, _, _ = policy(g, g_candidates, torch.empty(len(mol_candidates), dtype=torch.long).fill_(0).to(DEVICE))
+            _, _, _, probs, _, _, _ = policy(g, g_candidates, torch.zeros(len(mol_candidates), dtype=torch.long).to(DEVICE))
         max_action = np.argmax(probs.cpu().numpy())
         min_action = np.argmin(probs.cpu().numpy())
 
@@ -64,7 +64,7 @@ def gcpn_crem_rollout(save_path,
             break
 
         mol, mol_candidates, done = env.step(action, include_current_state=False)
-        g = Batch().from_data_list([mol_to_pyg_graph(mol)[0]]).to(DEVICE)
+        g = mols_to_pyg_batch(mol, surrogate_guide.use_3d, device=DEVICE)
 
         if new_rew > best_rew:
             mol_best = mol

@@ -35,28 +35,33 @@ class GNN_MyGAT(nn.Module):
 
         self.final_layer = nn.Linear(emb_dim, 1)
 
-    def forward(self, gA, gG=None):
-        x = self.get_embedding(gA, gG)
+    def forward(self, g, g3D=None):
+        x = self.get_embedding(g, g3D)
         y = self.final_layer(x).squeeze()
         return y
 
-    def get_embedding(self, gA, gG=None, aggr=True):
-        x = gA.x
-        edge_index = gA.edge_index
-        edge_attr  = gA.edge_attr
-        if gG is None:
+    def get_embedding(self, g, g3D=None, aggr=True):
+        if isinstance(g, list):
+            g3D = g[1]
+            g = g[0]
+
+        x = g.x
+        edge_index = g.edge_index
+        edge_attr  = g.edge_attr
+        if g3D is None:
+            assert self.use_3d is False
             for i, l in enumerate(self.layers):
                 x, edge_attr = l(x, edge_index, edge_attr)
         else:
-            geom_index = gG.edge_index
-            geom_attr = gG.edge_attr
+            geom_index = g3D.edge_index
+            geom_attr = g3D.edge_attr
             for l, l3D in zip(self.layers, self.layers3D):
                 x1, edge_attr = l(x, edge_index, edge_attr)
                 x2 = l3D(x, geom_index, geom_attr)
                 x = x1 + x2
 
         if aggr is True:
-            x = pyg.nn.global_add_pool(x, gA.batch)
+            x = pyg.nn.global_add_pool(x, g.batch)
         return x
 
 
@@ -79,7 +84,7 @@ def zeros(tensor):
 
 
 class MyGATConv(MessagePassing):
-    def __init__(self, in_channels, out_channels, nb_edge_attr=1, batch_norm=False, res=False,
+    def __init__(self, in_channels, out_channels, nb_edge_attr, batch_norm=False, res=False,
                  heads=2, concat=False, negative_slope=0.2, dropout=0, bias=True,
                  **kwargs):
         super(MyGATConv, self).__init__(aggr='add', node_dim=0, **kwargs)  # "Add" aggregation.
@@ -243,7 +248,7 @@ class MyGCNConv(MessagePassing):
 
 
 class MyHGATConv(MessagePassing):
-    def __init__(self, in_channels, out_channels, nb_edge_attr=1, batch_norm=False, res=True, norm_mode="symmetric",
+    def __init__(self, in_channels, out_channels, nb_edge_attr, batch_norm=False, res=True, norm_mode="symmetric",
                  heads=1, concat=True, negative_slope=0.2, dropout=0, bias=True,
                  **kwargs):
         super(MyHGATConv, self).__init__(aggr='add', node_dim=0, **kwargs)

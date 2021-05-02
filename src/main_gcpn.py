@@ -57,6 +57,7 @@ def molecule_arg_parser():
     #add_arg('--nb_edge_types', type=int, default=1)
     #add_arg('--gnn_nb_layers', type=int, default=4)
     #add_arg('--gnn_nb_hidden', type=int, default=256, help='hidden size of Graph Networks')
+    #add_arg('--use_3d', action='store_true')
     add_arg('--enc_num_layers', type=int, default=4)
     add_arg('--enc_num_hidden', type=int, default=128, help='hidden size of Encoding Networks')
     add_arg('--enc_num_output', type=int, default=64)
@@ -84,7 +85,7 @@ def main():
     surrogate_model = load_surrogate_model(args.artifact_path,
                                            args.surrogate_model_url,
                                            args.surrogate_model_path)
-    args.input_size, args.emb_size, args.nb_edge_types, args.gnn_nb_layers, args.gnn_nb_hidden = None, None, None, None, None
+    args.input_size, args.emb_size, args.nb_edge_types, args.gnn_nb_layers, args.gnn_nb_hidden, args.use_3d = [None] * 6
 
     env = CReM_Env(args.data_path, args.warm_start_dataset_path, mode='mol')
     #ob, _, _ = env.reset()

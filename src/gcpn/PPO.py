@@ -23,7 +23,7 @@ from .gcpn_policy import ActorCriticGCPN
 from .rnd_explore import RNDistillation
 
 from utils.general_utils import initialize_logger
-from utils.graph_utils import mol_to_pyg_graph, get_batch_shift
+from utils.graph_utils import mols_to_pyg_batch
 
 from gnn_surrogate.model import GNN_MyGAT
 
@@ -72,6 +72,7 @@ class DGCPN(nn.Module):
                  nb_edge_types=None,
                  gnn_nb_layers=None,
                  gnn_nb_hidden=None,
+                 use_3d=None,
                  enc_nb_layers=None,
                  enc_nb_hidden=None,
                  enc_nb_output=None,
@@ -88,6 +89,7 @@ class DGCPN(nn.Module):
             nb_edge_types = emb_model.nb_edge_types
             gnn_nb_layers = emb_model.nb_layers
             gnn_nb_hidden = emb_model.nb_hidden
+            use_3d = emb_model.use_3d
 
         self.policy = ActorCriticGCPN(lr[:2],
                                       betas,
@@ -100,6 +102,7 @@ class DGCPN(nn.Module):
                                       nb_edge_types,
                                       gnn_nb_layers,
                                       gnn_nb_hidden,
+                                      use_3d,
                                       enc_nb_layers,
                                       enc_nb_hidden,
                                       enc_nb_output)
@@ -115,6 +118,7 @@ class DGCPN(nn.Module):
                                           nb_edge_types,
                                           gnn_nb_layers,
                                           gnn_nb_hidden,
+                                          use_3d,
                                           enc_nb_layers,
                                           enc_nb_hidden,
                                           enc_nb_output)
@@ -128,6 +132,7 @@ class DGCPN(nn.Module):
                                              nb_edge_types,
                                              gnn_nb_layers,
                                              gnn_nb_hidden,
+                                             use_3d,
                                              rnd_nb_layers,
                                              rnd_nb_hidden,
                                              rnd_nb_output)
@@ -144,17 +149,13 @@ class DGCPN(nn.Module):
         raise NotImplementedError
 
     def select_action(self, states, candidates, batch_idx=None, return_shifted=False):
-        if not isinstance(states, list):
-            states = [states]
         if batch_idx is None:
-            batch_idx = torch.empty(len(candidates), dtype=torch.long).fill_(0)
+            batch_idx = torch.zeros(len(torch.unique(candidates[0].batch)), dtype=torch.long)
         batch_idx = batch_idx.to(self.device)
 
-        g = Batch.from_data_list(states).to(self.device)
-        g_candidates = Batch.from_data_list(candidates).to(self.device)
         with torch.autograd.no_grad():
             g_emb, g_next_emb, g_candidates_emb, action_logprobs, actions, shifted_actions = self.policy_old.select_action(
-                g, g_candidates, batch_idx)
+                states, candidates, batch_idx)
 
         if return_shifted:
             return [g_emb, g_next_emb, g_candidates_emb], action_logprobs, actions, shifted_actions
@@ -205,24 +206,17 @@ class DGCPN(nn.Module):
 #####################################################
 
 def get_surr_reward(states, surrogate_model, device):
-    if not isinstance(states, list):
-        states = [states]
-
-    states = [mol_to_pyg_graph(state)[0] for state in states]
-    g = Batch().from_data_list(states).to(device)
+    g = mols_to_pyg_batch(states, surrogate_model.use_3d, device=device)
 
     with torch.autograd.no_grad():
-        pred_docking_score = surrogate_model(g, None)
+        pred_docking_score = surrogate_model(g)
     return (-pred_docking_score).tolist()
 
 def get_expl_reward(states, emb_model, explore_critic, device):
-    if not isinstance(states, list):
-        states = [states]
-    
-    states = [mol_to_pyg_graph(state)[0] for state in states]
-    g = Batch().from_data_list(states).to(device)
+    g = mols_to_pyg_batch(states, emb_model.use_3d, device=device)
 
-    X = emb_model.get_embedding(g)
+    with torch.autograd.no_grad():
+        X = emb_model.get_embedding(g)
     scores = explore_critic.get_score(X)
     return scores.tolist()
 
@@ -311,7 +305,7 @@ def train_ppo(args, surrogate_model, env):
 
     max_episodes = 50000        # max training episodes
     max_timesteps = 6           # max timesteps in one episode
-    update_timesteps = 30      # update policy every n timesteps
+    update_timesteps = 500      # update policy every n timesteps
 
     K_epochs = 80               # update policy for K epochs
     eps_clip = 0.2              # clip parameter for PPO
@@ -357,6 +351,7 @@ def train_ppo(args, surrogate_model, env):
                 args.nb_edge_types,
                 args.gnn_nb_layers,
                 args.gnn_nb_hidden,
+                args.use_3d,
                 args.enc_num_layers,
                 args.enc_num_hidden,
                 args.enc_num_output,
@@ -402,8 +397,8 @@ def train_ppo(args, surrogate_model, env):
             # action selections (for not done)
             if len(notdone_idx) > 0:
                 state_embs, action_logprobs, actions, shifted_actions = ppo.select_action(
-                    [mol_to_pyg_graph(mols[idx])[0] for idx in notdone_idx], 
-                    [mol_to_pyg_graph(cand)[0] for cand in candidates], 
+                    mols_to_pyg_batch([mols[idx] for idx in notdone_idx], surrogate_model.use_3d, device=device), 
+                    mols_to_pyg_batch(candidates, surrogate_model.use_3d, device=device), 
                     batch_idx, return_shifted=True)
             else:
                 if sample_count >= update_timesteps:

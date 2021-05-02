@@ -34,7 +34,7 @@ def molecule_arg_parser():
     add_arg('--nb_sample_crem', type=int, default=128)
 
     add_arg('--nb_test', type=int, default=50)
-    add_arg('--nb_bad_steps', type=int, default=6) # match max_timesteps in ppo
+    add_arg('--nb_bad_steps', type=int, default=5)
 
     return parser
 

@@ -63,6 +63,7 @@ class ActorCriticGCPN(nn.Module):
                  nb_edge_types=None,
                  gnn_nb_layers=None,
                  gnn_nb_hidden=None,
+                 use_3d=None,
                  enc_nb_layers=None,
                  enc_nb_hidden=None,
                  enc_nb_output=None):
@@ -88,8 +89,8 @@ class ActorCriticGCPN(nn.Module):
     def select_action(self, states, candidates, batch_idx):
         return self.actor.select_action(states, candidates, batch_idx)
 
-    def get_value(self, g_emb):
-        return self.critic.get_value(g_emb)
+    def get_value(self, states_emb):
+        return self.critic.get_value(states_emb)
 
     def update(self, old_states, old_candidates, old_actions, old_logprobs, old_values, rewards):
         # Update actor

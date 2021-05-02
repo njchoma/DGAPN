@@ -24,6 +24,7 @@ class RNDistillation(nn.Module):
                  nb_edge_types,
                  gnn_nb_layers,
                  gnn_nb_hidden,
+                 use_3d,
                  rnd_nb_layers,
                  rnd_nb_hidden,
                  rnd_nb_output):

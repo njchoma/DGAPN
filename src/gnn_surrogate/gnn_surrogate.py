@@ -93,10 +93,7 @@ class MolData(Dataset):
             print("Invalid SMILE encountered. Using first row instead.")
 
         g = graph_utils.mol_to_pyg_graph(mol, self.use_3d)
-        if self.use_3d:
-            return torch.FloatTensor([logp]), g[0], g[1]
-        else:
-            return torch.FloatTensor([logp]), g[0], None
+        return torch.FloatTensor([logp]), g[0], g[1]
 
     def __len__(self):
         return len(self.logp)
