@@ -448,8 +448,6 @@ def train_ppo(args, surrogate_model, env):
                     surr_reward = surr_rewards
 
                 i_episode += 1
-                episode_count += 1
-                avg_length += 1
                 running_reward += surr_reward
                 writer.add_scalar("EpSurrogate", -1*surr_reward, i_episode-1)
                 rewbuffer_env.append(surr_reward)
@@ -458,7 +456,6 @@ def train_ppo(args, surrogate_model, env):
                 memories[idx].rewards.append(surr_reward)
                 memories[idx].is_terminals.append(True)
             for idx in stillnotdone_idx:
-                avg_length += 1
                 running_reward += 0
 
                 memories[idx].rewards.append(0)
@@ -477,6 +474,9 @@ def train_ppo(args, surrogate_model, env):
 
 
             sample_count += len(notdone_idx)
+            avg_length += len(notdone_idx)
+            episode_count += len(nowdone_idx)
+
             done_idx = new_done_idx
             notdone_idx = new_notdone_idx
 
@@ -499,14 +499,14 @@ def train_ppo(args, surrogate_model, env):
             break
 
         # save every 500 episodes
-        if save_counter > save_interval:
+        if save_counter >= save_interval:
             torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_gcpn.pth'.format(i_episode)))
             save_counter -= save_interval
 
         # save running model
         torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_gcpn.pth'))
 
-        if log_counter > log_interval:
+        if log_counter >= log_interval:
             avg_length = int(avg_length/log_counter)
             running_reward = running_reward/log_counter
             
