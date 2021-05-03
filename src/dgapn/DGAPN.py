@@ -12,32 +12,6 @@ from gnn_surrogate.model import GNN_MyGAT
 
 from utils.graph_utils import mols_to_pyg_batch
 
-#####################################################
-#                   HELPER MODULES                  #
-#####################################################
-
-class Memory:
-    def __init__(self):
-        self.actions = []
-        self.states = []
-        self.logprobs = []
-        self.rewards = []
-        self.is_terminals = []
-
-    def extend(self, memory):
-        self.actions.extend(memory.actions)
-        self.states.extend(memory.states)
-        self.logprobs.extend(memory.logprobs)
-        self.rewards.extend(memory.rewards)
-        self.is_terminals.extend(memory.is_terminals)
-
-    def clear(self):
-        del self.actions[:]
-        del self.states[:]
-        del self.logprobs[:]
-        del self.rewards[:]
-        del self.is_terminals[:]
-
 #################################################
 #                  MAIN MODEL                   #
 #################################################
@@ -197,7 +171,7 @@ def get_surr_reward(states, surrogate_model, device):
         pred_docking_score = surrogate_model(g)
     return (-pred_docking_score).tolist()
 
-def get_expl_reward(states, emb_model, explore_critic, device):
+def get_inno_reward(states, emb_model, explore_critic, device):
     g = mols_to_pyg_batch(states, emb_model.use_3d, device=device)
 
     with torch.autograd.no_grad():

@@ -30,11 +30,8 @@ def molecule_arg_parser():
     add_arg('--surrogate_model_url', default='')
     add_arg('--surrogate_model_path', default='')
 
-    add_arg('--iota', type=float, default=0.5, help='relative weight for exploration reward')
+    add_arg('--iota', type=float, default=0.5, help='relative weight for innovation reward')
     add_arg('--innovation_reward_episode_delay', type=int, default=100)
-
-    add_arg('--alpha', type=float, default=5., help='relative weight for adversarial reward')
-    add_arg('--adversarial_reward_episode_cutoff', type=int, default=50)
 
     # ENVIRONMENT PARAMETERS
     #add_arg('--dataset', type=str, default='zinc', help='caveman; grid; ba; zinc; gdb')

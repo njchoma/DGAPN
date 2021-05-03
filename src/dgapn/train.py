@@ -10,22 +10,40 @@ import torch
 import torch.multiprocessing as mp
 from torch.utils.tensorboard import SummaryWriter
 
-from .DGAPN import Memory, DGAPN, get_surr_reward, get_expl_reward
+from .DGAPN import DGAPN, get_surr_reward, get_inno_reward
 
 from utils.general_utils import initialize_logger
 from utils.graph_utils import mols_to_pyg_batch
 
 #####################################################
-#                   TRAINING LOOP                   #
+#                   HELPER MODULES                  #
 #####################################################
+
+class Memory:
+    def __init__(self):
+        self.actions = []
+        self.states = []
+        self.logprobs = []
+        self.rewards = []
+        self.is_terminals = []
+
+    def extend(self, memory):
+        self.actions.extend(memory.actions)
+        self.states.extend(memory.states)
+        self.logprobs.extend(memory.logprobs)
+        self.rewards.extend(memory.rewards)
+        self.is_terminals.extend(memory.is_terminals)
+
+    def clear(self):
+        del self.actions[:]
+        del self.states[:]
+        del self.logprobs[:]
+        del self.rewards[:]
+        del self.is_terminals[:]
 
 ################## Process ##################
 tasks = mp.JoinableQueue()
 results = mp.Queue()
-
-# logging variables
-running_reward = mp.Value("f", 0)
-avg_length = mp.Value("i", 0)
 
 
 class Worker(mp.Process):
@@ -91,6 +109,10 @@ class Result(object):
         return '%d' % self.index
 '''
 #############################################
+
+#####################################################
+#                   TRAINING LOOP                   #
+#####################################################
 
 def train_gpu_sync(args, surrogate_model, env):
     ############## Hyperparameters ##############
@@ -256,17 +278,22 @@ def train_gpu_sync(args, surrogate_model, env):
 
                 memories[idx].rewards.append(0)
                 memories[idx].is_terminals.append(False)
-            # get exploration rewards
+            # get innovation rewards
             if args.iota > 0 and i_episode > args.innovation_reward_episode_delay:
                 if len(notdone_idx) > 0:
-                    expl_rewards = get_expl_reward(
+                    inno_rewards = get_inno_reward(
                         [mols[idx] for idx in notdone_idx],
                         surrogate_model, ppo.explore_critic, device)
 
                 for i, idx in enumerate(notdone_idx):
-                    running_reward += args.iota * expl_rewards[i]
+                    try:
+                        inno_reward = args.iota * inno_rewards[i]
+                    except Exception as e:
+                        inno_reward = args.iota * inno_rewards
 
-                    memories[idx].rewards[-1] += args.iota * expl_rewards[i]
+                    running_reward += inno_reward
+
+                    memories[idx].rewards[-1] += inno_reward
 
             sample_count += len(notdone_idx)
             avg_length += len(notdone_idx)
