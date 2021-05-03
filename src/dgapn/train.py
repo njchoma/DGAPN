@@ -114,27 +114,28 @@ class Result(object):
 #                   TRAINING LOOP                   #
 #####################################################
 
+############## Hyperparameters ##############
+render = True
+solved_reward = 100         # stop training if avg_reward > solved_reward
+log_interval = 20           # print avg reward in the interval
+save_interval = 100         # save model in the interval
+
+max_episodes = 50000        # max training episodes
+max_timesteps = 6           # max timesteps in one episode
+update_timesteps = 500      # update policy every n timesteps
+
+K_epochs = 80               # update policy for K epochs
+eps_clip = 0.2              # clip parameter for PPO
+gamma = 0.99                # discount factor
+eta = 0.01                  # relative weight for entropy loss
+
+lr = (5e-4, 1e-4, 2e-3)     # learning rate for actor, critic and random network
+betas = (0.9, 0.999)
+eps = 0.01
+
+#############################################
+
 def train_gpu_sync(args, surrogate_model, env):
-    ############## Hyperparameters ##############
-    render = True
-    solved_reward = 100         # stop training if avg_reward > solved_reward
-    log_interval = 20           # print avg reward in the interval
-    save_interval = 100         # save model in the interval
-
-    max_episodes = 50000        # max training episodes
-    max_timesteps = 6           # max timesteps in one episode
-    update_timesteps = 500      # update policy every n timesteps
-
-    K_epochs = 80               # update policy for K epochs
-    eps_clip = 0.2              # clip parameter for PPO
-    gamma = 0.99                # discount factor
-    eta = 0.01                  # relative weight for entropy loss
-
-    lr = (5e-4, 1e-4, 2e-3)     # learning rate for actor, critic and random network
-    betas = (0.9, 0.999)
-    eps = 0.01
-
-    #############################################
     print("lr:", lr, "beta:", betas, "eps:", eps)  # parameters for Adam optimizer
 
     print('Creating %d processes' % args.nb_procs)
@@ -344,4 +345,123 @@ def train_gpu_sync(args, surrogate_model, env):
     for i in range(args.nb_procs):
         tasks.put(None)
     tasks.join()
+
+def train_serial(args, surrogate_model, env):
+    print("lr:", lr, "beta:", betas, "eps:", eps) # parameters for Adam optimizer
+
+    # logging variables
+    dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
+    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + '_' + dt))
+    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + '_' + dt)
+    os.makedirs(save_dir, exist_ok=True)
+    initialize_logger(save_dir)
+
+    device = torch.device("cpu") if args.use_cpu else torch.device(
+        'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
+
+    surrogate_model.to(device)
+    surrogate_model.eval()
+    print(surrogate_model)
+
+    ppo = DGAPN(lr,
+                betas,
+                eps,
+                eta,
+                gamma,
+                K_epochs,
+                eps_clip,
+                surrogate_model,
+                args.input_size,
+                args.emb_size,
+                args.nb_edge_types,
+                args.gnn_nb_layers,
+                args.gnn_nb_hidden,
+                args.use_3d,
+                args.enc_num_layers,
+                args.enc_num_hidden,
+                args.enc_num_output,
+                args.rnd_num_layers,
+                args.rnd_num_hidden,
+                args.rnd_num_output)
+    ppo.to_device(device)
+    print(ppo)
+
+    time_step = 0
+    update_count = 0 # for adversarial
+
+    avg_length = 0
+    running_reward = 0
+
+    memory = Memory()
+    rewbuffer_env = deque(maxlen=100)
+    # training loop
+    for i_episode in range(1, max_episodes+1):
+        state, candidates, done = env.reset()
+
+        for t in range(max_timesteps):
+            time_step += 1
+            # Running policy_old:
+            state_emb, action_logprob, action = ppo.select_action(
+                mols_to_pyg_batch(state, surrogate_model.use_3d, device=device), 
+                mols_to_pyg_batch(candidates, surrogate_model.use_3d, device=device))
+            memory.states.append(state_emb)
+            memory.actions.append(action)
+            memory.logprobs.append(action_logprob)
+
+            state, candidates, done = env.step(action)
+
+            # done and reward may not be needed anymore
+            reward = 0
+
+            if (t==(max_timesteps-1)) or done:
+                surr_reward = get_surr_reward(state, surrogate_model, device)
+                reward = surr_reward
+
+            if args.iota > 0 and i_episode > args.innovation_reward_episode_delay:
+                inno_reward = get_inno_reward(state, surrogate_model, ppo.explore_critic, device)
+                reward += inno_reward
+
+            # Saving reward and is_terminals:
+            memory.rewards.append(reward)
+            memory.is_terminals.append(done)
+
+            running_reward += reward
+            if done:
+                break
+
+        # update if it's time
+        if time_step >= update_timesteps:
+            print("\n\nupdating ppo @ episode %d..." % i_episode)
+            time_step = 0
+            ppo.update(memory)
+            memory.clear()
+
+        writer.add_scalar("EpSurrogate", -1*surr_reward, i_episode-1)
+        rewbuffer_env.append(reward)
+        avg_length += t
+
+        # write to Tensorboard
+        writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode-1)
+
+        # stop training if avg_reward > solved_reward
+        if np.mean(rewbuffer_env) > solved_reward:
+            print("########## Solved! ##########")
+            torch.save(ppo.policy.actor, './PPO_continuous_solved_{}.pth'.format('test'))
+            break
+
+        # save every 500 episodes
+        if (i_episode-1) % save_interval == 0:
+            torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
+
+        # save running model
+        torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_dgapn.pth'))
+
+        # logging
+        if i_episode % log_interval == 0:
+            avg_length = int(avg_length/log_interval)
+            running_reward = running_reward/log_interval
+            
+            print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
+            running_reward = 0
+            avg_length = 0
 

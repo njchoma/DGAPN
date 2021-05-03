@@ -5,7 +5,7 @@ import argparse
 import torch
 import torch.multiprocessing as mp
 
-from dgapn.train import train_gpu_sync
+from dgapn.train import train_gpu_sync, train_serial
 
 from utils.general_utils import maybe_download_file
 from gnn_surrogate import model
@@ -90,7 +90,10 @@ def main():
 
     print("====args====\n", args)
 
-    train_gpu_sync(args, surrogate_model, env)
+    if args.nb_procs > 1:
+        train_gpu_sync(args, surrogate_model, env)
+    else:
+        train_serial(args, surrogate_model, env)
 
 if __name__ == '__main__':
     mp.set_start_method('fork', force=True)
