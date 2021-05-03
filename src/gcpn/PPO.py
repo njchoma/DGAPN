@@ -231,9 +231,6 @@ def get_expl_reward(states, emb_model, explore_critic, device):
 tasks = mp.JoinableQueue()
 results = mp.Queue()
 
-# logging variables
-running_reward = mp.Value("f", 0)
-avg_length = mp.Value("i", 0)
 
 class Worker(mp.Process):
     def __init__(self, env, task_queue, result_queue, max_timesteps):
