@@ -87,6 +87,7 @@ def main():
         args.input_size = embed_model.nb_hidden
         args.nb_edge_types = embed_model.nb_edge_types
     except Exception as e:
+        print(e)
         embed_model = None
 
     env = CReM_Env(args.data_path, args.warm_start_dataset_path, mode='mol')

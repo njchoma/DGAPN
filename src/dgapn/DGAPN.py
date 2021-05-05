@@ -133,6 +133,9 @@ class DGAPN(nn.Module):
             if self.emb_model is not None:
                 states = self.emb_model.get_embedding(states, aggr=False)
                 candidates = self.emb_model.get_embedding(candidates, aggr=False)
+            else:
+                states = states[0]
+                candidates = candidates[0]
             action_logprobs, actions = self.policy_old.select_action(
                 states, candidates, batch_idx)
 
