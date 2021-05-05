@@ -17,6 +17,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def dgapn_rollout(save_path,
                     policy,
+                    emb_model,
                     env,
                     reward_type,
                     K,
@@ -25,7 +26,10 @@ def dgapn_rollout(save_path,
     mol_start = mol
     mol_best = mol
 
-    g = mols_to_pyg_batch(mol, policy.emb_model.use_3d, device=DEVICE)
+    g = mols_to_pyg_batch(mol, emb_model.use_3d, device=DEVICE)
+    if emb_model is not None:
+        with torch.autograd.no_grad():
+            g = emb_model.get_embedding(g, aggr=False)
     new_rew = get_main_reward(mol, reward_type)
     start_rew = new_rew
     best_rew = new_rew
@@ -34,11 +38,14 @@ def dgapn_rollout(save_path,
     for i in range(max_rollout):
         print("  {:3d} {:2d} {:4.1f}".format(i+1, steps_remaining, best_rew))
         steps_remaining -= 1
-        g_candidates = mols_to_pyg_batch(mol_candidates, policy.emb_model.use_3d, device=DEVICE)
+        g_candidates = mols_to_pyg_batch(mol_candidates, emb_model.use_3d, device=DEVICE)
+        if emb_model is not None:
+            with torch.autograd.no_grad():
+                g_candidates = emb_model.get_embedding(g_candidates, aggr=False)
         next_rewards = get_main_reward(mol_candidates, reward_type)
 
         with torch.autograd.no_grad():
-            _, _, _, probs, _, _, _ = policy(g, g_candidates, torch.zeros(len(mol_candidates), dtype=torch.long).to(DEVICE))
+            probs, _, _ = policy(g, g_candidates, torch.zeros(len(mol_candidates), dtype=torch.long).to(DEVICE))
         max_action = np.argmax(probs.cpu().numpy())
         min_action = np.argmin(probs.cpu().numpy())
 
@@ -60,7 +67,10 @@ def dgapn_rollout(save_path,
             break
 
         mol, mol_candidates, done = env.step(action, include_current_state=False)
-        g = mols_to_pyg_batch(mol, policy.emb_model.use_3d, device=DEVICE)
+        g = mols_to_pyg_batch(mol, emb_model.use_3d, device=DEVICE)
+        if emb_model is not None:
+            with torch.autograd.no_grad():
+                g = emb_model.get_embedding(g, aggr=False)
 
         if new_rew > best_rew:
             mol_best = mol
@@ -80,13 +90,15 @@ def dgapn_rollout(save_path,
 
     return start_rew, best_rew
 
-def eval_dgapn(artifact_path, policy, env, reward_type, N=120, K=1):
+def eval_dgapn(artifact_path, policy, emb_model, env, reward_type, N=120, K=1):
     # logging variables
     dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
     save_path = os.path.join(artifact_path, dt + '_dgapn.csv')
 
     policy = policy.to(DEVICE)
     policy.eval()
+    emb_model = emb_model.to(DEVICE)
+    emb_model.eval()
 
     print("\nStarting dgapn eval...\n")
     avg_improvement = []
@@ -94,6 +106,7 @@ def eval_dgapn(artifact_path, policy, env, reward_type, N=120, K=1):
     for i in range(N):
         start_rew, best_rew = dgapn_rollout(save_path,
                                             policy,
+                                            emb_model,
                                             env,
                                             reward_type,
                                             K)

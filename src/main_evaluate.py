@@ -63,10 +63,13 @@ def main():
                     K = args.nb_bad_steps)
     else:
         # DGAPN
-        policy = load_dgapn(args.policy_path)
+        dgapn = load_dgapn(args.policy_path)
+        policy = dgapn.policy.actor
+        emb_model = dgapn.emb_model
         print(policy)
         eval_dgapn(artifact_path,
                     policy,
+                    emb_model,
                     env,
                     args.reward_type,
                     N = args.nb_test,

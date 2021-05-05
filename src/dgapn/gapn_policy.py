@@ -55,28 +55,30 @@ class ActorCriticGAPN(nn.Module):
                  eps,
                  eta,
                  eps_clip,
-                 emb_model=None,
-                 input_dim=None,
-                 emb_dim=None,
-                 nb_edge_types=None,
-                 gnn_nb_layers=None,
-                 gnn_nb_hidden=None,
-                 use_3d=None,
-                 enc_nb_layers=None,
-                 enc_nb_hidden=None,
-                 enc_nb_output=None):
+                 input_dim,
+                 nb_edge_types,
+                 gnn_nb_layers,
+                 gnn_nb_hidden,
+                 enc_nb_layers,
+                 enc_nb_hidden,
+                 enc_nb_output):
         super(ActorCriticGAPN, self).__init__()
         # actor
         self.actor = GAPN_Actor(eta,
                                 eps_clip,
-                                emb_model,
-                                emb_dim,
+                                input_dim,
+                                nb_edge_types,
+                                gnn_nb_layers,
+                                gnn_nb_hidden,
                                 enc_nb_layers,
                                 enc_nb_hidden,
                                 enc_nb_output)
         self.optimizer_actor = torch.optim.Adam(self.actor.parameters(), lr=lr[0], betas=betas, eps=eps)
         # critic
-        self.critic = GAPN_Critic(emb_dim,
+        self.critic = GAPN_Critic(input_dim,
+                                  nb_edge_types,
+                                  gnn_nb_layers,
+                                  gnn_nb_hidden,
                                   enc_nb_layers,
                                   enc_nb_hidden)
         self.optimizer_critic = torch.optim.Adam(self.critic.parameters(), lr=lr[1], betas=betas, eps=eps)
@@ -87,12 +89,12 @@ class ActorCriticGAPN(nn.Module):
     def select_action(self, states, candidates, batch_idx):
         return self.actor.select_action(states, candidates, batch_idx)
 
-    def get_value(self, states_emb):
-        return self.critic.get_value(states_emb)
+    def get_value(self, states):
+        return self.critic.get_value(states)
 
-    def update(self, old_states, old_candidates, old_actions, old_logprobs, old_values, rewards):
+    def update(self, old_states, old_candidates, old_actions, old_logprobs, old_values, rewards, batch_idx):
         # Update actor
-        loss = self.actor.loss(old_states, old_candidates, old_actions, old_logprobs, old_values, rewards)
+        loss = self.actor.loss(old_states, old_candidates, old_actions, old_logprobs, old_values, rewards, batch_idx)
 
         self.optimizer_actor.zero_grad()
         loss.backward()
@@ -110,22 +112,32 @@ class ActorCriticGAPN(nn.Module):
 
 class GAPN_Critic(nn.Module):
     def __init__(self,
-                 emb_dim,
-                 nb_layers,
-                 nb_hidden):
+                 input_dim,
+                 nb_edge_types,
+                 gnn_nb_layers,
+                 gnn_nb_hidden,
+                 enc_nb_layers,
+                 enc_nb_hidden):
         super(GAPN_Critic, self).__init__()
-        layers = [nn.Linear(emb_dim, nb_hidden)]
-        for _ in range(nb_layers-1):
-            layers.append(nn.Linear(nb_hidden, nb_hidden))
+        self.gnn = MyGNN(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types)
+        if gnn_nb_layers == 0:
+            in_dim = input_dim
+        else:
+            in_dim = gnn_nb_hidden
+
+        layers = []
+        for _ in range(enc_nb_layers):
+            layers.append(nn.Linear(in_dim, enc_nb_hidden))
+            in_dim = enc_nb_hidden
 
         self.layers = nn.ModuleList(layers)
-        self.final_layer = nn.Linear(nb_hidden, 1)
+        self.final_layer = nn.Linear(in_dim, 1)
         self.act = nn.ReLU()
 
         self.MseLoss = nn.MSELoss()
 
     def forward(self, g_emb):
-        X = g_emb
+        X = self.gnn.get_embedding(g_emb, detach=False)
         for i, l in enumerate(self.layers):
             X = self.act(l(X))
         return self.final_layer(X).squeeze(1)
@@ -146,39 +158,40 @@ class GAPN_Actor(nn.Module):
     def __init__(self,
                  eta,
                  eps_clip,
-                 emb_model,
-                 emb_dim,
-                 nb_layers,
-                 nb_hidden,
-                 nb_output):
+                 input_dim,
+                 nb_edge_types,
+                 gnn_nb_layers,
+                 gnn_nb_hidden,
+                 enc_nb_layers,
+                 enc_nb_hidden,
+                 enc_nb_output):
         super(GAPN_Actor, self).__init__()
         self.eta = eta
         self.eps_clip = eps_clip
-        self.emb_model = emb_model
-        self.d_k = nb_output
+        self.d_k = enc_nb_output
+        self.gnn = MyGNN(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types)
+        if gnn_nb_layers == 0:
+            in_dim = input_dim
+        else:
+            in_dim = gnn_nb_hidden
 
-        Q_layers = [nn.Linear(emb_dim, nb_hidden)]
-        K_layers = [nn.Linear(emb_dim, nb_hidden)]
-        for _ in range(nb_layers-1):
-            Q_layers.append(nn.Linear(nb_hidden, nb_hidden))
-            K_layers.append(nn.Linear(nb_hidden, nb_hidden))
+        Q_layers = []
+        K_layers = []
+        for _ in range(enc_nb_layers):
+            Q_layers.append(nn.Linear(in_dim, enc_nb_hidden))
+            K_layers.append(nn.Linear(in_dim, enc_nb_hidden))
+            in_dim = enc_nb_hidden
 
         self.Q_layers = nn.ModuleList(Q_layers)
         self.K_layers = nn.ModuleList(K_layers)
-        self.Q_final_layer = nn.Linear(nb_hidden, nb_output)
-        self.K_final_layer = nn.Linear(nb_hidden, nb_output)
+        self.Q_final_layer = nn.Linear(in_dim, enc_nb_output)
+        self.K_final_layer = nn.Linear(in_dim, enc_nb_output)
         self.act = nn.ReLU()
 
-    def get_embedding(self, g):
-        with torch.autograd.no_grad():
-            g_emb = self.emb_model.get_embedding(g)
-        return g_emb.detach()
-
     def forward(self, g, g_candidates, batch_idx):
-        g_emb = self.get_embedding(g)
-        g_candidates_emb = self.get_embedding(g_candidates)
+        Q = self.gnn.get_embedding(g, detach=False)
+        K = self.gnn.get_embedding(g_candidates, detach=False)
 
-        Q, K = g_emb, g_candidates_emb
         for ql, kl in zip(self.Q_layers, self.K_layers):
             Q = self.act(ql(Q))
             K = self.act(kl(K))
@@ -192,45 +205,37 @@ class GAPN_Actor(nn.Module):
         shifted_actions = batched_sample(probs, batch_idx)
         actions = shifted_actions - get_batch_shift(batch_idx)
         action_logprobs = torch.log(probs[shifted_actions])
-        g_next_emb = g_candidates_emb[shifted_actions]
 
-        return g_emb, g_next_emb, g_candidates_emb, probs, action_logprobs, actions, shifted_actions
+        # probs for eval
+        return probs, action_logprobs, actions
 
     def select_action(self, g, g_candidates, batch_idx):
-        g_emb, g_next_emb, g_candidates_emb, probs, action_logprobs, actions, shifted_actions = self(g, g_candidates, batch_idx)
+        _, action_logprobs, actions = self(g, g_candidates, batch_idx)
 
-        g_emb = g_emb.detach().cpu()
-        g_next_emb = g_next_emb.detach().cpu()
-        g_candidates_emb = g_candidates_emb.detach().cpu()
-
-        probs = probs.squeeze_().tolist()
         action_logprobs = action_logprobs.squeeze_().tolist()
         actions = actions.squeeze_().tolist()
-        shifted_actions = shifted_actions.squeeze_().tolist()
 
-        if self.training:
-            return g_emb, g_next_emb, g_candidates_emb, action_logprobs, actions, shifted_actions
-        else:
-            return g_emb, g_candidates_emb, probs
+        return action_logprobs, actions
 
-    def evaluate(self, g_emb, g_g_candidates_emb, actions):
-        Q, K = g_emb, g_g_candidates_emb.x
+    def evaluate(self, g, g_candidates, actions, batch_idx):
+        Q = self.gnn.get_embedding(g, detach=False)
+        K = self.gnn.get_embedding(g_candidates, detach=False)
         for ql, kl in zip(self.Q_layers, self.K_layers):
             Q = self.act(ql(Q))
             K = self.act(kl(K))
         Q = self.Q_final_layer(Q)
         K = self.Q_final_layer(K)
 
-        Q = torch.repeat_interleave(Q, torch.bincount(g_g_candidates_emb.batch), dim=0)
+        Q = torch.repeat_interleave(Q, torch.bincount(batch_idx), dim=0)
         logits = torch.sum(Q * K, dim=1) / self.d_k**.5
 
-        probs = batched_softmax(logits, g_g_candidates_emb.batch)
-        batch_shift = get_batch_shift(g_g_candidates_emb.batch)
+        probs = batched_softmax(logits, batch_idx)
+        batch_shift = get_batch_shift(batch_idx)
         shifted_actions = actions + batch_shift
         return probs[shifted_actions]
 
-    def loss(self, g_emb, g_g_candidates_emb, actions, old_logprobs, state_values, rewards):
-        probs = self.evaluate(g_emb, g_g_candidates_emb, actions)
+    def loss(self, g, g_candidates, actions, old_logprobs, state_values, rewards, batch_idx):
+        probs = self.evaluate(g, g_candidates, actions, batch_idx)
         logprobs = torch.log(probs)
         entropies = probs * logprobs
 

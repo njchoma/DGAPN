@@ -14,7 +14,6 @@ def read_args():
     add_arg('--gpu', type=int, default=0)
     add_arg('--upsample', default=False)
     add_arg('--exp_loss', default=False)
-    add_arg('--embed', type=int, default=128)
     add_arg('--hidden', type=int, default=256)
     add_arg('--layers', type=int, default=4)
     add_arg('--use_3d', action='store_true')
@@ -37,7 +36,6 @@ def main():
                        gpu_num=args.gpu,
                        upsample=args.upsample,
                        exp_loss=args.exp_loss,
-                       emb_dim=args.embed,
                        nb_hidden=args.hidden,
                        nb_layers=args.layers,
                        use_3d=args.use_3d,

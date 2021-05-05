@@ -2,45 +2,41 @@ import torch
 import torch.nn as nn
 
 import torch_geometric as pyg
+from torch_geometric.data import Data, Batch
 
 
 class MyGNN(nn.Module):
-    def __init__(self, input_dim, emb_dim, nb_hidden, nb_layers, nb_edge_types, use_3d=False):
+    def __init__(self, input_dim, nb_hidden, nb_layers, nb_edge_types, use_3d=False, init_method='uniform'):
         super(MyGNN, self).__init__()
         self.input_dim = input_dim
-        self.emb_dim = emb_dim
         self.nb_hidden = nb_hidden
         self.nb_layers = nb_layers
         self.nb_edge_types = nb_edge_types
         self.use_3d = use_3d
 
-        if nb_layers == 1:
-            layers = [MyGAT(input_dim, emb_dim, nb_edge_types)]
-        else:
-            layers = [MyGAT(input_dim, nb_hidden, nb_edge_types)]
-            for _ in range(nb_layers-2):
-                layers.append(MyGAT(nb_hidden, nb_hidden, nb_edge_types))
-            layers.append(MyGAT(nb_hidden, emb_dim, nb_edge_types))
+        layers = []
+        in_dim = input_dim
+        for _ in range(nb_layers):
+            layers.append(MyGAT(in_dim, nb_hidden, nb_edge_types, init_method=init_method))
+            in_dim = nb_hidden
         self.layers = nn.ModuleList(layers)
 
         if use_3d:
-            if nb_layers == 1:
-                layers3D = [MyGCN(input_dim, emb_dim)]
-            else:
-                layers3D = [MyGCN(input_dim, nb_hidden)]
-                for _ in range(nb_layers-2):
-                    layers3D.append(MyGCN(nb_hidden, nb_hidden))
-                layers3D.append(MyGCN(nb_hidden, emb_dim))
+            layers3D = []
+            in_dim = input_dim
+            for _ in range(nb_layers):
+                layers3D.append(MyGCN(in_dim, nb_hidden, init_method=init_method))
+                in_dim = nb_hidden
             self.layers3D = nn.ModuleList(layers3D)
 
-        self.final_layer = nn.Linear(emb_dim, 1)
+        self.final_layer = nn.Linear(in_dim, 1)
 
     def forward(self, g, g3D=None):
-        x = self.get_embedding(g, g3D)
+        x = self.get_embedding(g, g3D, detach=False)
         y = self.final_layer(x).squeeze()
         return y
 
-    def get_embedding(self, g, g3D=None, aggr=True):
+    def get_embedding(self, g, g3D=None, aggr=True, detach=True):
         if isinstance(g, list):
             g3D = g[1]
             g = g[0]
@@ -48,6 +44,7 @@ class MyGNN(nn.Module):
         x = g.x
         edge_index = g.edge_index
         edge_attr  = g.edge_attr
+        batch = g.batch
         if g3D is None:
             assert self.use_3d is False
             for i, l in enumerate(self.layers):
@@ -60,9 +57,18 @@ class MyGNN(nn.Module):
                 x2 = l3D(x, geom_index, geom_attr)
                 x = x1 + x2
 
+        if detach is True:
+            x = x.detach()
+            edge_index = edge_index.detach()
+            edge_attr = edge_attr.detach()
+            batch = batch.detach()
+
         if aggr is True:
-            x = pyg.nn.global_add_pool(x, g.batch)
-        return x
+            return pyg.nn.global_add_pool(x, batch)
+        else:
+            g.x = x
+            g.edge_attr = edge_attr
+            return g
 
 
 
@@ -73,19 +79,24 @@ from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
 from torch_scatter import scatter_add
 
-def glorot(tensor):
+def init_randoms(tensor, method='uniform'):
     if tensor is not None:
         stdv = math.sqrt(6.0 / (tensor.size(-2) + tensor.size(-1)))
-        tensor.data.uniform_(-stdv, stdv)
+        if method == 'uniform':
+            tensor.data.uniform_(-stdv, stdv)
+        elif method == 'normal':
+            tensor.data.normal_(-stdv, stdv)
+        else:
+            pass
 
-def zeros(tensor):
+def init_zeros(tensor):
     if tensor is not None:
         tensor.data.fill_(0)
 
 
 class MyGAT(MessagePassing):
     def __init__(self, in_channels, out_channels, nb_edge_attr, batch_norm=False, res=False,
-                 heads=2, concat=False, negative_slope=0.2, dropout=0, bias=True,
+                 heads=2, concat=False, negative_slope=0.2, dropout=0, bias=True, init_method='uniform',
                  **kwargs):
         super(MyGAT, self).__init__(aggr='add', node_dim=0, **kwargs)  # "Add" aggregation.
         self.in_channels = in_channels
@@ -113,13 +124,13 @@ class MyGAT(MessagePassing):
 
         self.act = nn.ReLU()
 
-        self.reset_parameters()
+        self.reset_parameters(init_method)
 
-    def reset_parameters(self):
-        glorot(self.linN)
-        glorot(self.linE)
-        glorot(self.att)
-        zeros(self.bias)
+    def reset_parameters(self, init_method='uniform'):
+        init_randoms(self.linN, init_method)
+        init_randoms(self.linE, init_method)
+        init_randoms(self.att, init_method)
+        init_zeros(self.bias)
 
     def forward(self, node_attr, edge_index, edge_attr):
         # node_attr has shape [N, in_channels]
@@ -176,7 +187,7 @@ class MyGAT(MessagePassing):
 
 class MyGCN(MessagePassing):
     def __init__(self, in_channels, out_channels, batch_norm=False, res=False, 
-                 dropout=0, bias=True, **kwargs):
+                 dropout=0, bias=True, init_method='uniform', **kwargs):
         super(MyGCN, self).__init__(aggr='add', node_dim=0, **kwargs)  # "Add" aggregation.
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -197,11 +208,11 @@ class MyGCN(MessagePassing):
 
         self.act = nn.ReLU()
 
-        self.reset_parameters()
+        self.reset_parameters(init_method)
 
-    def reset_parameters(self):
-        glorot(self.weight)
-        zeros(self.bias)
+    def reset_parameters(self, init_method='uniform'):
+        init_randoms(self.weight, init_method)
+        init_zeros(self.bias)
 
     def forward(self, node_attr, edge_index, edge_weight=None):
         # node_attr has shape [N, in_channels]
@@ -249,7 +260,7 @@ class MyGCN(MessagePassing):
 
 class MyHGATConv(MessagePassing):
     def __init__(self, in_channels, out_channels, nb_edge_attr, batch_norm=False, res=True, norm_mode="symmetric",
-                 heads=1, concat=True, negative_slope=0.2, dropout=0, bias=True,
+                 heads=1, concat=True, negative_slope=0.2, dropout=0, bias=True, init_method='uniform',
                  **kwargs):
         super(MyHGATConv, self).__init__(aggr='add', node_dim=0, **kwargs)
         self.in_channels = in_channels
@@ -278,13 +289,13 @@ class MyHGATConv(MessagePassing):
 
         self.act = nn.ReLU()
 
-        self.reset_parameters()
+        self.reset_parameters(init_method)
 
-    def reset_parameters(self):
-        glorot(self.linN)
-        glorot(self.linE)
-        glorot(self.att)
-        zeros(self.bias)
+    def reset_parameters(self, init_method='uniform'):
+        init_randoms(self.linN, init_method)
+        init_randoms(self.linE, init_method)
+        init_randoms(self.att, init_method)
+        init_zeros(self.bias)
 
     def forward(self, node_attr, hyperedge_index, edge_attr):
         x = node_attr

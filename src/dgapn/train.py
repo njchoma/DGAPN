@@ -10,7 +10,7 @@ import torch
 import torch.multiprocessing as mp
 from torch.utils.tensorboard import SummaryWriter
 
-from .DGAPN import DGAPN, get_inno_reward
+from .DGAPN import DGAPN, Memory
 
 from reward.get_main_reward import get_main_reward
 
@@ -18,32 +18,9 @@ from utils.general_utils import initialize_logger
 from utils.graph_utils import mols_to_pyg_batch
 
 #####################################################
-#                   HELPER MODULES                  #
+#                      PROCESS                      #
 #####################################################
 
-class Memory:
-    def __init__(self):
-        self.actions = []
-        self.states = []
-        self.logprobs = []
-        self.rewards = []
-        self.is_terminals = []
-
-    def extend(self, memory):
-        self.actions.extend(memory.actions)
-        self.states.extend(memory.states)
-        self.logprobs.extend(memory.logprobs)
-        self.rewards.extend(memory.rewards)
-        self.is_terminals.extend(memory.is_terminals)
-
-    def clear(self):
-        del self.actions[:]
-        del self.states[:]
-        del self.logprobs[:]
-        del self.rewards[:]
-        del self.is_terminals[:]
-
-################## Process ##################
 tasks = mp.JoinableQueue()
 results = mp.Queue()
 
@@ -110,7 +87,6 @@ class Result(object):
     def __str__(self):
         return '%d' % self.index
 '''
-#############################################
 
 #####################################################
 #                   TRAINING LOOP                   #
@@ -155,11 +131,7 @@ def train_gpu_sync(args, embed_model, env):
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
 
-    embed_model.to(device)
-    embed_model.eval()
-    print(embed_model)
-
-    ppo = DGAPN(lr,
+    policy = DGAPN(lr,
                 betas,
                 eps,
                 eta,
@@ -168,23 +140,20 @@ def train_gpu_sync(args, embed_model, env):
                 eps_clip,
                 embed_model,
                 args.input_size,
-                args.emb_size,
                 args.nb_edge_types,
                 args.gnn_nb_layers,
                 args.gnn_nb_hidden,
-                args.use_3d,
                 args.enc_num_layers,
                 args.enc_num_hidden,
                 args.enc_num_output,
                 args.rnd_num_layers,
                 args.rnd_num_hidden,
                 args.rnd_num_output)
-    ppo.to_device(device)
-    print(ppo)
+    policy.to_device(device)
+    print(policy)
 
     sample_count = 0
     episode_count = 0
-    update_count = 0  # for adversarial
     save_counter = 0
     log_counter = 0
 
@@ -211,29 +180,26 @@ def train_gpu_sync(args, embed_model, env):
             mols[index] = mol
 
             notdone_idx.append(index)
-            candidates.extend(cands)
+            candidates.append(cands)
             batch_idx.extend([index] * len(cands))
-        batch_idx = torch.LongTensor(batch_idx)
         while True:
             # action selections (for not done)
             if len(notdone_idx) > 0:
-                state_embs, action_logprobs, actions, shifted_actions = ppo.select_action(
-                    mols_to_pyg_batch([mols[idx] for idx in notdone_idx], embed_model.use_3d, device=device),
-                    mols_to_pyg_batch(candidates, embed_model.use_3d, device=device),
-                    batch_idx, return_shifted=True)
+                states_emb, candidates_emb, action_logprobs, actions = policy.select_action(
+                    [mols[idx] for idx in notdone_idx],
+                    [item for sublist in candidates for item in sublist], batch_idx)
                 if not isinstance(action_logprobs, list):
                     action_logprobs = [action_logprobs]
                     actions = [actions]
-                    shifted_actions = [shifted_actions]
             else:
                 if sample_count >= update_timesteps:
                     break
 
             for i, idx in enumerate(notdone_idx):
-                tasks.put((idx, candidates[shifted_actions[i]], False))
+                tasks.put((idx, candidates[i][actions[i]], False))
 
-                memories[idx].states.append(
-                    [state_embs[0][[i], :], state_embs[1][[i], :], state_embs[2][batch_idx == idx, :]])
+                memories[idx].states.append(states_emb.to_data_list()[i])
+                memories[idx].candidates.append([data for j, data in enumerate(candidates_emb.to_data_list()) if batch_idx[j] == idx])
                 memories[idx].actions.append(actions[i])
                 memories[idx].logprobs.append(action_logprobs[i])
             for idx in done_idx:
@@ -255,9 +221,8 @@ def train_gpu_sync(args, embed_model, env):
                     new_done_idx.append(index)
                 else:
                     new_notdone_idx.append(index)
-                    candidates.extend(cands)
+                    candidates.append(cands)
                     batch_idx.extend([index] * len(cands))
-            batch_idx = torch.LongTensor(batch_idx)
             # get final rewards (for previously not done but now done)
             nowdone_idx = [idx for idx in notdone_idx if idx in new_done_idx]
             stillnotdone_idx = [idx for idx in notdone_idx if idx in new_notdone_idx]
@@ -286,9 +251,8 @@ def train_gpu_sync(args, embed_model, env):
             # get innovation rewards
             if args.iota > 0 and i_episode > args.innovation_reward_episode_delay:
                 if len(notdone_idx) > 0:
-                    inno_rewards = get_inno_reward(
-                        [mols[idx] for idx in notdone_idx],
-                        embed_model, ppo.explore_critic, device)
+                    inno_rewards = policy.get_inno_reward(
+                        [mols[idx] for idx in notdone_idx])
                     if not isinstance(inno_rewards, list):
                         inno_rewards = [inno_rewards]
 
@@ -310,27 +274,26 @@ def train_gpu_sync(args, embed_model, env):
             memory.extend(m)
             m.clear()
         # update model
-        print("\n\nupdating ppo @ episode %d..." % i_episode)
-        ppo.update(memory)
+        print("\n\nupdating policy @ episode %d..." % i_episode)
+        policy.update(memory)
         memory.clear()
 
-        update_count += 1
         save_counter += episode_count
         log_counter += episode_count
 
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > solved_reward:
             print("########## Solved! ##########")
-            torch.save(ppo.policy.actor, os.path.join(save_dir, 'PPO_continuous_solved_{}.pth'.format('test')))
+            torch.save(policy, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
             break
 
         # save every 500 episodes
         if save_counter >= save_interval:
-            torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
+            torch.save(policy, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
             save_counter = 0
 
         # save running model
-        torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_dgapn.pth'))
+        torch.save(policy, os.path.join(save_dir, 'running_dgapn.pth'))
 
         if log_counter >= log_interval:
             avg_length = int(avg_length / log_counter)
@@ -366,7 +329,7 @@ def train_serial(args, embed_model, env):
     embed_model.eval()
     print(embed_model)
 
-    ppo = DGAPN(lr,
+    policy = DGAPN(lr,
                 betas,
                 eps,
                 eta,
@@ -375,22 +338,19 @@ def train_serial(args, embed_model, env):
                 eps_clip,
                 embed_model,
                 args.input_size,
-                args.emb_size,
                 args.nb_edge_types,
                 args.gnn_nb_layers,
                 args.gnn_nb_hidden,
-                args.use_3d,
                 args.enc_num_layers,
                 args.enc_num_hidden,
                 args.enc_num_output,
                 args.rnd_num_layers,
                 args.rnd_num_hidden,
                 args.rnd_num_output)
-    ppo.to_device(device)
-    print(ppo)
+    policy.to_device(device)
+    print(policy)
 
     time_step = 0
-    update_count = 0 # for adversarial
 
     avg_length = 0
     running_reward = 0
@@ -404,10 +364,9 @@ def train_serial(args, embed_model, env):
         for t in range(max_timesteps):
             time_step += 1
             # Running policy_old:
-            state_emb, action_logprob, action = ppo.select_action(
-                mols_to_pyg_batch(state, embed_model.use_3d, device=device), 
-                mols_to_pyg_batch(candidates, embed_model.use_3d, device=device))
-            memory.states.append(state_emb)
+            action_logprob, action = policy.select_action(state, candidates)
+            memory.states.append(state)
+            memory.candidates.append(candidates)
             memory.actions.append(action)
             memory.logprobs.append(action_logprob)
 
@@ -421,7 +380,7 @@ def train_serial(args, embed_model, env):
                 reward = main_reward
 
             if args.iota > 0 and i_episode > args.innovation_reward_episode_delay:
-                inno_reward = get_inno_reward(state, embed_model, ppo.explore_critic, device)
+                inno_reward = policy.get_inno_reward(state)
                 reward += inno_reward
 
             # Saving reward and is_terminals:
@@ -434,9 +393,9 @@ def train_serial(args, embed_model, env):
 
         # update if it's time
         if time_step >= update_timesteps:
-            print("\n\nupdating ppo @ episode %d..." % i_episode)
+            print("\n\nupdating policy @ episode %d..." % i_episode)
             time_step = 0
-            ppo.update(memory)
+            policy.update(memory)
             memory.clear()
 
         writer.add_scalar("EpMainRew", main_reward, i_episode-1)
@@ -449,15 +408,15 @@ def train_serial(args, embed_model, env):
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > solved_reward:
             print("########## Solved! ##########")
-            torch.save(ppo.policy.actor, './PPO_continuous_solved_{}.pth'.format('test'))
+            torch.save(policy, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
             break
 
         # save every 500 episodes
         if (i_episode-1) % save_interval == 0:
-            torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
+            torch.save(policy, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
 
         # save running model
-        torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_dgapn.pth'))
+        torch.save(policy, os.path.join(save_dir, 'running_dgapn.pth'))
 
         # logging
         if i_episode % log_interval == 0:

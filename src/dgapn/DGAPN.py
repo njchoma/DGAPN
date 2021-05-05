@@ -12,6 +12,35 @@ from gnn_embed.model import MyGNN
 
 from utils.graph_utils import mols_to_pyg_batch
 
+#####################################################
+#                   HELPER MODULES                  #
+#####################################################
+
+class Memory:
+    def __init__(self):
+        self.actions = []
+        self.states = []
+        self.candidates = []
+        self.logprobs = []
+        self.rewards = []
+        self.is_terminals = []
+
+    def extend(self, memory):
+        self.actions.extend(memory.actions)
+        self.states.extend(memory.states)
+        self.candidates.extend(memory.candidates)
+        self.logprobs.extend(memory.logprobs)
+        self.rewards.extend(memory.rewards)
+        self.is_terminals.extend(memory.is_terminals)
+
+    def clear(self):
+        del self.actions[:]
+        del self.states[:]
+        del self.candidates[:]
+        del self.logprobs[:]
+        del self.rewards[:]
+        del self.is_terminals[:]
+
 #################################################
 #                  MAIN MODEL                   #
 #################################################
@@ -25,40 +54,32 @@ class DGAPN(nn.Module):
                  gamma,
                  K_epochs,
                  eps_clip,
-                 emb_model=None,
-                 input_dim=None,
-                 emb_dim=None,
-                 nb_edge_types=None,
-                 gnn_nb_layers=None,
-                 gnn_nb_hidden=None,
-                 use_3d=None,
-                 enc_nb_layers=None,
-                 enc_nb_hidden=None,
-                 enc_nb_output=None,
-                 rnd_nb_layers=None,
-                 rnd_nb_hidden=None,
-                 rnd_nb_output=None):
+                 emb_model,
+                 input_dim,
+                 nb_edge_types,
+                 gnn_nb_layers,
+                 gnn_nb_hidden,
+                 enc_nb_layers,
+                 enc_nb_hidden,
+                 enc_nb_output,
+                 rnd_nb_layers,
+                 rnd_nb_hidden,
+                 rnd_nb_output):
         super(DGAPN, self).__init__()
         self.gamma = gamma
         self.K_epochs = K_epochs
-
-        if emb_model is not None:
-            input_dim = emb_model.input_dim
-            emb_dim = emb_model.emb_dim
-            nb_edge_types = emb_model.nb_edge_types
+        self.emb_model = emb_model
+        self.emb_3d = emb_model.use_3d if emb_model is not None else False
 
         self.policy = ActorCriticGAPN(lr[:2],
                                       betas,
                                       eps,
                                       eta,
                                       eps_clip,
-                                      emb_model,
                                       input_dim,
-                                      emb_dim,
                                       nb_edge_types,
                                       gnn_nb_layers,
                                       gnn_nb_hidden,
-                                      use_3d,
                                       enc_nb_layers,
                                       enc_nb_hidden,
                                       enc_nb_output)
@@ -68,13 +89,10 @@ class DGAPN(nn.Module):
                                           eps,
                                           eta,
                                           eps_clip,
-                                          emb_model,
                                           input_dim,
-                                          emb_dim,
                                           nb_edge_types,
                                           gnn_nb_layers,
                                           gnn_nb_hidden,
-                                          use_3d,
                                           enc_nb_layers,
                                           enc_nb_hidden,
                                           enc_nb_output)
@@ -84,11 +102,9 @@ class DGAPN(nn.Module):
                                              betas,
                                              eps,
                                              input_dim,
-                                             emb_dim,
                                              nb_edge_types,
                                              gnn_nb_layers,
                                              gnn_nb_hidden,
-                                             use_3d,
                                              rnd_nb_layers,
                                              rnd_nb_hidden,
                                              rnd_nb_output)
@@ -96,6 +112,7 @@ class DGAPN(nn.Module):
         self.device = torch.device("cpu")
 
     def to_device(self, device):
+        self.emb_model = self.emb_model.to(device) if self.emb_model is not None else None
         self.policy.to(device)
         self.policy_old.to(device)
         self.explore_critic.to(device)
@@ -104,19 +121,31 @@ class DGAPN(nn.Module):
     def forward(self):
         raise NotImplementedError
 
-    def select_action(self, states, candidates, batch_idx=None, return_shifted=False):
+    def select_action(self, states, candidates, batch_idx=None):
         if batch_idx is None:
-            batch_idx = torch.zeros(len(torch.unique(candidates[0].batch)), dtype=torch.long)
-        batch_idx = batch_idx.to(self.device)
+            batch_idx = torch.zeros(len(candidates), dtype=torch.long)
+        batch_idx = torch.LongTensor(batch_idx).to(self.device)
+
+        states = mols_to_pyg_batch(states, self.emb_3d, device=self.device)
+        candidates = mols_to_pyg_batch(candidates, self.emb_3d, device=self.device)
 
         with torch.autograd.no_grad():
-            g_emb, g_next_emb, g_candidates_emb, action_logprobs, actions, shifted_actions = self.policy_old.select_action(
+            if self.emb_model is not None:
+                states = self.emb_model.get_embedding(states, aggr=False)
+                candidates = self.emb_model.get_embedding(candidates, aggr=False)
+            action_logprobs, actions = self.policy_old.select_action(
                 states, candidates, batch_idx)
 
-        if return_shifted:
-            return [g_emb, g_next_emb, g_candidates_emb], action_logprobs, actions, shifted_actions
-        else:
-            return [g_emb, g_next_emb, g_candidates_emb], action_logprobs, actions
+        return states, candidates, action_logprobs, actions
+    
+    def get_inno_reward(self, states):
+        states = mols_to_pyg_batch(states, self.emb_3d, device=self.device)
+
+        if self.emb_model is not None:
+            with torch.autograd.no_grad():
+                states = self.emb_model.get_embedding(states, aggr=False)
+        scores = self.explore_critic.get_score(states)
+        return scores.tolist()
 
     def update(self, memory, eps=1e-5):
         # Monte Carlo estimate of rewards:
@@ -132,10 +161,16 @@ class DGAPN(nn.Module):
         rewards = torch.tensor(rewards).to(self.device)
         rewards = (rewards - rewards.mean()) / (rewards.std() + eps)
 
-        # convert list to tensor
-        old_states = torch.cat(([m[0] for m in memory.states]),dim=0).to(self.device)
-        old_next_states = torch.cat(([m[1] for m in memory.states]),dim=0).to(self.device)
-        old_candidates = Batch().from_data_list([Data(x=m[2]) for m in memory.states]).to(self.device)
+        # candidates batch
+        batch_idx = []
+        for i, cands in enumerate(memory.candidates):
+            batch_idx.extend([i]*len(cands))
+        batch_idx = torch.LongTensor(batch_idx).to(self.device)
+
+        # convert list to tensor Batch().from_data_list([graph[0] for graph in graphs])
+        old_states = Batch().from_data_list(memory.states).to(self.device)
+        old_next_states = Batch().from_data_list([cands[a] for a, cands in zip(memory.actions, memory.candidates)]).to(self.device)
+        old_candidates = Batch().from_data_list([item for sublist in memory.candidates for item in sublist]).to(self.device)
         old_actions = torch.tensor(memory.actions).to(self.device)
         old_logprobs = torch.tensor(memory.logprobs).to(self.device)
 
@@ -145,7 +180,7 @@ class DGAPN(nn.Module):
         print("Optimizing...")
 
         for i in range(self.K_epochs):
-            loss, baseline_loss = self.policy.update(old_states, old_candidates, old_actions, old_logprobs, old_values, rewards)
+            loss, baseline_loss = self.policy.update(old_states, old_candidates, old_actions, old_logprobs, old_values, rewards, batch_idx)
             rnd_loss = self.explore_critic.update(old_next_states)
             if (i%10)==0:
                 print("  {:3d}: Actor Loss: {:7.3f}, Critic Loss: {:7.3f}, RND Loss: {:7.3f}".format(i, loss, baseline_loss, rnd_loss))
@@ -155,17 +190,4 @@ class DGAPN(nn.Module):
 
     def __repr__(self):
         return "{}\n".format(repr(self.policy))
-
-
-#####################################################
-#                      REWARDS                      #
-#####################################################
-
-def get_inno_reward(states, emb_model, explore_critic, device):
-    g = mols_to_pyg_batch(states, emb_model.use_3d, device=device)
-
-    with torch.autograd.no_grad():
-        X = emb_model.get_embedding(g)
-    scores = explore_critic.get_score(X)
-    return scores.tolist()
 

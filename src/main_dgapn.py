@@ -49,12 +49,11 @@ def molecule_arg_parser():
     #add_arg('--min_action', type=int, default=20) # default 0
 
     # NETWORK PARAMETERS
-    #add_arg('--input_size', type=int, default=121)
+    add_arg('--input_size', type=int, default=121)
     #add_arg('--emb_size', type=int, default=128)
-    #add_arg('--nb_edge_types', type=int, default=1)
-    #add_arg('--gnn_nb_layers', type=int, default=4)
-    #add_arg('--gnn_nb_hidden', type=int, default=256, help='hidden size of Graph Networks')
-    #add_arg('--use_3d', action='store_true')
+    add_arg('--nb_edge_types', type=int, default=1)
+    add_arg('--gnn_nb_layers', type=int, default=1) # number of layers on top of the embedding model
+    add_arg('--gnn_nb_hidden', type=int, default=256, help='hidden size of Graph Networks')
     add_arg('--enc_num_layers', type=int, default=4)
     add_arg('--enc_num_hidden', type=int, default=128, help='hidden size of Encoding Networks')
     add_arg('--enc_num_output', type=int, default=64)
@@ -79,10 +78,16 @@ def main():
     args = molecule_arg_parser().parse_args()
     #args.nb_procs = mp.cpu_count()
 
-    embed_model = load_embed_model(args.artifact_path,
-                                           args.embed_model_url,
-                                           args.embed_model_path)
-    args.input_size, args.emb_size, args.nb_edge_types, args.gnn_nb_layers, args.gnn_nb_hidden, args.use_3d = [None] * 6
+    try:
+        embed_model = load_embed_model(args.artifact_path,
+                                            args.embed_model_url,
+                                            args.embed_model_path)
+        embed_model.eval()
+        print(embed_model)
+        args.input_size = embed_model.nb_hidden
+        args.nb_edge_types = embed_model.nb_edge_types
+    except Exception as e:
+        embed_model = None
 
     env = CReM_Env(args.data_path, args.warm_start_dataset_path, mode='mol')
     #ob, _, _ = env.reset()

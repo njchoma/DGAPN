@@ -10,13 +10,16 @@ from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, de
 
 from gnn_embed.model import MyGNN
 
-def init_method_1(model):
-    model.weight.data.uniform_()
-    model.bias.data.uniform_()
-
-def init_method_2(model):
-    model.weight.data.normal_()
-    model.bias.data.normal_()
+def init_network(model, method='uniform'):
+    if model is not None:
+        if method == 'uniform':
+            model.weight.data.uniform_()
+            model.bias.data.uniform_()
+        elif method == 'normal':
+            model.weight.data.normal_()
+            model.bias.data.normal_()
+        else:
+            pass
 
 
 class RNDistillation(nn.Module):
@@ -25,26 +28,30 @@ class RNDistillation(nn.Module):
                  betas,
                  eps,
                  input_dim,
-                 emb_dim,
                  nb_edge_types,
                  gnn_nb_layers,
                  gnn_nb_hidden,
-                 use_3d,
                  rnd_nb_layers,
                  rnd_nb_hidden,
                  rnd_nb_output):
         super(RNDistillation, self).__init__()
 
-        self.f = RandomNetwork(emb_dim,
-                               rnd_nb_output,
+        self.f = RandomNetwork(input_dim,
+                               nb_edge_types,
+                               gnn_nb_layers,
+                               gnn_nb_hidden,
                                rnd_nb_layers,
                                rnd_nb_hidden,
-                               init_method=init_method_1)
-        self.f_hat = RandomNetwork(emb_dim,
-                                   rnd_nb_output,
+                               rnd_nb_output,
+                               init_method='uniform')
+        self.f_hat = RandomNetwork(input_dim,
+                                   nb_edge_types,
+                                   gnn_nb_layers,
+                                   gnn_nb_hidden,
                                    rnd_nb_layers,
                                    rnd_nb_hidden,
-                                   init_method=init_method_2)
+                                   rnd_nb_output,
+                                   init_method='normal')
 
         self.optimizer = torch.optim.Adam(self.f_hat.parameters(), lr=lr, betas=betas, eps=eps)
 
@@ -55,11 +62,11 @@ class RNDistillation(nn.Module):
         return errors
 
     def get_score(self, g_next_emb, out_min=-5., out_max=5., min_running=100, eps=0.01):
-        if len(self.running_error) < min_running:
-            return np.zeros(g_next_emb.size(0))
-
         with torch.autograd.no_grad():
             errors = self(g_next_emb).detach().cpu().numpy()
+
+        if len(self.running_error) < min_running:
+            return np.zeros_like(errors)
         scores = (errors - np.mean(self.running_error)) / (np.std(self.running_error) + eps)
         return np.clip(scores, out_min, out_max)
 
@@ -77,26 +84,35 @@ class RNDistillation(nn.Module):
 
 class RandomNetwork(nn.Module):
     def __init__(self,
-                 emb_dim,
-                 output_dim,
-                 nb_layers,
-                 nb_hidden,
+                 input_dim,
+                 nb_edge_types,
+                 gnn_nb_layers,
+                 gnn_nb_hidden,
+                 rnd_nb_layers,
+                 rnd_nb_hidden,
+                 rnd_nb_output,
                  init_method=None):
         super(RandomNetwork, self).__init__()
+        self.gnn = MyGNN(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, init_method=init_method)
+        if gnn_nb_layers == 0:
+            in_dim = input_dim
+        else:
+            in_dim = gnn_nb_hidden
+
         layers = []
-        in_dim = emb_dim
-        for _ in range(nb_layers):
-            curr_layer = nn.Linear(in_dim, nb_hidden)
+        for _ in range(rnd_nb_layers):
+            curr_layer = nn.Linear(in_dim, rnd_nb_hidden)
             if init_method is not None:
-                curr_layer.apply(init_method)
+                init_network(curr_layer, init_method)
             layers.append(curr_layer)
-            in_dim = nb_hidden
+            in_dim = rnd_nb_hidden
 
         self.layers = nn.ModuleList(layers)
-        self.final_layer = nn.Linear(in_dim, output_dim)
+        self.final_layer = nn.Linear(in_dim, rnd_nb_output)
         self.act = nn.ReLU()
 
-    def forward(self, X):
+    def forward(self, g_emb):
+        X = self.gnn.get_embedding(g_emb, detach=False)
         for i, l in enumerate(self.layers):
             X = self.act(l(X))
         return self.final_layer(X)

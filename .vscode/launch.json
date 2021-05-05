@@ -12,7 +12,7 @@
             "subProcess": true,
             "args": [
                 "--name", "embed",
-                "--use_3d",
+                //"--use_3d",
                 "--data_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
                 "--artifact_path", "test_run/dgapn",
                 "--gpu", "0"
