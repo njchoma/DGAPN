@@ -129,7 +129,7 @@ eps_clip = 0.2              # clip parameter for PPO
 gamma = 0.99                # discount factor
 eta = 0.01                  # relative weight for entropy loss
 
-lr = (5e-4, 1e-4, 2e-3)     # learning rate for actor, critic and random network
+lr = (1e-3, 1e-4, 2e-3)     # learning rate for actor, critic and random network
 betas = (0.9, 0.999)
 eps = 0.01
 
@@ -324,7 +324,7 @@ def train_gpu_sync(args, surrogate_model, env):
         # save every 500 episodes
         if save_counter >= save_interval:
             torch.save(ppo.policy.actor, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
-            save_counter -= save_interval
+            save_counter = 0
 
         # save running model
         torch.save(ppo.policy.actor, os.path.join(save_dir, 'running_dgapn.pth'))
@@ -336,7 +336,7 @@ def train_gpu_sync(args, surrogate_model, env):
             print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
             running_reward = 0
             avg_length = 0
-            log_counter -= log_interval
+            log_counter = 0
 
         episode_count = 0
         sample_count = 0
