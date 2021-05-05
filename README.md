@@ -10,7 +10,7 @@ Final product wish list:
 
 2. Retrieval system attention mechanism (done)
 
-3. User-specified number of GNN layers to share
+3. User-specified number of GNN layers to share (done)
 
 4. Fix multi-head (done)
 
