@@ -12,6 +12,7 @@ PYARGS="$PYARGS --nb_procs 8"
 PYARGS="$PYARGS --data_path $DATA/src/dataset"
 PYARGS="$PYARGS --warm_start_dataset_path $DATA/src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.sorted.4col.csv"
 PYARGS="$PYARGS --artifact_path $DATA/artifact/dgapn"
-PYARGS="$PYARGS --surrogate_model_path $DATA/artifact/surrogate_model.pth"
+PYARGS="$PYARGS --embed_model_path $DATA/artifact/embed_model.pth"
+# PYARGS="$PYARGS --reward_type dock"
 
 python src/main_dgapn.py $PYARGS

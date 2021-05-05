@@ -4,9 +4,9 @@ import torch.nn as nn
 import torch_geometric as pyg
 
 
-class GNN_MyGAT(nn.Module):
+class MyGNN(nn.Module):
     def __init__(self, input_dim, emb_dim, nb_hidden, nb_layers, nb_edge_types, use_3d=False):
-        super(GNN_MyGAT, self).__init__()
+        super(MyGNN, self).__init__()
         self.input_dim = input_dim
         self.emb_dim = emb_dim
         self.nb_hidden = nb_hidden
@@ -15,22 +15,22 @@ class GNN_MyGAT(nn.Module):
         self.use_3d = use_3d
 
         if nb_layers == 1:
-            layers = [MyGATConv(input_dim, emb_dim, nb_edge_types)]
+            layers = [MyGAT(input_dim, emb_dim, nb_edge_types)]
         else:
-            layers = [MyGATConv(input_dim, nb_hidden, nb_edge_types)]
+            layers = [MyGAT(input_dim, nb_hidden, nb_edge_types)]
             for _ in range(nb_layers-2):
-                layers.append(MyGATConv(nb_hidden, nb_hidden, nb_edge_types))
-            layers.append(MyGATConv(nb_hidden, emb_dim, nb_edge_types))
+                layers.append(MyGAT(nb_hidden, nb_hidden, nb_edge_types))
+            layers.append(MyGAT(nb_hidden, emb_dim, nb_edge_types))
         self.layers = nn.ModuleList(layers)
 
         if use_3d:
             if nb_layers == 1:
-                layers3D = [MyGCNConv(input_dim, emb_dim)]
+                layers3D = [MyGCN(input_dim, emb_dim)]
             else:
-                layers3D = [MyGCNConv(input_dim, nb_hidden)]
+                layers3D = [MyGCN(input_dim, nb_hidden)]
                 for _ in range(nb_layers-2):
-                    layers3D.append(MyGCNConv(nb_hidden, nb_hidden))
-                layers3D.append(MyGCNConv(nb_hidden, emb_dim))
+                    layers3D.append(MyGCN(nb_hidden, nb_hidden))
+                layers3D.append(MyGCN(nb_hidden, emb_dim))
             self.layers3D = nn.ModuleList(layers3D)
 
         self.final_layer = nn.Linear(emb_dim, 1)
@@ -83,11 +83,11 @@ def zeros(tensor):
         tensor.data.fill_(0)
 
 
-class MyGATConv(MessagePassing):
+class MyGAT(MessagePassing):
     def __init__(self, in_channels, out_channels, nb_edge_attr, batch_norm=False, res=False,
                  heads=2, concat=False, negative_slope=0.2, dropout=0, bias=True,
                  **kwargs):
-        super(MyGATConv, self).__init__(aggr='add', node_dim=0, **kwargs)  # "Add" aggregation.
+        super(MyGAT, self).__init__(aggr='add', node_dim=0, **kwargs)  # "Add" aggregation.
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.batch_norm = batch_norm
@@ -174,10 +174,10 @@ class MyGATConv(MessagePassing):
                                              self.in_channels, self.out_channels, self.heads)
 
 
-class MyGCNConv(MessagePassing):
+class MyGCN(MessagePassing):
     def __init__(self, in_channels, out_channels, batch_norm=False, res=False, 
                  dropout=0, bias=True, **kwargs):
-        super(MyGCNConv, self).__init__(aggr='add', node_dim=0, **kwargs)  # "Add" aggregation.
+        super(MyGCN, self).__init__(aggr='add', node_dim=0, **kwargs)  # "Add" aggregation.
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.batch_norm = batch_norm

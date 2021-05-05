@@ -5,9 +5,9 @@ import torch
 
 from utils.general_utils import maybe_download_file
 
-from gnn_surrogate import model
+from gnn_embed import model
 
-from dgapn.env import CReM_Env
+from environment.env import CReM_Env
 from dgapn.gapn_policy import GAPN_Actor
 
 from evaluate.eval_dgapn import eval_dgapn
@@ -26,10 +26,9 @@ def molecule_arg_parser():
     add_arg('--name', default='default_run')
     add_arg('--greedy', action='store_true')
 
-    add_arg('--surrogate_model_url', default='')
-    add_arg('--surrogate_guide_path', default='')
-    add_arg('--surrogate_eval_path', default='')
-    add_arg('--model_path', default='')
+    add_arg('--policy_path', default='')
+
+    add_arg('--reward_type', type=str, default='logp', help='logp;dock')
 
     add_arg('--nb_sample_crem', type=int, default=128)
 
@@ -38,19 +37,8 @@ def molecule_arg_parser():
 
     return parser
 
-def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_path):
-    if surrogate_model_url != '':
-        surrogate_model_path = os.path.join(artifact_path, 'surrogate_model.pth')
-
-        maybe_download_file(surrogate_model_path,
-                            surrogate_model_url,
-                            'Surrogate model')
-    surrogate_model = torch.load(surrogate_model_path, map_location='cpu')
-    print("Surrogate model loaded")
-    return surrogate_model
-
-def load_dgapn(model_path):
-    dgapn_model = torch.load(model_path, map_location='cpu')
+def load_dgapn(policy_path):
+    dgapn_model = torch.load(policy_path, map_location='cpu')
     print("DGAPN model loaded")
     return dgapn_model
 
@@ -63,34 +51,24 @@ def main():
                 nb_sample_crem = args.nb_sample_crem,
                 mode='mol')
 
-    surrogate_guide = load_surrogate_model(args.artifact_path,
-                                           args.surrogate_model_url,
-                                           args.surrogate_guide_path)
-    surrogate_eval  = load_surrogate_model(args.artifact_path,
-                                           '',
-                                           args.surrogate_eval_path)
-    print(surrogate_guide)
-
     artifact_path = os.path.join(args.artifact_path, args.name)
     os.makedirs(artifact_path, exist_ok=True)
 
     if args.greedy is True:
         # Greedy
         eval_greedy(artifact_path,
-                    surrogate_guide,
-                    surrogate_eval,
                     env,
+                    args.reward_type,
                     N = args.nb_test,
                     K = args.nb_bad_steps)
     else:
         # DGAPN
-        policy = load_dgapn(args.model_path)
+        policy = load_dgapn(args.policy_path)
         print(policy)
         eval_dgapn(artifact_path,
                     policy,
-                    surrogate_guide,
-                    surrogate_eval,
                     env,
+                    args.reward_type,
                     N = args.nb_test,
                     K = args.nb_bad_steps)
 

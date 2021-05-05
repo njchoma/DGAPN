@@ -9,28 +9,24 @@ from rdkit import Chem
 import torch
 from torch_geometric.data import Batch
 
+from reward.get_main_reward import get_main_reward
+
 from utils.graph_utils import mols_to_pyg_batch
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def get_rewards(g_batch, surrogate_model):
-    with torch.autograd.no_grad():
-        scores = surrogate_model(g_batch)
-    return scores.cpu().numpy()*-1
-
 def dgapn_rollout(save_path,
                     policy,
                     env,
-                    surrogate_guide,
-                    surrogate_eval,
+                    reward_type,
                     K,
                     max_rollout=6):
     mol, mol_candidates, done = env.reset()
     mol_start = mol
     mol_best = mol
 
-    g = mols_to_pyg_batch(mol, surrogate_guide.use_3d, device=DEVICE)
-    new_rew = get_rewards(g, surrogate_guide)
+    g = mols_to_pyg_batch(mol, policy.emb_model.use_3d, device=DEVICE)
+    new_rew = get_main_reward(mol, reward_type)
     start_rew = new_rew
     best_rew = new_rew
     steps_remaining = K
@@ -38,8 +34,8 @@ def dgapn_rollout(save_path,
     for i in range(max_rollout):
         print("  {:3d} {:2d} {:4.1f}".format(i+1, steps_remaining, best_rew))
         steps_remaining -= 1
-        g_candidates = mols_to_pyg_batch(mol_candidates, surrogate_guide.use_3d, device=DEVICE)
-        next_rewards = get_rewards(g_candidates, surrogate_guide)
+        g_candidates = mols_to_pyg_batch(mol_candidates, policy.emb_model.use_3d, device=DEVICE)
+        next_rewards = get_main_reward(mol_candidates, reward_type)
 
         with torch.autograd.no_grad():
             _, _, _, probs, _, _, _ = policy(g, g_candidates, torch.zeros(len(mol_candidates), dtype=torch.long).to(DEVICE))
@@ -64,7 +60,7 @@ def dgapn_rollout(save_path,
             break
 
         mol, mol_candidates, done = env.step(action, include_current_state=False)
-        g = mols_to_pyg_batch(mol, surrogate_guide.use_3d, device=DEVICE)
+        g = mols_to_pyg_batch(mol, policy.emb_model.use_3d, device=DEVICE)
 
         if new_rew > best_rew:
             mol_best = mol
@@ -84,15 +80,10 @@ def dgapn_rollout(save_path,
 
     return start_rew, best_rew
 
-def eval_dgapn(artifact_path, policy, surrogate_guide, surrogate_eval, env, N=120, K=1):
+def eval_dgapn(artifact_path, policy, env, reward_type, N=120, K=1):
     # logging variables
     dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
     save_path = os.path.join(artifact_path, dt + '_dgapn.csv')
-
-    surrogate_guide = surrogate_guide.to(DEVICE)
-    surrogate_guide.eval()
-    surrogate_eval = surrogate_eval.to(DEVICE)
-    surrogate_eval.eval()
 
     policy = policy.to(DEVICE)
     policy.eval()
@@ -104,8 +95,7 @@ def eval_dgapn(artifact_path, policy, surrogate_guide, surrogate_eval, env, N=12
         start_rew, best_rew = dgapn_rollout(save_path,
                                             policy,
                                             env,
-                                            surrogate_guide,
-                                            surrogate_eval,
+                                            reward_type,
                                             K)
         improvement = best_rew - start_rew
         print("Improvement ", improvement)

@@ -11,4 +11,4 @@ PYARGS="$PYARGS --data_path $DATA/src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db
 PYARGS="$PYARGS --artifact_path $DATA/artifact/dgapn"
 # PYARGS="$PYARGS --use_3d"
 
-python src/main_predict_dock_score.py $PYARGS
+python src/main_embed.py $PYARGS

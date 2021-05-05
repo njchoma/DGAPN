@@ -18,7 +18,7 @@ import torch_geometric as pyg
 
 import utils.graph_utils as graph_utils
 import utils.general_utils as general_utils
-from gnn_surrogate.model import GNN_MyGAT
+from gnn_embed.model import MyGNN
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -447,7 +447,7 @@ def main(artifact_path,
         logging.info("Model restored")
     except Exception as e:
         input_dim, nb_edge_types = train_data.get_graph_spec()
-        net = GNN_MyGAT(input_dim=input_dim,
+        net = MyGNN(input_dim=input_dim,
                         emb_dim=emb_dim,
                         nb_hidden=nb_hidden,
                         nb_layers=nb_layers,

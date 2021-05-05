@@ -8,8 +8,8 @@ import torch.multiprocessing as mp
 from dgapn.train import train_gpu_sync, train_serial
 
 from utils.general_utils import maybe_download_file
-from gnn_surrogate import model
-from dgapn.env import CReM_Env
+from gnn_embed import model
+from environment.env import CReM_Env
 
 def molecule_arg_parser():
     parser = argparse.ArgumentParser(
@@ -27,8 +27,8 @@ def molecule_arg_parser():
     #add_arg('--seed', help='RNG seed', type=int, default=666)
 
     add_arg('--warm_start_dataset_path', default='')
-    add_arg('--surrogate_model_url', default='')
-    add_arg('--surrogate_model_path', default='')
+    add_arg('--embed_model_url', default='')
+    add_arg('--embed_model_path', default='')
 
     add_arg('--iota', type=float, default=0.5, help='relative weight for innovation reward')
     add_arg('--innovation_reward_episode_delay', type=int, default=100)
@@ -40,7 +40,7 @@ def molecule_arg_parser():
     #add_arg('--sa_ratio', type=float, default=1)
     #add_arg('--reward_step_total', type=float, default=0.5)
     #add_arg('--normalize_adj', type=int, default=0)
-    #add_arg('--reward_type', type=str, default='qed', help='logppen;logp_target;qed;qedsa;qed_target;mw_target;gan')
+    add_arg('--reward_type', type=str, default='logp', help='logp;dock')
     #add_arg('--reward_target', type=float, default=0.5, help='target reward value')
     #add_arg('--has_feature', type=int, default=0)
     #add_arg('--is_conditional', type=int, default=0) # default 0
@@ -64,24 +64,24 @@ def molecule_arg_parser():
 
     return parser
 
-def load_surrogate_model(artifact_path, surrogate_model_url, surrogate_model_path):
-    if surrogate_model_url != '':
-        surrogate_model_path = os.path.join(artifact_path, 'surrogate_model.pth')
+def load_embed_model(artifact_path, embed_model_url, embed_model_path):
+    if embed_model_url != '':
+        embed_model_path = os.path.join(artifact_path, 'embed_model.pth')
 
-        maybe_download_file(surrogate_model_path,
-                            surrogate_model_url,
-                            'Surrogate model')
-    surrogate_model = torch.load(surrogate_model_path, map_location='cpu')
-    print("Surrogate model loaded")
-    return surrogate_model
+        maybe_download_file(embed_model_path,
+                            embed_model_url,
+                            'embed model')
+    embed_model = torch.load(embed_model_path, map_location='cpu')
+    print("embed model loaded")
+    return embed_model
 
 def main():
     args = molecule_arg_parser().parse_args()
     #args.nb_procs = mp.cpu_count()
 
-    surrogate_model = load_surrogate_model(args.artifact_path,
-                                           args.surrogate_model_url,
-                                           args.surrogate_model_path)
+    embed_model = load_embed_model(args.artifact_path,
+                                           args.embed_model_url,
+                                           args.embed_model_path)
     args.input_size, args.emb_size, args.nb_edge_types, args.gnn_nb_layers, args.gnn_nb_hidden, args.use_3d = [None] * 6
 
     env = CReM_Env(args.data_path, args.warm_start_dataset_path, mode='mol')
@@ -91,9 +91,9 @@ def main():
     print("====args====\n", args)
 
     if args.nb_procs > 1:
-        train_gpu_sync(args, surrogate_model, env)
+        train_gpu_sync(args, embed_model, env)
     else:
-        train_serial(args, surrogate_model, env)
+        train_serial(args, embed_model, env)
 
 if __name__ == '__main__':
     mp.set_start_method('fork', force=True)

@@ -10,7 +10,9 @@ import torch
 import torch.multiprocessing as mp
 from torch.utils.tensorboard import SummaryWriter
 
-from .DGAPN import DGAPN, get_surr_reward, get_inno_reward
+from .DGAPN import DGAPN, get_inno_reward
+
+from reward.get_main_reward import get_main_reward
 
 from utils.general_utils import initialize_logger
 from utils.graph_utils import mols_to_pyg_batch
@@ -129,13 +131,13 @@ eps_clip = 0.2              # clip parameter for PPO
 gamma = 0.99                # discount factor
 eta = 0.01                  # relative weight for entropy loss
 
-lr = (1e-3, 1e-4, 2e-3)     # learning rate for actor, critic and random network
+lr = (5e-4, 1e-4, 2e-3)     # learning rate for actor, critic and random network
 betas = (0.9, 0.999)
 eps = 0.01
 
 #############################################
 
-def train_gpu_sync(args, surrogate_model, env):
+def train_gpu_sync(args, embed_model, env):
     print("lr:", lr, "beta:", betas, "eps:", eps)  # parameters for Adam optimizer
 
     print('Creating %d processes' % args.nb_procs)
@@ -153,9 +155,9 @@ def train_gpu_sync(args, surrogate_model, env):
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
 
-    surrogate_model.to(device)
-    surrogate_model.eval()
-    print(surrogate_model)
+    embed_model.to(device)
+    embed_model.eval()
+    print(embed_model)
 
     ppo = DGAPN(lr,
                 betas,
@@ -164,7 +166,7 @@ def train_gpu_sync(args, surrogate_model, env):
                 gamma,
                 K_epochs,
                 eps_clip,
-                surrogate_model,
+                embed_model,
                 args.input_size,
                 args.emb_size,
                 args.nb_edge_types,
@@ -216,9 +218,13 @@ def train_gpu_sync(args, surrogate_model, env):
             # action selections (for not done)
             if len(notdone_idx) > 0:
                 state_embs, action_logprobs, actions, shifted_actions = ppo.select_action(
-                    mols_to_pyg_batch([mols[idx] for idx in notdone_idx], surrogate_model.use_3d, device=device),
-                    mols_to_pyg_batch(candidates, surrogate_model.use_3d, device=device),
+                    mols_to_pyg_batch([mols[idx] for idx in notdone_idx], embed_model.use_3d, device=device),
+                    mols_to_pyg_batch(candidates, embed_model.use_3d, device=device),
                     batch_idx, return_shifted=True)
+                if not isinstance(action_logprobs, list):
+                    action_logprobs = [action_logprobs]
+                    actions = [actions]
+                    shifted_actions = [shifted_actions]
             else:
                 if sample_count >= update_timesteps:
                     break
@@ -256,23 +262,21 @@ def train_gpu_sync(args, surrogate_model, env):
             nowdone_idx = [idx for idx in notdone_idx if idx in new_done_idx]
             stillnotdone_idx = [idx for idx in notdone_idx if idx in new_notdone_idx]
             if len(nowdone_idx) > 0:
-                surr_rewards = get_surr_reward(
-                    [mols[idx] for idx in nowdone_idx],
-                    surrogate_model, device)
+                main_rewards = get_main_reward(
+                    [mols[idx] for idx in nowdone_idx], reward_type=args.reward_type)
+                if not isinstance(main_rewards, list):
+                    main_rewards = [main_rewards]
 
             for i, idx in enumerate(nowdone_idx):
-                try:
-                    surr_reward = surr_rewards[i]
-                except Exception as e:
-                    surr_reward = surr_rewards
+                main_reward = main_rewards[i]
 
                 i_episode += 1
-                running_reward += surr_reward
-                writer.add_scalar("EpSurrogate", -1 * surr_reward, i_episode - 1)
-                rewbuffer_env.append(surr_reward)
+                running_reward += main_reward
+                writer.add_scalar("EpMainRew", main_reward, i_episode - 1)
+                rewbuffer_env.append(main_reward)
                 writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode - 1)
 
-                memories[idx].rewards.append(surr_reward)
+                memories[idx].rewards.append(main_reward)
                 memories[idx].is_terminals.append(True)
             for idx in stillnotdone_idx:
                 running_reward += 0
@@ -284,13 +288,12 @@ def train_gpu_sync(args, surrogate_model, env):
                 if len(notdone_idx) > 0:
                     inno_rewards = get_inno_reward(
                         [mols[idx] for idx in notdone_idx],
-                        surrogate_model, ppo.explore_critic, device)
+                        embed_model, ppo.explore_critic, device)
+                    if not isinstance(inno_rewards, list):
+                        inno_rewards = [inno_rewards]
 
                 for i, idx in enumerate(notdone_idx):
-                    try:
-                        inno_reward = args.iota * inno_rewards[i]
-                    except Exception as e:
-                        inno_reward = args.iota * inno_rewards
+                    inno_reward = args.iota * inno_rewards[i]
 
                     running_reward += inno_reward
 
@@ -346,7 +349,7 @@ def train_gpu_sync(args, surrogate_model, env):
         tasks.put(None)
     tasks.join()
 
-def train_serial(args, surrogate_model, env):
+def train_serial(args, embed_model, env):
     print("lr:", lr, "beta:", betas, "eps:", eps) # parameters for Adam optimizer
 
     # logging variables
@@ -359,9 +362,9 @@ def train_serial(args, surrogate_model, env):
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
 
-    surrogate_model.to(device)
-    surrogate_model.eval()
-    print(surrogate_model)
+    embed_model.to(device)
+    embed_model.eval()
+    print(embed_model)
 
     ppo = DGAPN(lr,
                 betas,
@@ -370,7 +373,7 @@ def train_serial(args, surrogate_model, env):
                 gamma,
                 K_epochs,
                 eps_clip,
-                surrogate_model,
+                embed_model,
                 args.input_size,
                 args.emb_size,
                 args.nb_edge_types,
@@ -402,8 +405,8 @@ def train_serial(args, surrogate_model, env):
             time_step += 1
             # Running policy_old:
             state_emb, action_logprob, action = ppo.select_action(
-                mols_to_pyg_batch(state, surrogate_model.use_3d, device=device), 
-                mols_to_pyg_batch(candidates, surrogate_model.use_3d, device=device))
+                mols_to_pyg_batch(state, embed_model.use_3d, device=device), 
+                mols_to_pyg_batch(candidates, embed_model.use_3d, device=device))
             memory.states.append(state_emb)
             memory.actions.append(action)
             memory.logprobs.append(action_logprob)
@@ -414,11 +417,11 @@ def train_serial(args, surrogate_model, env):
             reward = 0
 
             if (t==(max_timesteps-1)) or done:
-                surr_reward = get_surr_reward(state, surrogate_model, device)
-                reward = surr_reward
+                main_reward = get_main_reward(state, reward_type=args.reward_type)
+                reward = main_reward
 
             if args.iota > 0 and i_episode > args.innovation_reward_episode_delay:
-                inno_reward = get_inno_reward(state, surrogate_model, ppo.explore_critic, device)
+                inno_reward = get_inno_reward(state, embed_model, ppo.explore_critic, device)
                 reward += inno_reward
 
             # Saving reward and is_terminals:
@@ -436,7 +439,7 @@ def train_serial(args, surrogate_model, env):
             ppo.update(memory)
             memory.clear()
 
-        writer.add_scalar("EpSurrogate", -1*surr_reward, i_episode-1)
+        writer.add_scalar("EpMainRew", main_reward, i_episode-1)
         rewbuffer_env.append(reward)
         avg_length += t
 

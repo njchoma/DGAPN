@@ -5,13 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "main_predict_dock_score",
+            "name": "main_embed",
             "type": "python",
             "request": "launch",
-            "program": "src/main_predict_dock_score.py",
+            "program": "src/main_embed.py",
             "subProcess": true,
             "args": [
-                "--name", "predict_dock_score",
+                "--name", "embed",
                 "--use_3d",
                 "--data_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
                 "--artifact_path", "test_run/dgapn",
@@ -29,8 +29,9 @@
                 "--name", "DGAPN",
                 "--data_path", "src/dataset",
                 "--artifact_path", "test_run/dgapn",
+                "--reward_type", "logp", // change to dock
                 "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
-                "--surrogate_model_path", "artifact/test_surrogate.pth",
+                "--embed_model_path", "artifact/test_embed.pth",
                 "--gpu", "0"
             ],
             "console": "integratedTerminal"
@@ -46,10 +47,9 @@
                 //"--greedy",
                 "--data_path", "src/dataset",
                 "--artifact_path", "test_run/dgapn",
+                "--reward_type", "logp", // change to dock
                 "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_1_F.Orderable_zinc_db_enaHLL.2col.csv",
-                "--surrogate_guide_path", "artifact/test_surrogate.pth",
-                "--surrogate_eval_path", "artifact/test_surrogate.pth",
-                "--model_path", "artifact/test_dgapn.pth"
+                "--policy_path", "artifact/test_dgapn.pth"
             ],
             "console": "integratedTerminal"
         }

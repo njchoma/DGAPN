@@ -6,7 +6,7 @@ import torch_geometric as pyg
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
 
-from gnn_surrogate.model import GNN_MyGAT
+from gnn_embed.model import MyGNN
 
 from utils.graph_utils import get_batch_shift
 

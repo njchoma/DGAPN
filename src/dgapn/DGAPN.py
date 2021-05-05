@@ -8,7 +8,7 @@ from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, de
 
 from .gapn_policy import ActorCriticGAPN
 from .rnd_explore import RNDistillation
-from gnn_surrogate.model import GNN_MyGAT
+from gnn_embed.model import MyGNN
 
 from utils.graph_utils import mols_to_pyg_batch
 
@@ -46,9 +46,6 @@ class DGAPN(nn.Module):
             input_dim = emb_model.input_dim
             emb_dim = emb_model.emb_dim
             nb_edge_types = emb_model.nb_edge_types
-            gnn_nb_layers = emb_model.nb_layers
-            gnn_nb_hidden = emb_model.nb_hidden
-            use_3d = emb_model.use_3d
 
         self.policy = ActorCriticGAPN(lr[:2],
                                       betas,
@@ -163,13 +160,6 @@ class DGAPN(nn.Module):
 #####################################################
 #                      REWARDS                      #
 #####################################################
-
-def get_surr_reward(states, surrogate_model, device):
-    g = mols_to_pyg_batch(states, surrogate_model.use_3d, device=device)
-
-    with torch.autograd.no_grad():
-        pred_docking_score = surrogate_model(g)
-    return (-pred_docking_score).tolist()
 
 def get_inno_reward(states, emb_model, explore_critic, device):
     g = mols_to_pyg_batch(states, emb_model.use_3d, device=device)
