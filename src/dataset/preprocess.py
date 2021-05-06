@@ -6,7 +6,7 @@ def main(dataset_path):
         nb_col = len(next(reader))
         if nb_col == 2:
             scores, smiles = read_2col(reader)
-        elif nb_col ==4:
+        elif nb_col == 4:
             scores, smiles = read_4col(reader)
     return scores, smiles
 
