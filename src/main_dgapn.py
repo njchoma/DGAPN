@@ -40,7 +40,7 @@ def molecule_arg_parser():
     #add_arg('--sa_ratio', type=float, default=1)
     #add_arg('--reward_step_total', type=float, default=0.5)
     #add_arg('--normalize_adj', type=int, default=0)
-    add_arg('--reward_type', type=str, default='logp', help='logp;dock')
+    add_arg('--reward_type', type=str, default='plogp', help='plogp;logp;dock')
     #add_arg('--reward_target', type=float, default=0.5, help='target reward value')
     #add_arg('--has_feature', type=int, default=0)
     #add_arg('--is_conditional', type=int, default=0) # default 0
