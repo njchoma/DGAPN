@@ -170,7 +170,7 @@ class DGAPN(nn.Module):
             batch_idx.extend([i]*len(cands))
         batch_idx = torch.LongTensor(batch_idx).to(self.device)
 
-        # convert list to tensor Batch().from_data_list([graph[0] for graph in graphs])
+        # convert list to tensor
         old_states = Batch().from_data_list(memory.states).to(self.device)
         old_next_states = Batch().from_data_list([cands[a] for a, cands in zip(memory.actions, memory.candidates)]).to(self.device)
         old_candidates = Batch().from_data_list([item for sublist in memory.candidates for item in sublist]).to(self.device)

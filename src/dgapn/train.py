@@ -325,10 +325,6 @@ def train_serial(args, embed_model, env):
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
 
-    embed_model.to(device)
-    embed_model.eval()
-    print(embed_model)
-
     policy = DGAPN(lr,
                 betas,
                 eps,
@@ -364,9 +360,9 @@ def train_serial(args, embed_model, env):
         for t in range(max_timesteps):
             time_step += 1
             # Running policy_old:
-            action_logprob, action = policy.select_action(state, candidates)
-            memory.states.append(state)
-            memory.candidates.append(candidates)
+            state_emb, candidates_emb, action_logprob, action = policy.select_action(state, candidates)
+            memory.states.append(state_emb.to_data_list()[0])
+            memory.candidates.append(candidates_emb.to_data_list())
             memory.actions.append(action)
             memory.logprobs.append(action_logprob)
 
