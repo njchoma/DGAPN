@@ -1,0 +1,58 @@
+# AVS field file
+#
+# AutoDock Atomic Affinity and Electrostatic Grids
+#
+# Created by autogrid4.
+#
+#SPACING 1.000
+#NELEMENTS 26 26 26
+#CENTER -63.524 71.834 30.930
+#MACROMOLECULE NSP15_6W01_A_1_F_receptor.pdbqt
+#GRID_PARAMETER_FILE nsp15.gpf
+#
+ndim=3			# number of dimensions in the field
+dim1=27			# number of x-elements
+dim2=27			# number of y-elements
+dim3=27			# number of z-elements
+nspace=3		# number of physical coordinates per point
+veclen=16		# number of affinity values at each point
+data=float		# data type (byte, integer, float, double)
+field=uniform		# field type (uniform, rectilinear, irregular)
+coord 1 file=NSP15_6W01_A_1_F_receptor.maps.xyz filetype=ascii offset=0
+coord 2 file=NSP15_6W01_A_1_F_receptor.maps.xyz filetype=ascii offset=2
+coord 3 file=NSP15_6W01_A_1_F_receptor.maps.xyz filetype=ascii offset=4
+label=A-affinity	# component label for variable 1
+label=Br-affinity	# component label for variable 2
+label=C-affinity	# component label for variable 3
+label=Cl-affinity	# component label for variable 4
+label=F-affinity	# component label for variable 5
+label=N-affinity	# component label for variable 6
+label=NA-affinity	# component label for variable 7
+label=OA-affinity	# component label for variable 8
+label=S-affinity	# component label for variable 9
+label=SA-affinity	# component label for variable 10
+label=I-affinity	# component label for variable 11
+label=P-affinity	# component label for variable 12
+label=H-affinity	# component label for variable 13
+label=HD-affinity	# component label for variable 14
+label=Electrostatics	# component label for variable 14
+label=Desolvation	# component label for variable 15
+#
+# location of affinity grid files and how to read them
+#
+variable 1 file=NSP15_6W01_A_1_F_receptor.A.map filetype=ascii skip=6
+variable 2 file=NSP15_6W01_A_1_F_receptor.Br.map filetype=ascii skip=6
+variable 3 file=NSP15_6W01_A_1_F_receptor.C.map filetype=ascii skip=6
+variable 4 file=NSP15_6W01_A_1_F_receptor.Cl.map filetype=ascii skip=6
+variable 5 file=NSP15_6W01_A_1_F_receptor.F.map filetype=ascii skip=6
+variable 6 file=NSP15_6W01_A_1_F_receptor.S.map filetype=ascii skip=6
+variable 7 file=NSP15_6W01_A_1_F_receptor.SA.map filetype=ascii skip=6
+variable 8 file=NSP15_6W01_A_1_F_receptor.I.map filetype=ascii skip=6
+variable 9 file=NSP15_6W01_A_1_F_receptor.P.map filetype=ascii skip=6
+variable 10 file=NSP15_6W01_A_1_F_receptor.H.map filetype=ascii skip=6
+variable 11 file=NSP15_6W01_A_1_F_receptor.NA.map filetype=ascii skip=6
+variable 12 file=NSP15_6W01_A_1_F_receptor.OA.map filetype=ascii skip=6
+variable 13 file=NSP15_6W01_A_1_F_receptor.N.map filetype=ascii skip=6
+variable 14 file=NSP15_6W01_A_1_F_receptor.HD.map filetype=ascii skip=6
+variable 15 file=NSP15_6W01_A_1_F_receptor.e.map filetype=ascii skip=6
+variable 16 file=NSP15_6W01_A_1_F_receptor.d.map filetype=ascii skip=6
