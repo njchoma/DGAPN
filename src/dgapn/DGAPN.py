@@ -1,3 +1,5 @@
+import logging
+
 import torch
 import torch.nn as nn
 
@@ -180,13 +182,13 @@ class DGAPN(nn.Module):
         old_values = self.policy_old.get_value(old_states)
 
         # Optimize policy for K epochs:
-        print("Optimizing...")
+        logging.info("Optimizing...")
 
         for i in range(self.K_epochs):
             loss, baseline_loss = self.policy.update(old_states, old_candidates, old_actions, old_logprobs, old_values, rewards, batch_idx)
             rnd_loss = self.explore_critic.update(old_next_states)
             if (i%10)==0:
-                print("  {:3d}: Actor Loss: {:7.3f}, Critic Loss: {:7.3f}, RND Loss: {:7.3f}".format(i, loss, baseline_loss, rnd_loss))
+                logging.info("  {:3d}: Actor Loss: {:7.3f}, Critic Loss: {:7.3f}, RND Loss: {:7.3f}".format(i, loss, baseline_loss, rnd_loss))
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())

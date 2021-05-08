@@ -1,3 +1,5 @@
+import logging
+
 import torch
 import torch.nn as nn
 from torch.distributions.categorical import Categorical
@@ -247,7 +249,7 @@ class GAPN_Actor(nn.Module):
         surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
         loss = -torch.min(surr1, surr2)
         if torch.isnan(loss).any():
-            print("found nan in loss")
+            logging.info("found nan in loss")
             exit()
 
         loss += self.eta * entropies

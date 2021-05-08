@@ -1,5 +1,6 @@
 import os
 import gym
+import logging
 import numpy as np
 from collections import deque, OrderedDict
 
@@ -150,7 +151,7 @@ def train_gpu_sync(args, embed_model, env):
                 args.rnd_num_hidden,
                 args.rnd_num_output)
     policy.to_device(device)
-    print(policy)
+    logging.info(policy)
 
     sample_count = 0
     episode_count = 0
@@ -166,7 +167,7 @@ def train_gpu_sync(args, embed_model, env):
     # training loop
     i_episode = 0
     while i_episode < max_episodes:
-        print("collecting rollouts")
+        logging.info("collecting rollouts")
         for i in range(args.nb_procs):
             tasks.put((i, None, True))
         tasks.join()
@@ -274,7 +275,7 @@ def train_gpu_sync(args, embed_model, env):
             memory.extend(m)
             m.clear()
         # update model
-        print("\n\nupdating policy @ episode %d..." % i_episode)
+        logging.info("\n\nupdating policy @ episode %d..." % i_episode)
         policy.update(memory)
         memory.clear()
 
@@ -283,7 +284,7 @@ def train_gpu_sync(args, embed_model, env):
 
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > solved_reward:
-            print("########## Solved! ##########")
+            logging.info("########## Solved! ##########")
             torch.save(policy, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
             break
 
@@ -299,7 +300,7 @@ def train_gpu_sync(args, embed_model, env):
             avg_length = int(avg_length / log_counter)
             running_reward = running_reward / log_counter
 
-            print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
+            logging.info('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
             running_reward = 0
             avg_length = 0
             log_counter = 0
@@ -344,7 +345,7 @@ def train_serial(args, embed_model, env):
                 args.rnd_num_hidden,
                 args.rnd_num_output)
     policy.to_device(device)
-    print(policy)
+    logging.info(policy)
 
     time_step = 0
 
@@ -389,7 +390,7 @@ def train_serial(args, embed_model, env):
 
         # update if it's time
         if time_step >= update_timesteps:
-            print("\n\nupdating policy @ episode %d..." % i_episode)
+            logging.info("\n\nupdating policy @ episode %d..." % i_episode)
             time_step = 0
             policy.update(memory)
             memory.clear()
@@ -403,7 +404,7 @@ def train_serial(args, embed_model, env):
 
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > solved_reward:
-            print("########## Solved! ##########")
+            logging.info("########## Solved! ##########")
             torch.save(policy, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
             break
 
@@ -419,7 +420,7 @@ def train_serial(args, embed_model, env):
             avg_length = int(avg_length/log_interval)
             running_reward = running_reward/log_interval
             
-            print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
+            logging.info('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
             running_reward = 0
             avg_length = 0
 
