@@ -25,6 +25,9 @@ from utils.graph_utils import mols_to_pyg_batch
 tasks = mp.JoinableQueue()
 results = mp.Queue()
 
+test_tasks = mp.JoinableQueue()
+test_results = mp.Queue()
+
 
 class Worker(mp.Process):
     def __init__(self, env, task_queue, result_queue, max_timesteps):
@@ -150,6 +153,8 @@ def train_gpu_sync(args, embed_model, env):
                 args.rnd_num_layers,
                 args.rnd_num_hidden,
                 args.rnd_num_output)
+    #policy = torch.load(
+    #    "/global/home/users/yulunwu/exaLearnMol/test_run/dgapn/saves/DGAPN_2021.05.11_01:11:55/running_dgapn.pth")
     policy.to_device(device)
     logging.info(policy)
 
@@ -197,6 +202,11 @@ def train_gpu_sync(args, embed_model, env):
                     break
 
             for i, idx in enumerate(notdone_idx):
+                #test_tasks.put((idx, candidates[i][actions[i]], False))
+                #try:
+                #    next_task = test_tasks.get()
+                #except Exception as e:
+                #    a = 1
                 tasks.put((idx, candidates[i][actions[i]], False))
 
                 memories[idx].states.append(states_emb.to_data_list()[i])
@@ -372,7 +382,7 @@ def train_serial(args, embed_model, env):
             # done and reward may not be needed anymore
             reward = 0
 
-            if (t==(max_timesteps-1)) or done:
+            if (t==max_timesteps) or done:
                 main_reward = get_main_reward(state, reward_type=args.reward_type)
                 reward = main_reward
 

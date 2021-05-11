@@ -219,7 +219,7 @@ class MyGCN(MessagePassing):
         # edge_index has shape [2, E]
         # edge_weight has shape [E]
         if edge_weight is None:
-            edge_weight = x.new_ones(edge_index.size(1))
+            edge_weight = node_attr.new_ones(edge_index.size(1))
         x = node_attr
 
         if self.batch_norm:

@@ -13,7 +13,7 @@
             "args": [
                 "--name", "embed",
                 //"--use_3d",
-                "--data_path", "src/dataset/NSP15_6W01_A_3_H.negonly_unique.csv",
+                "--data_path", "src/dataset/zinc_plogp_sorted.csv", // NSP15_6W01_A_3_H.negonly_unique.csv
                 "--artifact_path", "test_run/dgapn",
                 "--gpu", "0"
             ],
@@ -29,9 +29,10 @@
                 "--name", "DGAPN",
                 "--data_path", "src/dataset",
                 "--artifact_path", "test_run/dgapn",
-                "--reward_type", "logp", // change to dock
-                "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_3_H.negonly_unique.csv",
-                "--embed_model_path", "artifact/test_embed.pth",
+                "--reward_type", "plogp", // change to dock
+                "--warm_start_dataset_path", "src/dataset/zinc_plogp_sorted.csv", // NSP15_6W01_A_3_H.negonly_unique.csv
+                "--embed_model_path", "artifact/plogp_embed_3d.pth",
+                //"--nb_procs", "1",
                 "--gpu", "0"
             ],
             "console": "integratedTerminal"
@@ -47,8 +48,8 @@
                 //"--greedy",
                 "--data_path", "src/dataset",
                 "--artifact_path", "test_run/dgapn",
-                "--reward_type", "logp", // change to dock
-                "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_3_H.negonly_unique.csv",
+                "--reward_type", "plogp", // change to dock
+                "--warm_start_dataset_path", "src/dataset/zinc_plogp_sorted.csv", // NSP15_6W01_A_3_H.negonly_unique.csv
                 "--policy_path", "artifact/test_dgapn.pth"
             ],
             "console": "integratedTerminal"
