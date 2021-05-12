@@ -6,9 +6,9 @@ conda activate my-rdkit-new
 DATA=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
 
 PYARGS=""
-PYARGS="$PYARGS --name predict_dock_DGAPN_A3H_sub_3D"
+PYARGS="$PYARGS --name predict_plogp_DGAPN_3D"
 PYARGS="$PYARGS --gpu 3"
-PYARGS="$PYARGS --data_path $DATA/src/dataset/NSP15_6W01_A_3_H.negonly_unique_30k.csv"
+PYARGS="$PYARGS --data_path $DATA/src/dataset/zinc_plogp_sorted.csv" # NSP15_6W01_A_3_H.negonly_unique.csv
 PYARGS="$PYARGS --artifact_path $DATA/artifact/dgapn"
 PYARGS="$PYARGS --use_3d"
 
