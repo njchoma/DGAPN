@@ -55,8 +55,8 @@ def molecule_arg_parser():
     add_arg('--gnn_nb_layers', type=int, default=1) # number of layers on top of the embedding model
     add_arg('--gnn_nb_hidden', type=int, default=256, help='hidden size of Graph Networks')
     add_arg('--enc_num_layers', type=int, default=4)
-    add_arg('--enc_num_hidden', type=int, default=128, help='hidden size of Encoding Networks')
-    add_arg('--enc_num_output', type=int, default=128)
+    add_arg('--enc_num_hidden', type=int, default=64, help='hidden size of Encoding Networks')
+    add_arg('--enc_num_output', type=int, default=64)
     add_arg('--rnd_num_layers', type=int, default=3)
     add_arg('--rnd_num_hidden', type=int, default=128, help='hidden size of Random Networks')
     add_arg('--rnd_num_output', type=int, default=4)
