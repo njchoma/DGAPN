@@ -150,7 +150,7 @@ class DGAPN(nn.Module):
             with torch.autograd.no_grad():
                 states = self.emb_model.get_embedding(states, aggr=False)
         scores = self.explore_critic.get_score(states)
-        return scores.tolist()
+        return scores.squeeze().tolist()
 
     def update(self, memory, eps=1e-5):
         # Monte Carlo estimate of rewards:

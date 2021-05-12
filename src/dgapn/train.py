@@ -2,6 +2,7 @@ import os
 import gym
 import logging
 import numpy as np
+from rdkit import Chem
 from collections import deque, OrderedDict
 
 import time
@@ -58,10 +59,10 @@ class Worker(mp.Process):
             # print('%s: Working' % proc_name)
             if done:
                 self.timestep_counter = 0
-                mol, candidates, done = self.env.reset()
+                mol, candidates, done = self.env.reset(return_type='smiles')
             else:
                 self.timestep_counter += 1
-                mol, candidates, done = self.env.reset(mol)
+                mol, candidates, done = self.env.reset(mol, return_type='smiles')
                 if self.timestep_counter >= self.max_timesteps:
                     done = True
 
@@ -111,7 +112,7 @@ eps_clip = 0.2              # clip parameter for PPO
 gamma = 0.99                # discount factor
 eta = 0.01                  # relative weight for entropy loss
 
-lr = (5e-4, 1e-4, 2e-3)     # learning rate for actor, critic and random network
+lr = (1e-3, 1e-4, 2e-3)     # learning rate for actor, critic and random network
 betas = (0.9, 0.999)
 eps = 0.01
 
@@ -192,8 +193,8 @@ def train_gpu_sync(args, embed_model, env):
             # action selections (for not done)
             if len(notdone_idx) > 0:
                 states_emb, candidates_emb, action_logprobs, actions = policy.select_action(
-                    [mols[idx] for idx in notdone_idx],
-                    [item for sublist in candidates for item in sublist], batch_idx)
+                    [Chem.MolFromSmiles(mols[idx]) for idx in notdone_idx],
+                    [Chem.MolFromSmiles(item) for sublist in candidates for item in sublist], batch_idx)
                 if not isinstance(action_logprobs, list):
                     action_logprobs = [action_logprobs]
                     actions = [actions]
@@ -239,7 +240,7 @@ def train_gpu_sync(args, embed_model, env):
             stillnotdone_idx = [idx for idx in notdone_idx if idx in new_notdone_idx]
             if len(nowdone_idx) > 0:
                 main_rewards = get_main_reward(
-                    [mols[idx] for idx in nowdone_idx], reward_type=args.reward_type)
+                    [Chem.MolFromSmiles(mols[idx]) for idx in nowdone_idx], reward_type=args.reward_type)
                 if not isinstance(main_rewards, list):
                     main_rewards = [main_rewards]
 
@@ -263,7 +264,7 @@ def train_gpu_sync(args, embed_model, env):
             if args.iota > 0 and i_episode > args.innovation_reward_episode_delay:
                 if len(notdone_idx) > 0:
                     inno_rewards = policy.get_inno_reward(
-                        [mols[idx] for idx in notdone_idx])
+                        [Chem.MolFromSmiles(mols[idx]) for idx in notdone_idx])
                     if not isinstance(inno_rewards, list):
                         inno_rewards = [inno_rewards]
 

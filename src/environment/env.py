@@ -30,21 +30,31 @@ class CReM_Env(object):
                                        DATASET_NAME)
 
 
-    def reset(self, mol=None, include_current_state=True):
+    def reset(self, mol=None, include_current_state=True, return_type=None):
+        if return_type is None:
+            return_type = self.mode
         if mol is None:
             idx = random.randrange(len(self.scores))
             mol = Chem.MolFromSmiles(self.smiles[idx])
-        return self.mol_to_candidates(mol, include_current_state)
+        if isinstance(mol, str):
+            mol = Chem.MolFromSmiles(mol)
+        return self.mol_to_candidates(mol, include_current_state, return_type)
 
-    def step(self, action, include_current_state=True):
+    def step(self, action, include_current_state=True, return_type=None):
         mol = self.new_mols[action]
-        return self.mol_to_candidates(mol, include_current_state)
+        return self.mol_to_candidates(mol, include_current_state, return_type)
 
 
-    def mol_to_candidates(self, mol, include_current_state):
-        if self.mode == 'pyg':
-            mol = mol_to_pyg_graph(mol)[0]
+    def mol_to_candidates(self, mol, include_current_state, return_type):
         mol_candidates, done = self.get_crem_candidates(mol, include_current_state)
+        if return_type == 'pyg':
+            pyg = mol_to_pyg_graph(mol)[0]
+            pyg_candidates = [mol_to_pyg_graph(i)[0] for i in mol_candidates]
+            return pyg, pyg_candidates, done
+        if return_type == 'smiles':
+            smiles = Chem.MolToSmiles(mol)
+            smiles_candidates = [Chem.MolToSmiles(mol) for mol in mol_candidates]
+            return smiles, smiles_candidates, done
 
         return mol, mol_candidates, done
 
@@ -64,8 +74,6 @@ class CReM_Env(object):
             new_mols = []
         self.new_mols = [mol] + new_mols if include_current_state else new_mols
         mol_candidates = self.new_mols
-        if self.mode == 'pyg':
-            mol_candidates = [mol_to_pyg_graph(i)[0] for i in mol_candidates]
 
         if len(mol_candidates)==0:
             return None, True

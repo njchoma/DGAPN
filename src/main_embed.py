@@ -14,7 +14,7 @@ def read_args():
     add_arg('--gpu', type=int, default=0)
     add_arg('--upsample', default=False)
     add_arg('--exp_loss', default=False)
-    add_arg('--hidden', type=int, default=256)
+    add_arg('--hidden', type=int, default=128)
     add_arg('--layers', type=int, default=4)
     add_arg('--use_3d', action='store_true')
     add_arg('--store_preprocessed', action='store_true')
