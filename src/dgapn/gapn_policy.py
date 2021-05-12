@@ -15,7 +15,7 @@ from utils.graph_utils import get_batch_shift
 #####################################################
 #                 BATCHED OPERATIONS                #
 #####################################################
-EPS = 1e-2
+EPS = 2e-2
 
 def batched_expand(emb, batch):
     unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), 
