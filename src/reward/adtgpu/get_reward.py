@@ -20,8 +20,12 @@ def get_dock_score(states):
     smiles = str(smiles)
     run_dir="./src/reward/adtgpu/autodockgpu"
     #Executable paths
-    obabel_path="/gpfs/alpine/syb105/proj-shared/Personal/manesh/BIN/openbabel/summit/build/bin/obabel"
-    adt_path="/gpfs/alpine/syb105/proj-shared/Personal/gabrielgaz/Apps/summit/autoDockGPU2/bin/autodock_gpu_64wi"
+    # For Summit systems
+    #obabel_path="/gpfs/alpine/syb105/proj-shared/Personal/manesh/BIN/openbabel/summit/build/bin/obabel"
+    #adt_path="/gpfs/alpine/syb105/proj-shared/Personal/gabrielgaz/Apps/summit/autoDockGPU2/bin/autodock_gpu_64wi"
+    # For exalearn systems
+    obabel_path="/usr/bin/obabel"
+    adt_path="/clusterfs/csdata/pkg/autodock-gpu/AutoDock-GPU/bin/autodock_gpu_64wi"
 
     #Check that input file path exist
     if not os.path.exists(receptor_file):
