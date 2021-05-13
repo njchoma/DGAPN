@@ -42,39 +42,57 @@ def get_dock_score(states):
     smiles=re.sub('\ |\'', '', smiles[1:-1]).split(",")
     if(DEBUG): print("List of smiles:\n{}".format('\n'.join(smiles)))
 
+    #smiles={'NC(=N)N1CCC[C@H]1Cc2onc(n2)c3ccc(Nc4nc(cs4)c5ccc(Br)cc5)cc3'}
     #Loop over smile strings to convert to pdbqt
     ligs_list=[]
     sm_counter=1
     for smile in smiles:
-        #Prepare SMILES for conversion, convert to pdb
-        my_mol = Chem.MolFromSmiles(smile)
-        my_mol_with_H=Chem.AddHs(my_mol)
-        AllChem.EmbedMolecule(my_mol_with_H)
-        AllChem.MMFFOptimizeMolecule(my_mol_with_H)
-        my_embedded_mol = Chem.RemoveHs(my_mol_with_H)
-        #print("Printing MolToPDBBlock:\n".format(Chem.MolToPDBBlock(my_embedded_mol))
- 
-        #Create temp directory needed for obabel
-        tmp_file=run_dir+ligands_dir+"/ligand"+str(sm_counter)+".pdb"
-        with open(tmp_file,'w') as f:
-            f.write(Chem.MolToPDBBlock(my_embedded_mol))
-        
-        #Create name for output pdbqt file
-        ligand_out=run_dir+ligands_dir+"/ligand"+str(sm_counter)+".pdbqt"
+        VALID=True
+        #Verify SMILES is valid
+        my_mol = Chem.MolFromSmiles(smile,sanitize=False)
+        if my_mol is None:
+            print('invalid SMILES')
+            VALID=False
+        else:
+            try:
+                Chem.SanitizeMol(my_mol)
+            except:
+                print('invalid chemistry')
+                VALID=False
+   
+        if(VALID): 
+            #Prepare SMILES for conversion, convert to pdb
+            #my_mol = Chem.MolFromSmiles(smile)
+            my_mol_with_H=Chem.AddHs(my_mol)
+            AllChem.EmbedMolecule(my_mol_with_H)
+            AllChem.MMFFOptimizeMolecule(my_mol_with_H)
+            my_embedded_mol = Chem.RemoveHs(my_mol_with_H)
+            #print("Printing MolToPDBBlock:\n".format(Chem.MolToPDBBlock(my_embedded_mol))
+     
+            #Create temp directory needed for obabel
+            tmp_file=run_dir+ligands_dir+"/ligand"+str(sm_counter)+".pdb"
+            with open(tmp_file,'w') as f:
+                f.write(Chem.MolToPDBBlock(my_embedded_mol))
+            
+            #Create name for output pdbqt file
+            ligand_out=run_dir+ligands_dir+"/ligand"+str(sm_counter)+".pdbqt"
 
-        #Convert pdb to pdbqt
-        cmd=obabel_path+" --partialcharge gasteiger --addfilename -ipdb "
-        cmd+=tmp_file+" -opdbqt -O "+ligand_out
-        if(DEBUG): print("\nCmd to run:\n{}".format(cmd))
-        if(DEBUG): subprocess.Popen(cmd,shell=True).wait()
-        else: subprocess.Popen(cmd,shell=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).wait()
-        if(DEBUG): print("Done!")
-    
-        #Clean up and increment smile counter
-        os.remove(tmp_file)
-        ligand_store_file=ligand_out.split('/')[-1][:-6]
-        ligs_list.append(ligand_store_file)
+            #Convert pdb to pdbqt
+            cmd=obabel_path+" --partialcharge gasteiger --addfilename -ipdb "
+            cmd+=tmp_file+" -opdbqt -O "+ligand_out
+            if(DEBUG): print("\nCmd to run:\n{}".format(cmd))
+            if(DEBUG): subprocess.Popen(cmd,shell=True).wait()
+            else: subprocess.Popen(cmd,shell=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).wait()
+            if(DEBUG): print("Done!")
+        
+            #Clean up and increment smile counter
+            os.remove(tmp_file)
+            ligand_store_file=ligand_out.split('/')[-1][:-6]
+            ligs_list.append(ligand_store_file)
+        else: #invalid SMILES
+            ligs_list.append(None)
         sm_counter+=1
+    if(DEBUG): print("ligs_list:\n{}".format(ligs_list))
     
     #Get stub name of receptor and field file
     receptor_dir='/'.join(receptor_file.split('/')[:-1])
@@ -89,8 +107,9 @@ def get_dock_score(states):
     with open(run_file,'w') as f:
         f.write(receptor_field+'\n')
         for lig in ligs_list:
-            f.write("ligands/"+lig+".pdbqt\n")
-            f.write("ligands/"+lig+'\n')
+            if lig != None:
+                f.write("ligands/"+lig+".pdbqt\n")
+                f.write("ligands/"+lig+'\n')
 
     #Copy map files to run dir
     cmd="cp "+receptor_dir+"/"+receptor_stub+"* "+run_dir
@@ -112,14 +131,17 @@ def get_dock_score(states):
     #Read final scores into list
     pred_docking_score=[]
     for lig in ligs_list:
-        #Parse for final score
-        lig_path=run_dir+ligands_dir+"/"+lig+".dlg"
-        if not os.path.exists(lig_path):
-            print("ERROR: No such file {}".format(lig_path))
-        else: 
-            grep_cmd = "grep -2 \"^Rank \" "+lig_path+" | head -5 | tail -1 | cut -d \'|\' -f2 | sed \'s/ //g\'"
-            grep_out=os.popen(grep_cmd).read()
-            pred_docking_score.append(-float(grep_out.strip()))
+        if lig != None:
+            #Parse for final score
+            lig_path=run_dir+ligands_dir+"/"+lig+".dlg"
+            if not os.path.exists(lig_path):
+                print("ERROR: No such file {}".format(lig_path))
+            else: 
+                grep_cmd = "grep -2 \"^Rank \" "+lig_path+" | head -5 | tail -1 | cut -d \'|\' -f2 | sed \'s/ //g\'"
+                grep_out=os.popen(grep_cmd).read()
+                pred_docking_score.append(-float(grep_out.strip()))
+        else:#invalid SMILES
+            pred_docking_score.append("0")
             
     shutil.rmtree(run_dir)
     print("Reward Scores (-dock): {}".format(pred_docking_score))
