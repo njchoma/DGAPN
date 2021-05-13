@@ -42,11 +42,11 @@ def get_dock_score(states):
     smiles=re.sub('\ |\'', '', smiles[1:-1]).split(",")
     if(DEBUG): print("List of smiles:\n{}".format('\n'.join(smiles)))
 
-    #smiles={'NC(=N)N1CCC[C@H]1Cc2onc(n2)c3ccc(Nc4nc(cs4)c5ccc(Br)cc5)cc3'}
     #Loop over smile strings to convert to pdbqt
     ligs_list=[]
     sm_counter=1
     for smile in smiles:
+        if(DEBUG): print("Processing: {}".format(smile))
         VALID=True
         #Verify SMILES is valid
         my_mol = Chem.MolFromSmiles(smile,sanitize=False)
@@ -60,15 +60,20 @@ def get_dock_score(states):
                 print('invalid chemistry')
                 VALID=False
    
+        if(VALID):
+            try: 
+                #Prepare SMILES for conversion, convert to pdb
+                #my_mol = Chem.MolFromSmiles(smile)
+                my_mol_with_H=Chem.AddHs(my_mol)
+                AllChem.EmbedMolecule(my_mol_with_H)
+                AllChem.MMFFOptimizeMolecule(my_mol_with_H)
+                my_embedded_mol = Chem.RemoveHs(my_mol_with_H)
+                #print("Printing MolToPDBBlock:\n".format(Chem.MolToPDBBlock(my_embedded_mol))
+            except:
+                print('other SMILES error')
+                VALID=False   
+ 
         if(VALID): 
-            #Prepare SMILES for conversion, convert to pdb
-            #my_mol = Chem.MolFromSmiles(smile)
-            my_mol_with_H=Chem.AddHs(my_mol)
-            AllChem.EmbedMolecule(my_mol_with_H)
-            AllChem.MMFFOptimizeMolecule(my_mol_with_H)
-            my_embedded_mol = Chem.RemoveHs(my_mol_with_H)
-            #print("Printing MolToPDBBlock:\n".format(Chem.MolToPDBBlock(my_embedded_mol))
-     
             #Create temp directory needed for obabel
             tmp_file=run_dir+ligands_dir+"/ligand"+str(sm_counter)+".pdb"
             with open(tmp_file,'w') as f:
@@ -141,7 +146,7 @@ def get_dock_score(states):
                 grep_out=os.popen(grep_cmd).read()
                 pred_docking_score.append(-float(grep_out.strip()))
         else:#invalid SMILES
-            pred_docking_score.append("0")
+            pred_docking_score.append(0.00)
             
     shutil.rmtree(run_dir)
     print("Reward Scores (-dock): {}".format(pred_docking_score))
