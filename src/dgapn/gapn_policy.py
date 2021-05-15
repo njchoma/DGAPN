@@ -232,7 +232,7 @@ class GAPN_Actor(nn.Module):
         K = self.K_final_layer(K)
 
         Q = batched_expand(Q, batch_idx)
-        logits = torch.sum(Q * K, dim=1) / self.d_k#**.5
+        logits = torch.sum(Q * K, dim=1) / self.d_k**.5
         #logits = self.final_layer(torch.cat([Q, K], dim=-1))
 
         probs = batched_softmax(logits, batch_idx)
