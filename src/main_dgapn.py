@@ -61,6 +61,9 @@ def molecule_arg_parser():
     add_arg('--rnd_num_hidden', type=int, default=128, help='hidden size of Random Networks')
     add_arg('--rnd_num_output', type=int, default=4)
 
+    # AUTODOCK PARAMETERS
+    add_arg('--adt_tmp_dir', default='')
+
     return parser
 
 def load_embed_model(artifact_path, embed_model_url, embed_model_path):

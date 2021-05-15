@@ -240,7 +240,7 @@ def train_gpu_sync(args, embed_model, env):
             stillnotdone_idx = [idx for idx in notdone_idx if idx in new_notdone_idx]
             if len(nowdone_idx) > 0:
                 main_rewards = get_main_reward(
-                    [Chem.MolFromSmiles(mols[idx]) for idx in nowdone_idx], reward_type=args.reward_type)
+                    [Chem.MolFromSmiles(mols[idx]) for idx in nowdone_idx], reward_type=args.reward_type, args=args)
                 if not isinstance(main_rewards, list):
                     main_rewards = [main_rewards]
 
@@ -384,7 +384,7 @@ def train_serial(args, embed_model, env):
             reward = 0
 
             if (t==(max_timesteps-1)) or done:
-                main_reward = get_main_reward(state, reward_type=args.reward_type)
+                main_reward = get_main_reward(state, reward_type=args.reward_type, args=args)
                 reward = main_reward
 
             if args.iota > 0 and i_episode > args.innovation_reward_episode_delay:
