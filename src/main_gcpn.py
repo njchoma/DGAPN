@@ -119,9 +119,10 @@ def main():
     dt = get_current_datetime()
     writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/'+dt))
     
-    surrogate_model = load_surrogate_model(args.artifact_path,
-                                           args.surrogate_model_url,
-                                           args.surrogate_model_path)
+    # surrogate_model = load_surrogate_model(args.artifact_path,
+    #                                        args.surrogate_model_url,
+    #                                        args.surrogate_model_path)
+    surrogate_model = None
     print(surrogate_model)
 
     train(args,surrogate_model, seed=args.seed,writer=writer)

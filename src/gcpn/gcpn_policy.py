@@ -168,13 +168,23 @@ class GCPN(nn.Module):
         X_agg = pyg.nn.global_add_pool(X, batch)
         return probs_agg, X_agg
 
+def get_batch_shift(pyg_batch):
+    unique = torch.flip(torch.unique(pyg_batch.cpu(), sorted=False).to(pyg_batch.device), dims=(0,)) # temp fix due to torch.unique bug
+    batch_num_nodes = torch.bincount(pyg_batch)
+    batch_num_nodes = batch_num_nodes[unique]
+
+    # shift batch
+    zero = torch.LongTensor([0]).to(batch_num_nodes.device)
+    offset = torch.cat((zero, torch.cumsum(batch_num_nodes, dim=0)[:-1]))
+
+    return offset
+
 def get_batch_idx(batch, actions):
     batch_num_nodes = torch.bincount(batch)
-    batch_size = batch_num_nodes.shape[0]
-    cumsum = torch.cumsum(batch_num_nodes, dim=0) - batch_num_nodes[0]
+    batch_shift = get_batch_shift(batch)
 
-    a_first  = cumsum + actions[:,0]
-    a_second = cumsum + actions[:,1]
+    a_first  = batch_shift + actions[:,0]
+    a_second = batch_shift + actions[:,1]
     return a_first, a_second, batch_num_nodes
     
 

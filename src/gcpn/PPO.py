@@ -1,3 +1,4 @@
+import csv
 import gym
 import numpy as np
 from collections import deque
@@ -12,6 +13,8 @@ from torch_geometric.utils import dense_to_sparse
 from .gcpn_policy import GCPN
 
 from utils.graph_utils import state_to_pyg
+
+from gcpn.adtgpu.get_reward import get_dock_score
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -332,7 +335,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
     memory = Memory()
     print("lr:", lr, "beta:", betas)
 
-    surrogate_model = surrogate_model.to(device)
+    # surrogate_model = surrogate_model.to(device)
     
     # logging variables
     running_reward = 0
@@ -346,63 +349,75 @@ def train_ppo(args, surrogate_model, env, writer=None):
     rewbuffer_env = deque(maxlen=100)
     # training loop
     for i_episode in range(1, max_episodes+1):
-        cur_ep_ret_env = 0
-        state = env.reset()
-        surr_reward=0.0
-        for t in range(max_timesteps):
-            time_step +=1
-            # Running policy_old:
-            action = ppo.select_action(state, memory, env)
-            state, reward, done, _ = env.step(action)
+        try:
+            cur_ep_ret_env = 0
+            state = env.reset()
+            surr_reward=0.0
+            for t in range(max_timesteps):
+                time_step +=1
+                # Running policy_old:
+                action = ppo.select_action(state, memory, env)
+                state, reward, done, info = env.step(action)
+                reward = 0
 
-            if done and (i_episode > args.surrogate_reward_timestep_delay):
-                surr_reward = get_final_reward(state, env, surrogate_model)
-                reward += surr_reward / 5
+                if done:
+                    smile = info['smile']
+                    try:
+                        reward = get_dock_score(smile)[0]
+                    except Exception as e:
+                        print(e)
+                        reward = 0.0
+                    with open('scores.csv','a') as fd:
+                        csv_writer = csv.writer(fd)
+                        csv_writer.writerow([smile, reward])
 
-            
-            
-            # Saving reward and is_terminals:
-            memory.rewards.append(reward)
-            memory.is_terminals.append(done)
+                
+                
+                # Saving reward and is_terminals:
+                memory.rewards.append(reward)
+                memory.is_terminals.append(done)
 
-            # update if its time
-            if time_step % update_timestep == 0:
-                print("updating ppo")
-                ppo.update(memory, i_episode, writer)
-                memory.clear_memory()
-                time_step = 0
-            running_reward += reward
-            cur_ep_ret_env += reward
-            if (((i_episode+1)%20)==0) and render:
-                env.render()
-            if done:
+                # update if its time
+                if time_step % update_timestep == 0:
+                    print("updating ppo")
+                    ppo.update(memory, i_episode, writer)
+                    memory.clear_memory()
+                    time_step = 0
+                running_reward += reward
+                cur_ep_ret_env += reward
+                if (((i_episode+1)%20)==0) and render:
+                    env.render()
+                if done:
+                    break
+            writer.add_scalar("EpSurrogate", -1*surr_reward, episode_count)
+            rewbuffer_env.append(cur_ep_ret_env)
+            avg_length += t
+
+            # write to Tensorboard
+            writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), episode_count)
+            # writer.add_scalar("Average Length", avg_length, global_step=episode_count)
+            # writer.add_scalar("Running Reward", running_reward, global_step=episode_count)
+            episode_count += 1
+
+            # stop training if avg_reward > solved_reward
+            if running_reward > (log_interval*solved_reward):
+                print("########## Solved! ##########")
+                torch.save(ppo.policy.state_dict(), './PPO_continuous_solved_{}.pth'.format('test'))
                 break
-        writer.add_scalar("EpSurrogate", -1*surr_reward, episode_count)
-        rewbuffer_env.append(cur_ep_ret_env)
-        avg_length += t
-
-        # write to Tensorboard
-        writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), episode_count)
-        # writer.add_scalar("Average Length", avg_length, global_step=episode_count)
-        # writer.add_scalar("Running Reward", running_reward, global_step=episode_count)
-        episode_count += 1
-
-        # stop training if avg_reward > solved_reward
-        if running_reward > (log_interval*solved_reward):
-            print("########## Solved! ##########")
-            torch.save(ppo.policy.state_dict(), './PPO_continuous_solved_{}.pth'.format('test'))
-            break
-        
-        # save every 500 episodes
-        if i_episode % 500 == 0:
-            torch.save(ppo.policy.state_dict(), './PPO_continuous_{}.pth'.format('test'))
-
-        # logging
-        if i_episode % log_interval == 0:
-            avg_length = int(avg_length/log_interval)
-            running_reward = running_reward/log_interval
             
-            print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
-            running_reward = 0
-            avg_length = 0
+            # save every 500 episodes
+            if i_episode % 500 == 0:
+                torch.save(ppo.policy.state_dict(), './PPO_continuous_{}.pth'.format('test'))
+
+            # logging
+            if i_episode % log_interval == 0:
+                avg_length = int(avg_length/log_interval)
+                running_reward = running_reward/log_interval
+                
+                print('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
+                running_reward = 0
+                avg_length = 0
+        except Exception as e:
+            print(e)
+            continue
 
