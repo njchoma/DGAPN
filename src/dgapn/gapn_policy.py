@@ -15,7 +15,7 @@ from utils.graph_utils import get_batch_shift
 #####################################################
 #                 BATCHED OPERATIONS                #
 #####################################################
-EPS = 2e-2
+EPS = 1e-4
 
 def batched_expand(emb, batch):
     unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), 
@@ -203,8 +203,8 @@ class GAPN_Actor(nn.Module):
         K = self.K_final_layer(K)
 
         Q = batched_expand(Q, batch_idx)
-        logits = torch.sum(Q * K, dim=1) / self.d_k**.5
-        #logits = self.final_layer(torch.cat([Q, K], dim=-1)).squeeze(1)
+        #logits = torch.sum(Q * K, dim=1) / self.d_k**.5
+        logits = self.final_layer(torch.cat([Q, K], dim=-1)).squeeze(1)
 
         probs = batched_softmax(logits, batch_idx)
         shifted_actions = batched_sample(probs, batch_idx)
@@ -232,8 +232,8 @@ class GAPN_Actor(nn.Module):
         K = self.K_final_layer(K)
 
         Q = batched_expand(Q, batch_idx)
-        logits = torch.sum(Q * K, dim=1) / self.d_k**.5
-        #logits = self.final_layer(torch.cat([Q, K], dim=-1)).squeeze(1)
+        #logits = torch.sum(Q * K, dim=1) / self.d_k**.5
+        logits = self.final_layer(torch.cat([Q, K], dim=-1)).squeeze(1)
 
         probs = batched_softmax(logits, batch_idx)
         batch_shift = get_batch_shift(batch_idx)
