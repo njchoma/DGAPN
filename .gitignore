@@ -17,6 +17,7 @@ molecule_gen*
 log/
 runs/
 saves/
+autodockgpu/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
