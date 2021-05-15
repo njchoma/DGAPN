@@ -21,10 +21,10 @@ def dgapn_rollout(save_path,
                     env,
                     reward_type,
                     K,
-                    max_rollout=6):
+                    max_rollout=20):
     mol, mol_candidates, done = env.reset()
     mol_start = mol
-    mol_best = mol
+    smile_best = Chem.MolToSmiles(mol, isomericSmiles=False)
 
     g = mols_to_pyg_batch(mol, emb_model.use_3d, device=DEVICE)
     if emb_model is not None:
@@ -42,7 +42,7 @@ def dgapn_rollout(save_path,
         if emb_model is not None:
             with torch.autograd.no_grad():
                 g_candidates = emb_model.get_embedding(g_candidates, aggr=False)
-        next_rewards = get_main_reward(mol_candidates, reward_type)
+        # next_rewards = get_main_reward(mol_candidates, reward_type)
 
         with torch.autograd.no_grad():
             probs, _, _ = policy(g, g_candidates, torch.zeros(len(mol_candidates), dtype=torch.long).to(DEVICE))
@@ -60,20 +60,22 @@ def dgapn_rollout(save_path,
         # # print(c)
         # exit()
 
+        mol, mol_candidates, done = env.step(action, include_current_state=False)
+
         try:
-            new_rew = next_rewards[action]
+            # new_rew = next_rewards[action]
+            new_rew = get_main_reward([mol], reward_type)[0]
         except Exception as e:
             print(e)
             break
 
-        mol, mol_candidates, done = env.step(action, include_current_state=False)
         g = mols_to_pyg_batch(mol, emb_model.use_3d, device=DEVICE)
         if emb_model is not None:
             with torch.autograd.no_grad():
                 g = emb_model.get_embedding(g, aggr=False)
 
         if new_rew > best_rew:
-            mol_best = mol
+            smile_best = Chem.MolToSmiles(mol, isomericSmiles=False)
             best_rew = new_rew
             steps_remaining = K
 
@@ -83,10 +85,9 @@ def dgapn_rollout(save_path,
     with open(save_path, 'a') as f:
         print("Writing SMILE molecules!")
 
-        smile = Chem.MolToSmiles(mol_best, isomericSmiles=False)
-        print(smile, new_rew)
+        print(smile_best, best_rew)
         row = ''.join(['{},'] * 2)[:-1] + '\n'
-        f.write(row.format(smile, new_rew))
+        f.write(row.format(smile_best, best_rew))
 
     return start_rew, best_rew
 
