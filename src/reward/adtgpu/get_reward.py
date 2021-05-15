@@ -7,6 +7,8 @@ import subprocess
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
+from random import random
+
 def get_dock_score(states):
     if not isinstance(states, list):
         states = [states]
@@ -18,7 +20,7 @@ def get_dock_score(states):
     #Setup parameters (TODO - genearlize/simplify this)
     receptor_file="./src/reward/adtgpu/receptor/NSP15_6W01_A_3_H_receptor.pdbqt"
     smiles = str(smiles)
-    run_dir="./src/reward/adtgpu/autodockgpu"
+    run_dir="./src/reward/adtgpu/autodockgpu" + str(random())[2:]
     #Executable paths
     # For Summit systems
     #obabel_path="/gpfs/alpine/syb105/proj-shared/Personal/manesh/BIN/openbabel/summit/build/bin/obabel"
