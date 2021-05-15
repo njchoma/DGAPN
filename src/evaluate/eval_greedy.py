@@ -13,7 +13,7 @@ def greedy_rollout(save_path, env, reward_type, K, max_rollout=6):
     mol_start = mol
     mol_best = mol
 
-    new_rew = get_main_reward(mol, reward_type)
+    new_rew = get_main_reward(mol, reward_type)[0]
     start_rew = new_rew
     best_rew = new_rew
     steps_remaining = K

@@ -188,6 +188,8 @@ class GAPN_Actor(nn.Module):
         self.K_layers = nn.ModuleList(K_layers)
         self.Q_final_layer = nn.Linear(in_dim, enc_nb_output)
         self.K_final_layer = nn.Linear(in_dim, enc_nb_output)
+
+        self.final_layer = nn.Linear(2*enc_nb_output, 1)
         self.act = nn.ReLU()
 
     def forward(self, g, g_candidates, batch_idx):
@@ -198,10 +200,11 @@ class GAPN_Actor(nn.Module):
             Q = self.act(ql(Q))
             K = self.act(kl(K))
         Q = self.Q_final_layer(Q)
-        K = self.Q_final_layer(K)
+        K = self.K_final_layer(K)
 
         Q = batched_expand(Q, batch_idx)
         logits = torch.sum(Q * K, dim=1) / self.d_k**.5
+        #logits = self.final_layer(torch.cat([Q, K], dim=-1))
 
         probs = batched_softmax(logits, batch_idx)
         shifted_actions = batched_sample(probs, batch_idx)
@@ -226,10 +229,11 @@ class GAPN_Actor(nn.Module):
             Q = self.act(ql(Q))
             K = self.act(kl(K))
         Q = self.Q_final_layer(Q)
-        K = self.Q_final_layer(K)
+        K = self.K_final_layer(K)
 
         Q = batched_expand(Q, batch_idx)
-        logits = torch.sum(Q * K, dim=1) / self.d_k**.5
+        logits = torch.sum(Q * K, dim=1) / self.d_k#**.5
+        #logits = self.final_layer(torch.cat([Q, K], dim=-1))
 
         probs = batched_softmax(logits, batch_idx)
         batch_shift = get_batch_shift(batch_idx)
