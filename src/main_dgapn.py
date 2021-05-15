@@ -30,7 +30,7 @@ def molecule_arg_parser():
     add_arg('--embed_model_url', default='')
     add_arg('--embed_model_path', default='')
 
-    add_arg('--iota', type=float, default=0.5, help='relative weight for innovation reward')
+    add_arg('--iota', type=float, default=0.2, help='relative weight for innovation reward')
     add_arg('--innovation_reward_episode_delay', type=int, default=100)
 
     # ENVIRONMENT PARAMETERS
@@ -52,7 +52,7 @@ def molecule_arg_parser():
     add_arg('--input_size', type=int, default=121)
     #add_arg('--emb_size', type=int, default=128)
     add_arg('--nb_edge_types', type=int, default=1)
-    add_arg('--gnn_nb_layers', type=int, default=2) # number of layers on top of the embedding model
+    add_arg('--gnn_nb_layers', type=int, default=5) # number of layers on top of the embedding model
     add_arg('--gnn_nb_hidden', type=int, default=256, help='hidden size of Graph Networks')
     add_arg('--enc_num_layers', type=int, default=4)
     add_arg('--enc_num_hidden', type=int, default=256, help='hidden size of Encoding Networks')

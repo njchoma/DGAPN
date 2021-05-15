@@ -204,7 +204,7 @@ class GAPN_Actor(nn.Module):
 
         Q = batched_expand(Q, batch_idx)
         logits = torch.sum(Q * K, dim=1) / self.d_k**.5
-        #logits = self.final_layer(torch.cat([Q, K], dim=-1))
+        #logits = self.final_layer(torch.cat([Q, K], dim=-1)).squeeze()
 
         probs = batched_softmax(logits, batch_idx)
         shifted_actions = batched_sample(probs, batch_idx)
@@ -233,7 +233,7 @@ class GAPN_Actor(nn.Module):
 
         Q = batched_expand(Q, batch_idx)
         logits = torch.sum(Q * K, dim=1) / self.d_k**.5
-        #logits = self.final_layer(torch.cat([Q, K], dim=-1))
+        #logits = self.final_layer(torch.cat([Q, K], dim=-1)).squeeze()
 
         probs = batched_softmax(logits, batch_idx)
         batch_shift = get_batch_shift(batch_idx)

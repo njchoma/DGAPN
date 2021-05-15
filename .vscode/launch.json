@@ -29,9 +29,9 @@
                 "--name", "DGAPN",
                 "--data_path", "src/dataset",
                 "--artifact_path", "test_run/dgapn",
-                "--reward_type", "plogp", // change to dock
-                "--warm_start_dataset_path", "src/dataset/zinc_plogp_sorted.csv", // NSP15_6W01_A_3_H.negonly_unique.csv
-                "--embed_model_path", "artifact/plogp_embed_3d.pth",
+                "--reward_type", "dock",
+                "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_3_H.negonly_unique_30k.csv", // zinc_plogp_sorted.csv
+                "--embed_model_path", "artifact/A3H_embed_3d.pth",
                 //"--nb_procs", "1",
                 "--gpu", "0"
             ],
