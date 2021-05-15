@@ -383,7 +383,7 @@ def train_serial(args, embed_model, env):
             # done and reward may not be needed anymore
             reward = 0
 
-            if (t==max_timesteps) or done:
+            if (t==(max_timesteps-1)) or done:
                 main_reward = get_main_reward(state, reward_type=args.reward_type)
                 reward = main_reward
 
@@ -408,7 +408,7 @@ def train_serial(args, embed_model, env):
 
         writer.add_scalar("EpMainRew", main_reward, i_episode-1)
         rewbuffer_env.append(reward)
-        avg_length += t
+        avg_length += (t+1)
 
         # write to Tensorboard
         writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode-1)
