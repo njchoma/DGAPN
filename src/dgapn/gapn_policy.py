@@ -207,7 +207,7 @@ class GAPN_Actor(nn.Module):
         #logits = torch.sum(Q * K, dim=1) / self.d_k**.5
         logits = torch.cat([Q, K], dim=-1)
         for l in self.final_layers:
-            logits = l(logits)
+            logits = l(self.act(logits))
         logits = logits.squeeze(1)
 
         probs = batched_softmax(logits, batch_idx)
@@ -239,7 +239,7 @@ class GAPN_Actor(nn.Module):
         #logits = torch.sum(Q * K, dim=1) / self.d_k**.5
         logits = torch.cat([Q, K], dim=-1)
         for l in self.final_layers:
-            logits = l(logits)
+            logits = l(self.act(logits))
         logits = logits.squeeze(1)
 
         probs = batched_softmax(logits, batch_idx)
