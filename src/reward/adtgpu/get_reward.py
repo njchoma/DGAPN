@@ -18,7 +18,6 @@ def get_dock_score(states, args=None):
     #Setup parameters (TODO - genearlize/simplify this)
     receptor_file="./src/reward/adtgpu/receptor/NSP15_6W01_A_3_H_receptor.pdbqt"
     smiles = str(smiles)
-    run_dir="./src/reward/adtgpu/autodockgpu" + str(random())[2:]
     if(args and args.adt_tmp_dir!=''): run_dir="./src/reward/adtgpu/autodockgpu"+str(args.adt_tmp_dir)
     else: run_dir="./src/reward/adtgpu/autodockgpu"
     if(DEBUG): print("adttmp: {}".format(run_dir))
