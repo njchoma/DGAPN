@@ -389,7 +389,9 @@ def train_serial(args, embed_model, env):
                 main_reward = get_main_reward(state, reward_type=args.reward_type, args=args)
                 reward = main_reward
 
-            if args.iota > 0 and i_episode > args.innovation_reward_episode_delay:
+            if (args.iota > 0 and 
+                i_episode > args.innovation_reward_episode_delay and 
+                i_episode < args.innovation_reward_episode_cutoff):
                 inno_reward = policy.get_inno_reward(state)
                 reward += inno_reward
 
