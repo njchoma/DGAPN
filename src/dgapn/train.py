@@ -261,7 +261,9 @@ def train_gpu_sync(args, embed_model, env):
                 memories[idx].rewards.append(0)
                 memories[idx].is_terminals.append(False)
             # get innovation rewards
-            if args.iota > 0 and i_episode > args.innovation_reward_episode_delay:
+            if (args.iota > 0 and 
+                i_episode > args.innovation_reward_episode_delay and 
+                i_episode < args.innovation_reward_episode_cutoff):
                 if len(notdone_idx) > 0:
                     inno_rewards = policy.get_inno_reward(
                         [Chem.MolFromSmiles(mols[idx]) for idx in notdone_idx])

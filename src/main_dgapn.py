@@ -32,6 +32,7 @@ def molecule_arg_parser():
 
     add_arg('--iota', type=float, default=0.2, help='relative weight for innovation reward')
     add_arg('--innovation_reward_episode_delay', type=int, default=100)
+    add_arg('--innovation_reward_episode_cutoff', type=int, default=5000)
 
     # ENVIRONMENT PARAMETERS
     #add_arg('--dataset', type=str, default='zinc', help='caveman; grid; ba; zinc; gdb')
