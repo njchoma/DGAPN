@@ -29,6 +29,7 @@ def molecule_arg_parser():
     add_arg('--warm_start_dataset_path', default='')
     add_arg('--embed_model_url', default='')
     add_arg('--embed_model_path', default='')
+    add_arg('--running_model_path', default='')
 
     add_arg('--iota', type=float, default=0.2, help='relative weight for innovation reward')
     add_arg('--innovation_reward_episode_delay', type=int, default=100)
@@ -82,7 +83,8 @@ def main():
     args = molecule_arg_parser().parse_args()
     #args.nb_procs = mp.cpu_count()
 
-    try:
+    embed_model = None
+    if args.embed_model_url != '' or args.embed_model_path != '':
         embed_model = load_embed_model(args.artifact_path,
                                             args.embed_model_url,
                                             args.embed_model_path)
@@ -90,9 +92,6 @@ def main():
         print(embed_model)
         args.input_size = embed_model.nb_hidden
         args.nb_edge_types = embed_model.nb_edge_types
-    except Exception as e:
-        print(e)
-        embed_model = None
 
     env = CReM_Env(args.data_path, args.warm_start_dataset_path, mode='mol')
     #ob, _, _ = env.reset()

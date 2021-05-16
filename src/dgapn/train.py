@@ -154,8 +154,8 @@ def train_gpu_sync(args, embed_model, env):
                 args.rnd_num_layers,
                 args.rnd_num_hidden,
                 args.rnd_num_output)
-    #policy = torch.load(
-    #    "/global/home/users/yulunwu/exaLearnMol/test_run/dgapn/saves/DGAPN_2021.05.11_01:11:55/running_dgapn.pth")
+    if args.running_model_path != '':
+        policy = torch.load(args.running_model_path)
     policy.to_device(device)
     logging.info(policy)
 
@@ -357,6 +357,8 @@ def train_serial(args, embed_model, env):
                 args.rnd_num_layers,
                 args.rnd_num_hidden,
                 args.rnd_num_output)
+    if args.running_model_path != '':
+        policy = torch.load(args.running_model_path)
     policy.to_device(device)
     logging.info(policy)
 
