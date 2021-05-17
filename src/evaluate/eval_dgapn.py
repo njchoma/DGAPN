@@ -13,7 +13,7 @@ from reward.get_main_reward import get_main_reward
 
 from utils.graph_utils import mols_to_pyg_batch
 
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+DEVICE = 'cuda:1' if torch.cuda.is_available() else 'cpu'
 
 def dgapn_rollout(save_path,
                     policy,
@@ -25,8 +25,9 @@ def dgapn_rollout(save_path,
     mol, mol_candidates, done = env.reset()
     mol_start = mol
     smile_best = Chem.MolToSmiles(mol, isomericSmiles=False)
+    emb_model_3d = emb_model.use_3d if emb_model is not None else False
 
-    g = mols_to_pyg_batch(mol, emb_model.use_3d, device=DEVICE)
+    g = mols_to_pyg_batch(mol, emb_model_3d, device=DEVICE)
     if emb_model is not None:
         with torch.autograd.no_grad():
             g = emb_model.get_embedding(g, aggr=False)
@@ -38,7 +39,7 @@ def dgapn_rollout(save_path,
     for i in range(max_rollout):
         print("  {:3d} {:2d} {:4.1f}".format(i+1, steps_remaining, best_rew))
         steps_remaining -= 1
-        g_candidates = mols_to_pyg_batch(mol_candidates, emb_model.use_3d, device=DEVICE)
+        g_candidates = mols_to_pyg_batch(mol_candidates, emb_model_3d, device=DEVICE)
         if emb_model is not None:
             with torch.autograd.no_grad():
                 g_candidates = emb_model.get_embedding(g_candidates, aggr=False)
@@ -69,7 +70,7 @@ def dgapn_rollout(save_path,
             print(e)
             break
 
-        g = mols_to_pyg_batch(mol, emb_model.use_3d, device=DEVICE)
+        g = mols_to_pyg_batch(mol, emb_model_3d, device=DEVICE)
         if emb_model is not None:
             with torch.autograd.no_grad():
                 g = emb_model.get_embedding(g, aggr=False)
@@ -98,8 +99,9 @@ def eval_dgapn(artifact_path, policy, emb_model, env, reward_type, N=120, K=1):
 
     policy = policy.to(DEVICE)
     policy.eval()
-    emb_model = emb_model.to(DEVICE)
-    emb_model.eval()
+    if emb_model is not None:
+        emb_model = emb_model.to(DEVICE)
+        emb_model.eval()
 
     print("\nStarting dgapn eval...\n")
     avg_improvement = []
