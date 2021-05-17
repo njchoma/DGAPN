@@ -26,9 +26,6 @@ from utils.graph_utils import mols_to_pyg_batch
 tasks = mp.JoinableQueue()
 results = mp.Queue()
 
-test_tasks = mp.JoinableQueue()
-test_results = mp.Queue()
-
 
 class Worker(mp.Process):
     def __init__(self, env, task_queue, result_queue, max_timesteps):
@@ -97,32 +94,14 @@ class Result(object):
 #                   TRAINING LOOP                   #
 #####################################################
 
-############## Hyperparameters ##############
-render = True
-solved_reward = 100         # stop training if avg_reward > solved_reward
-log_interval = 20           # print avg reward in the interval
-save_interval = 100         # save model in the interval
-
-max_episodes = 50000        # max training episodes
-max_timesteps = 6           # max timesteps in one episode
-update_timesteps = 500      # update policy every n timesteps
-
-K_epochs = 80               # update policy for K epochs
-eps_clip = 0.2              # clip parameter for PPO
-gamma = 0.99                # discount factor
-eta = 0.01                  # relative weight for entropy loss
-
-lr = (1e-3, 1e-4, 2e-3)     # learning rate for actor, critic and random network
-betas = (0.9, 0.999)
-eps = 0.01
-
-#############################################
-
 def train_gpu_sync(args, embed_model, env):
+    lr = (args.actor_lr, args.critic_lr, args.rnd_lr)
+    betas = (args.beta1, args.beta2)
+    eps = args.eps
     print("lr:", lr, "beta:", betas, "eps:", eps)  # parameters for Adam optimizer
 
     print('Creating %d processes' % args.nb_procs)
-    workers = [Worker(env, tasks, results, max_timesteps) for i in range(args.nb_procs)]
+    workers = [Worker(env, tasks, results, args.max_timesteps) for i in range(args.nb_procs)]
     for w in workers:
         w.start()
 
@@ -139,10 +118,10 @@ def train_gpu_sync(args, embed_model, env):
     policy = DGAPN(lr,
                 betas,
                 eps,
-                eta,
-                gamma,
-                K_epochs,
-                eps_clip,
+                args.eta,
+                args.gamma,
+                args.K_epochs,
+                args.eps_clip,
                 embed_model,
                 args.input_size,
                 args.nb_edge_types,
@@ -172,7 +151,7 @@ def train_gpu_sync(args, embed_model, env):
     rewbuffer_env = deque(maxlen=100)
     # training loop
     i_episode = 0
-    while i_episode < max_episodes:
+    while i_episode < args.max_episodes:
         logging.info("collecting rollouts")
         for i in range(args.nb_procs):
             tasks.put((i, None, True))
@@ -199,15 +178,10 @@ def train_gpu_sync(args, embed_model, env):
                     action_logprobs = [action_logprobs]
                     actions = [actions]
             else:
-                if sample_count >= update_timesteps:
+                if sample_count >= args.update_timesteps:
                     break
 
             for i, idx in enumerate(notdone_idx):
-                #test_tasks.put((idx, candidates[i][actions[i]], False))
-                #try:
-                #    next_task = test_tasks.get()
-                #except Exception as e:
-                #    a = 1
                 tasks.put((idx, candidates[i][actions[i]], False))
 
                 memories[idx].states.append(states_emb.to_data_list()[i])
@@ -215,7 +189,7 @@ def train_gpu_sync(args, embed_model, env):
                 memories[idx].actions.append(actions[i])
                 memories[idx].logprobs.append(action_logprobs[i])
             for idx in done_idx:
-                if sample_count >= update_timesteps:
+                if sample_count >= args.update_timesteps:
                     tasks.put((None, None, True))
                 else:
                     tasks.put((idx, None, True))
@@ -296,20 +270,20 @@ def train_gpu_sync(args, embed_model, env):
         log_counter += episode_count
 
         # stop training if avg_reward > solved_reward
-        if np.mean(rewbuffer_env) > solved_reward:
+        if np.mean(rewbuffer_env) > args.solved_reward:
             logging.info("########## Solved! ##########")
             torch.save(policy, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
             break
 
         # save every 500 episodes
-        if save_counter >= save_interval:
+        if save_counter >= args.save_interval:
             torch.save(policy, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
             save_counter = 0
 
         # save running model
         torch.save(policy, os.path.join(save_dir, 'running_dgapn.pth'))
 
-        if log_counter >= log_interval:
+        if log_counter >= args.log_interval:
             avg_length = int(avg_length / log_counter)
             running_reward = running_reward / log_counter
 
@@ -327,6 +301,9 @@ def train_gpu_sync(args, embed_model, env):
     tasks.join()
 
 def train_serial(args, embed_model, env):
+    lr = (args.actor_lr, args.critic_lr, args.rnd_lr)
+    betas = (args.beta1, args.beta2)
+    eps = args.eps
     print("lr:", lr, "beta:", betas, "eps:", eps) # parameters for Adam optimizer
 
     # logging variables
@@ -342,10 +319,10 @@ def train_serial(args, embed_model, env):
     policy = DGAPN(lr,
                 betas,
                 eps,
-                eta,
-                gamma,
-                K_epochs,
-                eps_clip,
+                args.eta,
+                args.gamma,
+                args.K_epochs,
+                args.eps_clip,
                 embed_model,
                 args.input_size,
                 args.nb_edge_types,
@@ -370,10 +347,10 @@ def train_serial(args, embed_model, env):
     memory = Memory()
     rewbuffer_env = deque(maxlen=100)
     # training loop
-    for i_episode in range(1, max_episodes+1):
+    for i_episode in range(1, args.max_episodes+1):
         state, candidates, done = env.reset()
 
-        for t in range(max_timesteps):
+        for t in range(args.max_timesteps):
             time_step += 1
             # Running policy_old:
             state_emb, candidates_emb, action_logprob, action = policy.select_action(state, candidates)
@@ -387,7 +364,7 @@ def train_serial(args, embed_model, env):
             # done and reward may not be needed anymore
             reward = 0
 
-            if (t==(max_timesteps-1)) or done:
+            if (t==(args.max_timesteps-1)) or done:
                 main_reward = get_main_reward(state, reward_type=args.reward_type, args=args)
                 reward = main_reward
 
@@ -406,7 +383,7 @@ def train_serial(args, embed_model, env):
                 break
 
         # update if it's time
-        if time_step >= update_timesteps:
+        if time_step >= args.update_timesteps:
             logging.info("\n\nupdating policy @ episode %d..." % i_episode)
             time_step = 0
             policy.update(memory)
@@ -420,22 +397,22 @@ def train_serial(args, embed_model, env):
         writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode-1)
 
         # stop training if avg_reward > solved_reward
-        if np.mean(rewbuffer_env) > solved_reward:
+        if np.mean(rewbuffer_env) > args.solved_reward:
             logging.info("########## Solved! ##########")
             torch.save(policy, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
             break
 
         # save every 500 episodes
-        if (i_episode-1) % save_interval == 0:
+        if (i_episode-1) % args.save_interval == 0:
             torch.save(policy, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
 
         # save running model
         torch.save(policy, os.path.join(save_dir, 'running_dgapn.pth'))
 
         # logging
-        if i_episode % log_interval == 0:
-            avg_length = int(avg_length/log_interval)
-            running_reward = running_reward/log_interval
+        if i_episode % args.log_interval == 0:
+            avg_length = int(avg_length/args.log_interval)
+            running_reward = running_reward/args.log_interval
             
             logging.info('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
             running_reward = 0

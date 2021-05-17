@@ -30,38 +30,42 @@ def molecule_arg_parser():
     add_arg('--embed_model_url', default='')
     add_arg('--embed_model_path', default='')
     add_arg('--running_model_path', default='')
+    add_arg('--log_interval', type=int, default=20)         # print avg reward in the interval
+    add_arg('--save_interval', type=int, default=100)       # save model in the interval
 
-    add_arg('--iota', type=float, default=0.2, help='relative weight for innovation reward')
+    add_arg('--reward_type', type=str, default='dock', help='plogp;logp;dock')
+
+    add_arg('--iota', type=float, default=0.1, help='relative weight for innovation reward')
     add_arg('--innovation_reward_episode_delay', type=int, default=100)
-    add_arg('--innovation_reward_episode_cutoff', type=int, default=5000)
+    add_arg('--innovation_reward_episode_cutoff', type=int, default=8000)
 
-    # ENVIRONMENT PARAMETERS
-    #add_arg('--dataset', type=str, default='zinc', help='caveman; grid; ba; zinc; gdb')
-    #add_arg('--logp_ratio', type=float, default=1)
-    #add_arg('--qed_ratio', type=float, default=1)
-    #add_arg('--sa_ratio', type=float, default=1)
-    #add_arg('--reward_step_total', type=float, default=0.5)
-    #add_arg('--normalize_adj', type=int, default=0)
-    add_arg('--reward_type', type=str, default='plogp', help='plogp;logp;dock')
-    #add_arg('--reward_target', type=float, default=0.5, help='target reward value')
-    #add_arg('--has_feature', type=int, default=0)
-    #add_arg('--is_conditional', type=int, default=0) # default 0
-    #add_arg('--conditional', type=str, default='low') # default 0
-    #add_arg('--max_action', type=int, default=128) # default 0
-    #add_arg('--min_action', type=int, default=20) # default 0
+    # TRAINING PARAMETERS
+    add_arg('--solved_reward', type=float, default=100)     # stop training if avg_reward > solved_reward
+    add_arg('--max_episodes', type=int, default=50000)      # max training episodes
+    add_arg('--max_timesteps', type=int, default=9)         # max timesteps in one episode
+    add_arg('--update_timesteps', type=int, default=500)    # update policy every n timesteps
+    add_arg('--K_epochs', type=int, default=80)             # update policy for K epochs
+    add_arg('--eps_clip', type=float, default=0.2)          # clip parameter for PPO
+    add_arg('--gamma', type=float, default=0.99)            # discount factor
+    add_arg('--eta', type=float, default=0.01)              # relative weight for entropy loss
+    add_arg('--actor_lr', type=float, default=1e-3)         # learning rate for actor
+    add_arg('--critic_lr', type=float, default=1e-4)        # learning rate for critic
+    add_arg('--rnd_lr', type=float, default=2e-3)           # learning rate for random network
+    add_arg('--beta1', type=float, default=0.9)             # beta1 for Adam optimizer
+    add_arg('--beta2', type=float, default=0.999)           # beta2 for Adam optimizer
+    add_arg('--eps', type=float, default=0.01)              # eps for Adam optimizer
 
     # NETWORK PARAMETERS
     add_arg('--input_size', type=int, default=121)
-    #add_arg('--emb_size', type=int, default=128)
     add_arg('--nb_edge_types', type=int, default=1)
-    add_arg('--gnn_nb_layers', type=int, default=5) # number of layers on top of the embedding model
-    add_arg('--gnn_nb_hidden', type=int, default=256, help='hidden size of Graph Networks')
-    add_arg('--enc_num_layers', type=int, default=4)
-    add_arg('--enc_num_hidden', type=int, default=256, help='hidden size of Encoding Networks')
-    add_arg('--enc_num_output', type=int, default=256)
-    add_arg('--rnd_num_layers', type=int, default=3)
-    add_arg('--rnd_num_hidden', type=int, default=128, help='hidden size of Random Networks')
-    add_arg('--rnd_num_output', type=int, default=4)
+    add_arg('--gnn_nb_layers', type=int, default=3)         # number of layers on top of the embedding model
+    add_arg('--gnn_nb_hidden', type=int, default=512, help='hidden size of Graph Networks')
+    add_arg('--enc_num_layers', type=int, default=3)
+    add_arg('--enc_num_hidden', type=int, default=512, help='hidden size of Encoding Networks')
+    add_arg('--enc_num_output', type=int, default=512)
+    add_arg('--rnd_num_layers', type=int, default=1)
+    add_arg('--rnd_num_hidden', type=int, default=256, help='hidden size of Random Networks')
+    add_arg('--rnd_num_output', type=int, default=8)
 
     # AUTODOCK PARAMETERS
     add_arg('--adt_tmp_dir', default='')
