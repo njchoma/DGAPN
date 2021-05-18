@@ -31,24 +31,24 @@ def molecule_arg_parser():
     add_arg('--embed_model_path', default='')
     add_arg('--running_model_path', default='')
     add_arg('--log_interval', type=int, default=20)         # print avg reward in the interval
-    add_arg('--save_interval', type=int, default=100)       # save model in the interval
+    add_arg('--save_interval', type=int, default=200)       # save model in the interval
 
     add_arg('--reward_type', type=str, default='dock', help='plogp;logp;dock')
 
     add_arg('--iota', type=float, default=0.1, help='relative weight for innovation reward')
     add_arg('--innovation_reward_episode_delay', type=int, default=100)
-    add_arg('--innovation_reward_episode_cutoff', type=int, default=8000)
+    add_arg('--innovation_reward_episode_cutoff', type=int, default=4000)
 
     # TRAINING PARAMETERS
     add_arg('--solved_reward', type=float, default=100)     # stop training if avg_reward > solved_reward
     add_arg('--max_episodes', type=int, default=50000)      # max training episodes
-    add_arg('--max_timesteps', type=int, default=9)         # max timesteps in one episode
-    add_arg('--update_timesteps', type=int, default=500)    # update policy every n timesteps
-    add_arg('--K_epochs', type=int, default=80)             # update policy for K epochs
+    add_arg('--max_timesteps', type=int, default=12)        # max timesteps in one episode
+    add_arg('--update_timesteps', type=int, default=300)    # update policy every n timesteps
+    add_arg('--K_epochs', type=int, default=50)             # update policy for K epochs
     add_arg('--eps_clip', type=float, default=0.2)          # clip parameter for PPO
     add_arg('--gamma', type=float, default=0.99)            # discount factor
     add_arg('--eta', type=float, default=0.01)              # relative weight for entropy loss
-    add_arg('--actor_lr', type=float, default=1e-3)         # learning rate for actor
+    add_arg('--actor_lr', type=float, default=5e-4)         # learning rate for actor
     add_arg('--critic_lr', type=float, default=1e-4)        # learning rate for critic
     add_arg('--rnd_lr', type=float, default=2e-3)           # learning rate for random network
     add_arg('--beta1', type=float, default=0.9)             # beta1 for Adam optimizer

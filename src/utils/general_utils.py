@@ -1,4 +1,5 @@
 import os
+import csv
 import wget
 import logging
 
@@ -34,3 +35,8 @@ def maybe_download_file(file_path, url, file_descriptor):
     else:
         print("{} found.".format(file_descriptor))
     print()
+
+def deque_to_csv(que, save_path):
+    with open(save_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(que)

@@ -16,7 +16,7 @@ from .DGAPN import DGAPN, Memory
 
 from reward.get_main_reward import get_main_reward
 
-from utils.general_utils import initialize_logger
+from utils.general_utils import initialize_logger, deque_to_csv
 from utils.graph_utils import mols_to_pyg_batch
 
 #####################################################
@@ -149,6 +149,7 @@ def train_gpu_sync(args, embed_model, env):
     memory = Memory()
     memories = [Memory() for _ in range(args.nb_procs)]
     rewbuffer_env = deque(maxlen=100)
+    molbuffer_env = deque(maxlen=1000)
     # training loop
     i_episode = 0
     while i_episode < args.max_episodes:
@@ -225,6 +226,7 @@ def train_gpu_sync(args, embed_model, env):
                 running_reward += main_reward
                 writer.add_scalar("EpMainRew", main_reward, i_episode - 1)
                 rewbuffer_env.append(main_reward)
+                molbuffer_env.append((mols[idx], main_reward))
                 writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode - 1)
 
                 memories[idx].rewards.append(main_reward)
@@ -278,6 +280,7 @@ def train_gpu_sync(args, embed_model, env):
         # save every 500 episodes
         if save_counter >= args.save_interval:
             torch.save(policy, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
+            deque_to_csv(molbuffer_env, os.path.join(save_dir, 'mol_dgapn.csv'))
             save_counter = 0
 
         # save running model
@@ -346,6 +349,7 @@ def train_serial(args, embed_model, env):
 
     memory = Memory()
     rewbuffer_env = deque(maxlen=100)
+    molbuffer_env = deque(maxlen=1000)
     # training loop
     for i_episode in range(1, args.max_episodes+1):
         state, candidates, done = env.reset()
@@ -390,7 +394,8 @@ def train_serial(args, embed_model, env):
             memory.clear()
 
         writer.add_scalar("EpMainRew", main_reward, i_episode-1)
-        rewbuffer_env.append(reward)
+        rewbuffer_env.append(main_reward) # reward
+        molbuffer_env.append((Chem.MolToSmiles(state), main_reward))
         avg_length += (t+1)
 
         # write to Tensorboard
@@ -402,9 +407,10 @@ def train_serial(args, embed_model, env):
             torch.save(policy, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
             break
 
-        # save every 500 episodes
+        # save every save_interval episodes
         if (i_episode-1) % args.save_interval == 0:
             torch.save(policy, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
+            deque_to_csv(molbuffer_env, os.path.join(save_dir, 'mol_dgapn.csv'))
 
         # save running model
         torch.save(policy, os.path.join(save_dir, 'running_dgapn.pth'))
