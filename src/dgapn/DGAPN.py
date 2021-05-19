@@ -57,8 +57,10 @@ class DGAPN(nn.Module):
                  K_epochs,
                  eps_clip,
                  emb_model,
+                 emb_nb_shared,
                  input_dim,
                  nb_edge_types,
+                 use_3d,
                  gnn_nb_layers,
                  gnn_nb_hidden,
                  enc_nb_layers,
@@ -70,8 +72,10 @@ class DGAPN(nn.Module):
         super(DGAPN, self).__init__()
         self.gamma = gamma
         self.K_epochs = K_epochs
+        self.use_3d = use_3d
         self.emb_model = emb_model
-        self.emb_3d = emb_model.use_3d if emb_model is not None else False
+        self.emb_3d = emb_model.use_3d if emb_model is not None else use_3d
+        self.emb_nb_shared = emb_nb_shared
 
         self.policy = ActorCriticGAPN(lr[:2],
                                       betas,
@@ -80,6 +84,7 @@ class DGAPN(nn.Module):
                                       eps_clip,
                                       input_dim,
                                       nb_edge_types,
+                                      use_3d,
                                       gnn_nb_layers,
                                       gnn_nb_hidden,
                                       enc_nb_layers,
@@ -93,6 +98,7 @@ class DGAPN(nn.Module):
                                           eps_clip,
                                           input_dim,
                                           nb_edge_types,
+                                          use_3d,
                                           gnn_nb_layers,
                                           gnn_nb_hidden,
                                           enc_nb_layers,
@@ -105,6 +111,7 @@ class DGAPN(nn.Module):
                                              eps,
                                              input_dim,
                                              nb_edge_types,
+                                             use_3d,
                                              gnn_nb_layers,
                                              gnn_nb_hidden,
                                              rnd_nb_layers,
@@ -114,7 +121,8 @@ class DGAPN(nn.Module):
         self.device = torch.device("cpu")
 
     def to_device(self, device):
-        self.emb_model = self.emb_model.to(device) if self.emb_model is not None else None
+        if self.emb_model is not None:
+            self.emb_model.to_device(device, n_layers=self.emb_nb_shared)
         self.policy.to(device)
         self.policy_old.to(device)
         self.explore_critic.to(device)
@@ -133,11 +141,8 @@ class DGAPN(nn.Module):
 
         with torch.autograd.no_grad():
             if self.emb_model is not None:
-                states = self.emb_model.get_embedding(states, aggr=False)
-                candidates = self.emb_model.get_embedding(candidates, aggr=False)
-            else:
-                states = states[0]
-                candidates = candidates[0]
+                states = self.emb_model.get_embedding(states, n_layers=self.emb_nb_shared, return_3d=self.use_3d, aggr=False)
+                candidates = self.emb_model.get_embedding(candidates, n_layers=self.emb_nb_shared, return_3d=self.use_3d, aggr=False)
             action_logprobs, actions = self.policy_old.select_action(
                 states, candidates, batch_idx)
 

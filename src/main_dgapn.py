@@ -27,8 +27,6 @@ def molecule_arg_parser():
     #add_arg('--seed', help='RNG seed', type=int, default=666)
 
     add_arg('--warm_start_dataset_path', default='')
-    add_arg('--embed_model_url', default='')
-    add_arg('--embed_model_path', default='')
     add_arg('--running_model_path', default='')
     add_arg('--log_interval', type=int, default=20)         # print avg reward in the interval
     add_arg('--save_interval', type=int, default=200)       # save model in the interval
@@ -42,9 +40,9 @@ def molecule_arg_parser():
     # TRAINING PARAMETERS
     add_arg('--solved_reward', type=float, default=100)     # stop training if avg_reward > solved_reward
     add_arg('--max_episodes', type=int, default=50000)      # max training episodes
-    add_arg('--max_timesteps', type=int, default=12)        # max timesteps in one episode
+    add_arg('--max_timesteps', type=int, default=15)        # max timesteps in one episode
     add_arg('--update_timesteps', type=int, default=300)    # update policy every n timesteps
-    add_arg('--K_epochs', type=int, default=50)             # update policy for K epochs
+    add_arg('--K_epochs', type=int, default=40)             # update policy for K epochs
     add_arg('--eps_clip', type=float, default=0.2)          # clip parameter for PPO
     add_arg('--gamma', type=float, default=0.99)            # discount factor
     add_arg('--eta', type=float, default=0.01)              # relative weight for entropy loss
@@ -56,13 +54,18 @@ def molecule_arg_parser():
     add_arg('--eps', type=float, default=0.01)              # eps for Adam optimizer
 
     # NETWORK PARAMETERS
+    add_arg('--embed_model_url', default='')
+    add_arg('--embed_model_path', default='')
+    add_arg('--emb_nb_shared', type=int, default=2)         # number of layers for the embedding model to share
+
     add_arg('--input_size', type=int, default=121)
     add_arg('--nb_edge_types', type=int, default=1)
-    add_arg('--gnn_nb_layers', type=int, default=3)         # number of layers on top of the embedding model
-    add_arg('--gnn_nb_hidden', type=int, default=512, help='hidden size of Graph Networks')
+    add_arg('--use_3d', action='store_true')
+    add_arg('--gnn_nb_layers', type=int, default=3)         # number of layers on top of the shared layers
+    add_arg('--gnn_nb_hidden', type=int, default=256, help='hidden size of Graph Networks')
     add_arg('--enc_num_layers', type=int, default=3)
-    add_arg('--enc_num_hidden', type=int, default=512, help='hidden size of Encoding Networks')
-    add_arg('--enc_num_output', type=int, default=512)
+    add_arg('--enc_num_hidden', type=int, default=256, help='hidden size of Encoding Networks')
+    add_arg('--enc_num_output', type=int, default=256)
     add_arg('--rnd_num_layers', type=int, default=1)
     add_arg('--rnd_num_hidden', type=int, default=256, help='hidden size of Random Networks')
     add_arg('--rnd_num_output', type=int, default=8)
@@ -94,6 +97,9 @@ def main():
                                             args.embed_model_path)
         embed_model.eval()
         print(embed_model)
+        assert args.emb_nb_shared <= embed_model.nb_layers
+        if not embed_model.use_3d:
+            assert not args.use_3d
         args.input_size = embed_model.nb_hidden
         args.nb_edge_types = embed_model.nb_edge_types
 

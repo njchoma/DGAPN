@@ -36,10 +36,13 @@ class MyGNN(nn.Module):
         y = self.final_layer(x).squeeze()
         return y
 
-    def get_embedding(self, g, g3D=None, aggr=True, detach=True):
+    def get_embedding(self, g, g3D=None, n_layers=None, return_3d=False, aggr=True, detach=True):
         if isinstance(g, list):
             g3D = g[1]
             g = g[0]
+        if n_layers is None:
+            n_layers = self.nb_layers
+        assert n_layers <= self.nb_layers
 
         x = g.x
         edge_index = g.edge_index
@@ -47,28 +50,47 @@ class MyGNN(nn.Module):
         batch = g.batch
         if g3D is None:
             assert self.use_3d is False
-            for i, l in enumerate(self.layers):
-                x, edge_attr = l(x, edge_index, edge_attr)
+            for i in range(n_layers):
+                x, edge_attr = self.layers[i](x, edge_index, edge_attr)
         else:
             geom_index = g3D.edge_index
             geom_attr = g3D.edge_attr
-            for l, l3D in zip(self.layers, self.layers3D):
-                x1, edge_attr = l(x, edge_index, edge_attr)
-                x2 = l3D(x, geom_index, geom_attr)
+            for i in range(n_layers):
+                x1, edge_attr = self.layers[i](x, edge_index, edge_attr)
+                x2 = self.layers3D[i](x, geom_index, geom_attr)
                 x = x1 + x2
 
-        if detach is True:
+        if detach:
+            x1 = x1.detach()
+            x2 = x2.detach()
             x = x.detach()
             edge_index = edge_index.detach()
             edge_attr = edge_attr.detach()
+            geom_index = geom_index.detach()
+            geom_attr = geom_attr.detach()
             batch = batch.detach()
 
-        if aggr is True:
+        if aggr:
             return pyg.nn.global_add_pool(x, batch)
+        elif return_3d:
+            g.x = x1
+            g.edge_attr = edge_attr
+            g3D.x = x2
+            return [g, g3D]
         else:
             g.x = x
             g.edge_attr = edge_attr
             return g
+
+    def to_device(self, device, n_layers=None):
+        if n_layers is None:
+            n_layers = self.nb_layers
+        assert n_layers <= self.nb_layers
+
+        for i in range(n_layers):
+            self.layers[i].to(device)
+            if self.use_3d:
+                self.layers3D[i].to(device)
 
 
 

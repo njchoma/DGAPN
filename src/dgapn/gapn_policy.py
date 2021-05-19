@@ -59,6 +59,7 @@ class ActorCriticGAPN(nn.Module):
                  eps_clip,
                  input_dim,
                  nb_edge_types,
+                 use_3d,
                  gnn_nb_layers,
                  gnn_nb_hidden,
                  enc_nb_layers,
@@ -70,6 +71,7 @@ class ActorCriticGAPN(nn.Module):
                                 eps_clip,
                                 input_dim,
                                 nb_edge_types,
+                                use_3d,
                                 gnn_nb_layers,
                                 gnn_nb_hidden,
                                 enc_nb_layers,
@@ -79,6 +81,7 @@ class ActorCriticGAPN(nn.Module):
         # critic
         self.critic = GAPN_Critic(input_dim,
                                   nb_edge_types,
+                                  use_3d,
                                   gnn_nb_layers,
                                   gnn_nb_hidden,
                                   enc_nb_layers,
@@ -116,12 +119,13 @@ class GAPN_Critic(nn.Module):
     def __init__(self,
                  input_dim,
                  nb_edge_types,
+                 use_3d,
                  gnn_nb_layers,
                  gnn_nb_hidden,
                  enc_nb_layers,
                  enc_nb_hidden):
         super(GAPN_Critic, self).__init__()
-        self.gnn = MyGNN(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types)
+        self.gnn = MyGNN(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d)
         if gnn_nb_layers == 0:
             in_dim = input_dim
         else:
@@ -162,6 +166,7 @@ class GAPN_Actor(nn.Module):
                  eps_clip,
                  input_dim,
                  nb_edge_types,
+                 use_3d,
                  gnn_nb_layers,
                  gnn_nb_hidden,
                  enc_nb_layers,
@@ -171,7 +176,7 @@ class GAPN_Actor(nn.Module):
         self.eta = eta
         self.eps_clip = eps_clip
         self.d_k = enc_nb_output
-        self.gnn = MyGNN(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types)
+        self.gnn = MyGNN(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d)
         if gnn_nb_layers == 0:
             in_dim = input_dim
         else:
