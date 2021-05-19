@@ -230,8 +230,6 @@ def proc_one_epoch(net,
     t0 = time.time()
     logging.info("  {} batches, {} samples".format(nb_batch, nb_samples))
     for i, (y, G1, G2) in enumerate(loader):
-        if i > 10:
-            break
         t1 = time.time()
         if train:
             optim.zero_grad()
@@ -274,7 +272,7 @@ def train(net,
     best_loss = arg_handler('best_loss')
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, 'min', patience=3, verbose=True)
     scheduler.step(best_loss)
-    for i in range(arg_handler('current_epoch'), 2):
+    for i in range(arg_handler('current_epoch'), 1000):
         t0 = time.time()
         logging.info("\n\nEpoch {}".format(i + 1))
         logging.info("Learning rate: {0:.3g}".format(current_lr))
