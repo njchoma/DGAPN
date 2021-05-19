@@ -147,6 +147,7 @@ def train_gpu_sync(args, embed_model, env):
 
     avg_length = 0
     running_reward = 0
+    running_main_reward = 0
 
     memory = Memory()
     memories = [Memory() for _ in range(args.nb_procs)]
@@ -226,6 +227,7 @@ def train_gpu_sync(args, embed_model, env):
 
                 i_episode += 1
                 running_reward += main_reward
+                running_main_reward += main_reward
                 writer.add_scalar("EpMainRew", main_reward, i_episode - 1)
                 rewbuffer_env.append(main_reward)
                 molbuffer_env.append((mols[idx], main_reward))
@@ -291,9 +293,12 @@ def train_gpu_sync(args, embed_model, env):
         if log_counter >= args.log_interval:
             avg_length = int(avg_length / log_counter)
             running_reward = running_reward / log_counter
+            running_main_reward = running_main_reward / log_counter
 
-            logging.info('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
+            logging.info('Episode {} \t Avg length: {} \t Avg reward: {:5.3f} \t Avg main reward: {:5.3f}'.format(
+                i_episode, avg_length, running_reward, running_main_reward))
             running_reward = 0
+            running_main_reward = 0
             avg_length = 0
             log_counter = 0
 
@@ -350,6 +355,7 @@ def train_serial(args, embed_model, env):
 
     avg_length = 0
     running_reward = 0
+    running_main_reward = 0
 
     memory = Memory()
     rewbuffer_env = deque(maxlen=100)
@@ -375,6 +381,7 @@ def train_serial(args, embed_model, env):
             if (t==(args.max_timesteps-1)) or done:
                 main_reward = get_main_reward(state, reward_type=args.reward_type, args=args)
                 reward = main_reward
+                running_main_reward += main_reward
 
             if (args.iota > 0 and 
                 i_episode > args.innovation_reward_episode_delay and 
@@ -423,8 +430,11 @@ def train_serial(args, embed_model, env):
         if i_episode % args.log_interval == 0:
             avg_length = int(avg_length/args.log_interval)
             running_reward = running_reward/args.log_interval
+            running_main_reward = running_main_reward/args.log_interval
             
-            logging.info('Episode {} \t Avg length: {} \t Avg reward: {:5.3f}'.format(i_episode, avg_length, running_reward))
+            logging.info('Episode {} \t Avg length: {} \t Avg reward: {:5.3f} \t Avg main reward: {:5.3f}'.format(
+                i_episode, avg_length, running_reward, running_main_reward))
             running_reward = 0
+            running_main_reward = 0
             avg_length = 0
 
