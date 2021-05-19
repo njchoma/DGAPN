@@ -61,26 +61,19 @@ class MyGNN(nn.Module):
                 x = x1 + x2
 
         if detach:
-            x1 = x1.detach()
-            x2 = x2.detach()
             x = x.detach()
-            edge_index = edge_index.detach()
             edge_attr = edge_attr.detach()
-            geom_index = geom_index.detach()
-            geom_attr = geom_attr.detach()
-            batch = batch.detach()
 
         if aggr:
             return pyg.nn.global_add_pool(x, batch)
-        elif return_3d:
-            g.x = x1
-            g.edge_attr = edge_attr
-            g3D.x = x2
-            return [g, g3D]
         else:
             g.x = x
             g.edge_attr = edge_attr
-            return g
+            if return_3d:
+                g3D.x = x
+                return [g, g3D]
+            else:
+                return g
 
     def to_device(self, device, n_layers=None):
         if n_layers is None:

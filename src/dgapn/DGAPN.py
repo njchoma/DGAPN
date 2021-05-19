@@ -146,6 +146,14 @@ class DGAPN(nn.Module):
             action_logprobs, actions = self.policy_old.select_action(
                 states, candidates, batch_idx)
 
+        if not isinstance(states, list):
+            states = [states]
+            candidates = [candidates]
+        states = [states[i].to_data_list() for i in range(1+self.use_3d)]
+        states = list(zip(*states))
+        candidates = [candidates[i].to_data_list() for i in range(1+self.use_3d)]
+        candidates = list(zip(*candidates))
+
         return states, candidates, action_logprobs, actions
     
     def get_inno_reward(self, states):
@@ -178,9 +186,12 @@ class DGAPN(nn.Module):
         batch_idx = torch.LongTensor(batch_idx).to(self.device)
 
         # convert list to tensor
-        old_states = Batch().from_data_list(memory.states).to(self.device)
-        old_next_states = Batch().from_data_list([cands[a] for a, cands in zip(memory.actions, memory.candidates)]).to(self.device)
-        old_candidates = Batch().from_data_list([item for sublist in memory.candidates for item in sublist]).to(self.device)
+        old_states = [Batch().from_data_list([state[i] for state in memory.states]).to(self.device) 
+                        for i in range(1+self.use_3d)]
+        old_next_states = [Batch().from_data_list([cands[a][i] for a, cands in zip(memory.actions, memory.candidates)]).to(self.device) 
+                        for i in range(1+self.use_3d)]
+        old_candidates = [Batch().from_data_list([item[i] for sublist in memory.candidates for item in sublist]).to(self.device)
+                        for i in range(1+self.use_3d)]
         old_actions = torch.tensor(memory.actions).to(self.device)
         old_logprobs = torch.tensor(memory.logprobs).to(self.device)
 

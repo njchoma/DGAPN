@@ -187,8 +187,8 @@ def train_gpu_sync(args, embed_model, env):
             for i, idx in enumerate(notdone_idx):
                 tasks.put((idx, candidates[i][actions[i]], False))
 
-                memories[idx].states.append(states_emb.to_data_list()[i])
-                memories[idx].candidates.append([data for j, data in enumerate(candidates_emb.to_data_list()) if batch_idx[j] == idx])
+                memories[idx].states.append(states_emb[i])
+                memories[idx].candidates.append([data for j, data in enumerate(candidates_emb) if batch_idx[j] == idx])
                 memories[idx].actions.append(actions[i])
                 memories[idx].logprobs.append(action_logprobs[i])
             for idx in done_idx:
@@ -362,8 +362,8 @@ def train_serial(args, embed_model, env):
             time_step += 1
             # Running policy_old:
             state_emb, candidates_emb, action_logprob, action = policy.select_action(state, candidates)
-            memory.states.append(state_emb.to_data_list()[0])
-            memory.candidates.append(candidates_emb.to_data_list())
+            memory.states.append(state_emb[0])
+            memory.candidates.append(candidates_emb)
             memory.actions.append(action)
             memory.logprobs.append(action_logprob)
 

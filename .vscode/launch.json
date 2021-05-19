@@ -32,7 +32,7 @@
                 "--artifact_path", "test_run/dgapn",
                 "--reward_type", "dock",
                 "--warm_start_dataset_path", "src/dataset/NSP15_6W01_A_3_H.negonly_unique_30k.csv", // zinc_plogp_sorted.csv
-                "--embed_model_path", "artifact/test_embed.pth",
+                //"--embed_model_path", "artifact/test_embed.pth",
                 //"--nb_procs", "1",
                 "--gpu", "0"
             ],
