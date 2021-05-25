@@ -1,14 +1,23 @@
 # MY ADDITIONS
-*.nfs*
-*.pth
+commands
+settings.json
+module_check.py
+*PPO*.pth
+*.png
 *.swp
 run*
 test_run*
-/src/.idea/
-*.DS_Store
-num_check.py
+molecule_gen*
 *.idea/
-*.png
+*.DS_Store
+*.csv
+*.db
+*.db.gz
+*.nfs*
+log/
+runs/
+saves/
+autodockgpu*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

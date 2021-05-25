@@ -7,10 +7,11 @@ import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
 
+import torch_geometric as pyg
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils import dense_to_sparse
 
-from .gcpn_policy import GCPN
+from .gcpn_policy import GCPN, GNN_Embed
 
 from utils.graph_utils import state_to_pyg
 
@@ -79,6 +80,12 @@ class ActorCriticGCPN(nn.Module):
                            mlp_nb_hidden,
                            prob_redux_factor)
         # critic
+        self.critic_embed = GNN_Embed(gnn_nb_hidden,
+                                   gnn_nb_layers,
+                                   gnn_nb_hidden_kernel,
+                                   1,
+                                   input_dim,
+                                   emb_dim)
         self.critic = GCPN_Critic(emb_dim, mlp_nb_layers, mlp_nb_hidden)
         
     def forward(self):
@@ -95,10 +102,14 @@ class ActorCriticGCPN(nn.Module):
         return action
     
     def evaluate(self, state, action):   
-        probs, X_agg = self.actor.evaluate(state, action)
+        probs, _ = self.actor.evaluate(state, action)
+
+        batch = state.batch
+        X = self.critic_embed(state)
+        X_agg = pyg.nn.global_add_pool(X, batch)
+        state_value = self.critic(X_agg)
         
         action_logprobs = torch.log(probs)
-        state_value = self.critic(X_agg)
 
         entropy = (probs * action_logprobs).sum(1)
         
@@ -153,8 +164,9 @@ class PPO_GCPN:
                                       mlp_nb_layers,
                                       mlp_nb_hidden,
                                       prob_redux_factor).to(device)
-        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
-        
+        self.optimizer_actor = torch.optim.Adam(self.policy.actor.parameters(), lr=lr, betas=betas)
+        self.optimizer_critic = torch.optim.Adam(list(self.policy.critic_embed.parameters()) + list(self.policy.critic.parameters()), lr=lr, betas=betas)
+
         self.policy_old = ActorCriticGCPN(input_dim,
                                           emb_dim,
                                           nb_edge_types,
@@ -172,7 +184,8 @@ class PPO_GCPN:
     def select_action(self, state, memory, env):
         g = state_to_surrogate_graph(state, env).to(device)
         # state = wrap_state(state).to(device)
-        action = self.policy_old.act(g, memory)
+        with torch.autograd.no_grad():
+            action = self.policy_old.act(g, memory)
         return action
     
     def update(self, memory, i_episode, writer=None):
@@ -224,20 +237,26 @@ class PPO_GCPN:
             ## entropy
             loss += self.eta*entropies
             ## baseline
-            loss = loss.mean() + self.upsilon*self.MseLoss(state_values, rewards)
-
+            actor_loss = loss.mean()
             ## take gradient step
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+            self.optimizer_actor.zero_grad()
+            actor_loss.backward()
+            self.optimizer_actor.step()
+
+            critic_loss = self.MseLoss(state_values, rewards)
+            ## take gradient step
+            self.optimizer_critic.zero_grad()
+            critic_loss.backward()
+            self.optimizer_critic.step()
+
             if (i%10)==0:
-                print("  {:3d}: Loss: {:7.3f}".format(i, loss))
+                print("  {:3d}: Actor Loss: {:7.3f}, Critic Loss: {:7.3f}".format(i, actor_loss, critic_loss))
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
 
     def __repr__(self):
-        return "{}\n{}".format(repr(self.policy), repr(self.optimizer))
+        return "{}\n{}\n{}".format(repr(self.policy), repr(self.optimizer_actor), repr(self.optimizer_critic))
 
 
 #####################################################
@@ -294,7 +313,7 @@ def train_ppo(args, surrogate_model, env, writer=None):
 
     ############## Hyperparameters ##############
     render = True
-    solved_reward = 100          # stop training if avg_reward > solved_reward
+    solved_reward = 100         # stop training if avg_reward > solved_reward
     log_interval = 80           # print avg reward in the interval
     max_episodes = 50000        # max training episodes
     max_timesteps = 1500        # max timesteps in one episode

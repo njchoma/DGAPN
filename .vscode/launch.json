@@ -1,0 +1,22 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "main_gcpn",
+            "type": "python",
+            "request": "launch",
+            "program": "src/main_gcpn.py",
+            "subProcess": true,
+            "args": [
+                "--name", "GCPN_DOCK",
+                "--data_path", "src/dataset",
+                "--artifact_path", "test_run/dcpn",
+                "--prob_redux_factor", "0.99"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}
