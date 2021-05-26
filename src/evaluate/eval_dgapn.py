@@ -25,12 +25,12 @@ def dgapn_rollout(save_path,
     mol, mol_candidates, done = env.reset()
     mol_start = mol
     smile_best = Chem.MolToSmiles(mol, isomericSmiles=False)
-    emb_model_3d = emb_model.use_3d if emb_model is not None else False
+    emb_model_3d = emb_model.use_3d if emb_model is not None else policy.use_3d
 
     g = mols_to_pyg_batch(mol, emb_model_3d, device=DEVICE)
     if emb_model is not None:
         with torch.autograd.no_grad():
-            g = emb_model.get_embedding(g, aggr=False)
+            g = emb_model.get_embedding(g, n_layers=policy.emb_nb_shared, return_3d=policy.use_3d, aggr=False)
     new_rew = get_main_reward(mol, reward_type)[0]
     start_rew = new_rew
     best_rew = new_rew
@@ -42,7 +42,7 @@ def dgapn_rollout(save_path,
         g_candidates = mols_to_pyg_batch(mol_candidates, emb_model_3d, device=DEVICE)
         if emb_model is not None:
             with torch.autograd.no_grad():
-                g_candidates = emb_model.get_embedding(g_candidates, aggr=False)
+                g_candidates = emb_model.get_embedding(g_candidates, n_layers=policy.emb_nb_shared, return_3d=policy.use_3d, aggr=False)
         # next_rewards = get_main_reward(mol_candidates, reward_type)
 
         with torch.autograd.no_grad():
@@ -73,7 +73,7 @@ def dgapn_rollout(save_path,
         g = mols_to_pyg_batch(mol, emb_model_3d, device=DEVICE)
         if emb_model is not None:
             with torch.autograd.no_grad():
-                g = emb_model.get_embedding(g, aggr=False)
+                g = emb_model.get_embedding(g, n_layers=policy.emb_nb_shared, return_3d=policy.use_3d, aggr=False)
 
         if new_rew > best_rew:
             smile_best = Chem.MolToSmiles(mol, isomericSmiles=False)
