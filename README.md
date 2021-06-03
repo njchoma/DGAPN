@@ -1,4 +1,4 @@
-# Spatial Graph Attention and Curiosity-driven Policyfor Antiviral Drug Discovery
+# Spatial Graph Attention and Curiosity-driven Policy for Antiviral Drug Discovery
 
 This repository is the official implementation of "Spatial Graph Attention and Curiosity-driven Policyfor Antiviral Drug Discovery".
 
@@ -177,4 +177,4 @@ The flag `--policy_path` should be modified to direct to a trained DGAPN model.
 ./main_eval.sh
 ```
 
-Molecules will be saved in the artifact directory (set via the `--artifact_path` flag in `main_eval.sh`) as a csv file, where the each line contains the molecule's SMILES string and associated docking score.
+Molecules will be saved in the artifact directory (set via the `--artifact_path` flag in `main_eval.sh`) as a csv file, where each line contains a molecule's SMILES string and associated docking score.
