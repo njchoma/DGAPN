@@ -28,7 +28,7 @@ def molecule_arg_parser():
 
     add_arg('--policy_path', default='')
 
-    add_arg('--reward_type', type=str, default='logp', help='logp;dock')
+    add_arg('--reward_type', type=str, default='plogp', help='plogp;logp;dock')
 
     add_arg('--nb_sample_crem', type=int, default=128)
 

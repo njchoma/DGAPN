@@ -31,7 +31,7 @@ def molecule_arg_parser():
     add_arg('--log_interval', type=int, default=20)         # print avg reward in the interval
     add_arg('--save_interval', type=int, default=200)       # save model in the interval
 
-    add_arg('--reward_type', type=str, default='dock', help='plogp;logp;dock')
+    add_arg('--reward_type', type=str, default='plogp', help='plogp;logp;dock')
 
     add_arg('--iota', type=float, default=0.1, help='relative weight for innovation reward')
     add_arg('--innovation_reward_episode_delay', type=int, default=100)
