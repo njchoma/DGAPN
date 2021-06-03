@@ -21,7 +21,7 @@ conda activate my-mol-env
 
 3. Install software dependency (if docking reward is desired)
 
-To evaluate molecular docking scores, the docking program [AutoDock-GPU](https://github.com/ccsb-scripps/AutoDock-GPU/wiki) and [Open Babel](https://open-babel.readthedocs.io/en/latest/Command-line_tools/babel.html) need to be installed. Several input receptor files are also required, see [the sub-directory](src/reward/adtgpu/README.md) for more details.
+To evaluate molecular docking scores, the docking program [AutoDock-GPU](https://github.com/ccsb-scripps/AutoDock-GPU/wiki) and [Open Babel](https://open-babel.readthedocs.io/en/latest/Command-line_tools/babel.html) need to be installed. Several input receptor files are also required, see [the sub-directory](src/reward/adtgpu) for more details.
 
 For optimizing logP, penalized logP, etc., this is not necessary.
 
