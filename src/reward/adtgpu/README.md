@@ -1,135 +1,136 @@
-### AutoDock-GPU implementation in the DGAPN framework
-
-#### Background
+**AutoDock-GPU implementation in the DGAPN framework**
 
 Our pipeline achieves high-throughput processing by taking advantage of
 the performance benefits of AutoDock-GPU
-(<https://arxiv.org/pdf/2007.03678.pdf>; <https://doi.org/10.26434/chemrxiv.9702389.v1>)
-for structure-based molecular docking and the calculation of the binding
-affinity of the putative protein-ligand complexes generated.
+(https://arxiv.org/pdf/2007.03678.pdf);(https://doi.org/10.26434/chemrxiv.9702389.v1)
+for structure-based molecular docking and calculation of the binding
+affinity of the putative protein-ligand complexes generated. The
+implementation in the DGAPN framework is done in two steps:
 
-The recently published paper
-(<https://pubs.acs.org/doi/10.1021/acs.jctc.0c01006>)
-describes the latest implementation in greater detail.
+1.  Receptor pre-processing
 
-Refer to the AutoDock-GPU documentation
-(<https://github.com/ccsb-scripps/AutoDock-GPU/wiki>)
-for more information.
+2.  Reward scores from molecular docking within DGAPN
 
-**Overview of the usage of AutoDock-GPU in the DGAPN framework :**
+**Installation**
 
-1.  APIs / software used:
-	-   AutoDockTools (<http://autodock.scripps.edu/resources/adt>)
-		> To define a search box for docking on the receptor and to generate the
-		> inputs for AutoGrid4.
+1.  Install the software for receptor pre-processing:
 
-	-   AutoGrid4
-    ([[http://autodock.scripps.edu/wiki/AutoGrid)]{.ul}](http://autodock.scripps.edu/wiki/AutoGrid)
-		> To pre-calculate atom-specific grid maps of energy of interaction for
-		> a given protein target
+-   AutoDockTools (http://autodock.scripps.edu/resources/adt)
 
-	-   RDKit (<https://www.rdkit.org/>)
-		> To convert, filter, and manipulate chemical data
+-   AutoGrid4 (http://autodock.scripps.edu/wiki/AutoGrid)
 
-	-   obabel
-    ([[https://open-babel.readthedocs.io/en/latest/Command-line_tools/babel.html]{.ul}](https://open-babel.readthedocs.io/en/latest/Command-line_tools/babel.html))
-		> To convert, filter, and manipulate chemical data
+2.  Install the software for molecular docking on Linux compute server
+    > along with DGAPN
 
-	-   AutoDock-GPU
-    ([[https://github.com/ccsb-scripps/AutoDock-GPU/wiki]{.ul}](https://github.com/ccsb-scripps/AutoDock-GPU/wiki))
+-   RDKit (https://www.rdkit.org/)
 
-2.  Input: SMILES strings of all molecules generated per iteration by
-    DGAPN
+-   Open Babel (https://open-babel.readthedocs.io/en/latest/Command-line_tools/babel.html)
 
-3.  Output: List of reward scores, which are the negative of the docking
-    score returned by AutoDock-GPU (since DGAPN performs maximization)
+-   AutoDock-GPU (https://github.com/ccsb-scripps/AutoDock-GPU/wiki)
 
-Notes:
+> Needs to be installed on a compute server with GPUs
 
--   AutoDockTools and AutoGrid4 are required in the preliminary step
-    that needs to be performed for each receptor in order to prepare
-    inputs for targeted molecular docking, using AutoDock-GPU
+**Receptor pre-processing**
 
--   AutoDock-GPU needs to be installed on a Linux compute server with
-    GPUs
-
--   Executable paths must be set for the specific computing system for
-    Obabel and AutoDock-GPU
-
-**Required receptor input files:**
-
-AutoDock-GPU requires several files specific to the receptor.
-
--   .map files: One for each atom type, they provide electrostatic
-    potential and desolvation free energy grid maps, for the given
-    target macromolecule
-
--   .maps.fld file: Describes the consistent set of atomic affinity grid
-    maps
-
--   .maps.xyz file: Describes the spatial extents of the grid box
-
--   .pdbqt file: Contains the atomic coordinates, partial charges, and
-    AutoDock atom types of the receptor
-
-**Pre-processing structural information from the receptor:**
+DGAPN was tested for targeted docking, in which a functional binding
+site is defined. Therefore, previous structural knowledge about the
+protein is needed to specify a search box that includes the side chains
+of amino acids forming the region of interest.
 
 The receptor input files provided in these resources are for docking in
 the catalytic site of NSP15. In order to create the required files for a
-new receptor the following steps can be followed:
+new receptor these steps can be followed.
 
-1.  Using AutoDockTools, define the search space and generate the inputs
-    to run AutoGrid4
+1.  Define the docking space
 
-    -   Grid > Macromolecule > Open
+> Using the graphical interface of AutoDockTools, define the docking
+> space and generate the inputs to run AutoGrid4 as described:
 
-    -   Save as pdbqt
+-   After removing coordinates of water and other non-bound molecules,
+    > open the PDB file of the receptor:
 
-    -   Set map types > Directly
+> *Grid \> Macromolecule \> Open*
+>
+> Save as PDBQT
 
-    -   Define a list of atom types that your ligands may contain. For
-        our test set, they are: A Br C Cl F HD N NA OA S SA. More
-        information about this can be found at
-        [[http://autodock.scripps.edu/faqs-help/faq/where-do-i-set-the-autodock-4-force-field-parameters]{.ul}](http://autodock.scripps.edu/faqs-help/faq/where-do-i-set-the-autodock-4-force-field-parameters).
+-   Define a list of atom types that your ligands may contain:
 
-    -   Grid > Grid box
+> *Set map types \> Directly*
+>
+> Based on the chemical space explored by CReM, use: A Br C Cl F HD N NA
+> OA S SA
 
-    -   Use spacing = 1 Å and select the docking space
+-   Define the docking space:
 
-    -   File > Close saving current
+> *Grid \> Grid box*
+>
+> Use spacing = 1 Å and define the dimensions and position of the
+> docking space.
+>
+> *File \> Close saving current*
+>
+> *Grid \> Output \> Save GPF*
 
-    -   Grid > Output > Save GPF
+2.  Calculate grid maps
 
-	> This will generate the receptor PDBQT and .gpf files.
+> Pre-calculate atom-specific maps of energy of interaction running
+> AutoGrid4:
+>
+> `<AUTOGRID4_INSTALL_DIR>/bin/autogrid4 -p \[file\].gpf`
 
-2.  Pre-calculate atom-specific maps of energy of interaction running
-    AutoGrid4
+Save .map, .maps.fld, .maps.xyz, and .pdbqt files at
+`/src/reward/adtgpu/receptor`. These files, generated by
+AutoGrid4, are inputs for AutoDock-GPU.
 
-    -   Run AutoGrid4 with: autogrid4 -p \[file\].gpf
+**Receptor-specific inputs for AutoDock-GPU**
 
-	> This will generate the .map and .fld needed to run adt-gpu.
+> ● .map files: One for each atom type, they provide electrostatic
+> potential and desolvation free energy grid maps, for the given target
+> macromolecule.
+>
+> ● .maps.fld file: Describes the consistent set of atomic affinity grid
+> maps.
+>
+> ● .maps.xyz file: Describes the dimensions and position of the grid
+> box.
+>
+> ● .pdbqt file: Contains the atomic coordinates, partial charges, and
+> AutoDock atom types of the receptor.
 
-**Autodock-GPU Processing Workflow:**
+**Molecular docking within DGAPN**
 
-Our implementation of AutoDock-GPU for DGAPN is summarized as follows:
+In `/src/reward/adtgpu/run_adtgpu.py`, provide the path to
+Open Babel and AutoDock-GPU binaries:
+
+```bash
+#Executable paths
+
+OBABEL_PATH=\"\<OBABEL_INSTALL_DIR>/bin/obabel\"
+
+ADT_PATH=\"\<AUTODOCK_GPU_INSTALL_DIR>/bin/\<AUTODOCK_GPU_EXECUTABLE>\"
+
+#Receptor paths
+
+RECEPTOR_FILE=\"\<NAME_OF_RECEPTOR>.pdbqt\"
+```
+
+**Summary of the AutoDock-GPU processing workflow**
 
 1.  Using RDKit, the chemical validity of the SMILES strings of the
-    generated molecules is checked. If valid, the SMILES are converted
-    into PDB, using the Chem.MolToPDBBlock module. Invalid SMILES are
-    given a score of 0.0
+    > generated molecules is checked. If valid, the SMILES are converted
+    > into PDB, using the `Chem.MolToPDBBlock` module. Invalid
+    > SMILES are given a score of 0.0
 
-2.  PDB files are converted to PDBQT, using obabel. Both the PDB and
-    PDBQT formats are temporarily saved in a /ligands/ sub-directory,
-    under the work directory
+2.  PDB files are converted to PDBQT, using Open Babel. Both the PDB and
+    > PDBQT formats are temporarily saved in a `/ligands/`
+    > sub-directory, under the work directory
 
 3.  A list of all PDBQT ligands to be evaluated is stored in a text file
-    in the /ligands/ sub-directory
+    > in the `/ligands/` sub-directory
 
-4.  Molecular docking is performed using AutoDock-GPU. In this study, we
-    defined 10 LGA replicas per molecule (the nrun parameter) - this is
-    a default value for targeted docking
+4.  Molecular docking is performed using AutoDock-GPU
 
 5.  Output is parsed to fetch the docking scores, the negative of the
-    docking score is returned for all SMILES as reward scores. The
-    reward function for DGAPN (get_dock_score) can be found at
-    src/reward/adtgpu in the source code.
+    > docking score is returned for all SMILES as reward scores. The
+    > reward function for DGAPN (`get_dock_score`) is defined
+    > in `/src/reward/adtgpu/get_reward.py`
