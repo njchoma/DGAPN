@@ -36,7 +36,11 @@ Once the conda environment and Autodock-GPU are set up, the function call to tra
 ./main_dgapn.sh
 ```
 
-A list of flags may be found in `main_dgapn.sh` for experimentation with different network and training parameters.
+A list of flags may be found in `main_dgapn.sh` for experimentation with different network and training parameters. If you prefer to train with a pre-trained embedding model or just want to try out supervised learning with Spatial Graph Attention Network (sGAT), run the following:
+
+```bash
+./main_embed.sh
+```
 
 #### Evaluate
 
