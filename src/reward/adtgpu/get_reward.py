@@ -7,6 +7,22 @@ import subprocess
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
+########## Executable paths ##########
+
+# For exaLearn systems
+OBABEL_PATH = "/usr/bin/obabel"
+ADT_PATH = "/clusterfs/csdata/pkg/autodock-gpu/AutoDock-GPU/bin/autodock_gpu_64wi"
+# For Summit systems
+#OBABEL_PATH = "/gpfs/alpine/syb105/proj-shared/Personal/manesh/BIN/openbabel/summit/build/bin/obabel"
+#ADT_PATH = "/gpfs/alpine/syb105/proj-shared/Personal/gabrielgaz/Apps/summit/autoDockGPU2/bin/autodock_gpu_64wi"
+
+########### receptor files ###########
+
+# NSP15, site A3H
+RECEPTOR_FILE = "NSP15_6W01_A_3_H_receptor.pdbqt"
+
+######################################
+
 def get_dock_score(states, args=None):
     if not isinstance(states, list):
         states = [states]
@@ -16,18 +32,14 @@ def get_dock_score(states, args=None):
     DEBUG=False
 
     #Setup parameters (TODO - genearlize/simplify this)
-    receptor_file="./src/reward/adtgpu/receptor/NSP15_6W01_A_3_H_receptor.pdbqt"
-    smiles = str(smiles)
+    obabel_path=OBABEL_PATH
+    adt_path=ADT_PATH
+    receptor_file="./src/reward/adtgpu/receptor/"+RECEPTOR_FILE
     if(args and args.adt_tmp_dir!=''): run_dir="./src/reward/adtgpu/autodockgpu"+str(args.adt_tmp_dir)
     else: run_dir="./src/reward/adtgpu/autodockgpu"
     if(DEBUG): print("adttmp: {}".format(run_dir))
-    #Executable paths
-    # For Summit systems
-    #obabel_path="/gpfs/alpine/syb105/proj-shared/Personal/manesh/BIN/openbabel/summit/build/bin/obabel"
-    #adt_path="/gpfs/alpine/syb105/proj-shared/Personal/gabrielgaz/Apps/summit/autoDockGPU2/bin/autodock_gpu_64wi"
-    # For exalearn systems
-    obabel_path="/usr/bin/obabel"
-    adt_path="/clusterfs/csdata/pkg/autodock-gpu/AutoDock-GPU/bin/autodock_gpu_64wi"
+
+    smiles = str(smiles)
 
     #Check that input file path exist
     if not os.path.exists(receptor_file):
