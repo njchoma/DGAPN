@@ -19,14 +19,14 @@ EPS = 1e-4
 
 def batched_expand(emb, batch):
     unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), 
-                        dims=(0,)) # TODO (Yulun): temp fix due to torch.unique bug
+                        dims=(0,)) 
 
     X = torch.repeat_interleave(emb, torch.bincount(batch)[unique], dim=0)
     return X
 
 def batched_sample(probs, batch):
     unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), 
-                        dims=(0,)) # TODO (Yulun): temp fix due to torch.unique bug
+                        dims=(0,)) 
     mask = batch.unsqueeze(0) == unique.unsqueeze(1)
 
     p = probs * mask

@@ -178,7 +178,6 @@ class MyGAT(MessagePassing):
             out = out.view(-1, self.heads * self.out_channels)
             edge_attr = edge_attr.view(-1, self.heads * self.nb_edge_attr)
         else:
-            # TODO (Yulun): Efficiency
             out = out.mean(dim=1)
             edge_attr = edge_attr.mean(dim=1)
 
@@ -352,7 +351,7 @@ class MyHGATConv(MessagePassing):
             out = out.view(-1, self.heads * self.out_channels)
             edge_attr = edge_attr.view(-1, self.heads * self.nb_edge_attr)
         else:
-            out = out.mean(dim=1)  # TODO(Yulun): simply extract one entry of dim 1.
+            out = out.mean(dim=1)  
             edge_attr = edge_attr.mean(dim=1)
 
         out = self.act(out)

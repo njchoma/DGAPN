@@ -98,7 +98,6 @@ def mol_to_pyg_graph(mol, idm=False, ratio=2.):
             W[np.isinf(W)] = 0
         except Exception as e:
             try:
-                # TODO (Yulun): make this the first try?
                 mol = Chem.AddHs(mol)
                 if AllChem.EmbedMolecule(mol, randomSeed=0xf00d) == -1:  # optional random seed for reproducibility)
                     AllChem.Compute2DCoords(mol)
