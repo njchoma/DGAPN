@@ -1,0 +1,14 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: linux-64
+bzip2=1.0.8=h7b6447c_0
+networkx=2.5.1=pypi_0
+numpy=1.20.2=pypi_0
+python=3.8
+pyyaml=5.4.1=pypi_0
+rdkit=2021.03.1=py38hf8acc3d_0
+scikit-learn=0.24.2=pypi_0
+scipy=1.6.3=pypi_0
+tensorboard=2.5.0=pypi_0
+tqdm=4.60.0=pypi_0
+wget=3.2=pypi_0

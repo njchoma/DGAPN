@@ -8,7 +8,7 @@ import torch_geometric as pyg
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
 
-from gnn_embed.model import MyGNN
+from gnn_embed import sGAT
 
 def init_network(model, method='uniform'):
     if model is not None:
@@ -97,7 +97,7 @@ class RandomNetwork(nn.Module):
                  rnd_nb_output,
                  init_method=None):
         super(RandomNetwork, self).__init__()
-        self.gnn = MyGNN(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d, init_method=init_method)
+        self.gnn = sGAT(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d, init_method=init_method)
         if gnn_nb_layers == 0:
             in_dim = input_dim
         else:

@@ -5,10 +5,7 @@ import torch
 
 from utils.general_utils import maybe_download_file
 
-from gnn_embed import model
-
 from environment.env import CReM_Env
-from dgapn.gapn_policy import GAPN_Actor
 
 from evaluate.eval_dgapn import eval_dgapn
 from evaluate.eval_greedy import eval_greedy

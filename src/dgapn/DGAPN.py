@@ -10,7 +10,6 @@ from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, de
 
 from .gapn_policy import ActorCriticGAPN
 from .rnd_explore import RNDistillation
-from gnn_embed.model import MyGNN
 
 from utils.graph_utils import mols_to_pyg_batch
 

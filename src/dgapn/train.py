@@ -16,7 +16,7 @@ from .DGAPN import DGAPN, Memory
 
 from reward.get_main_reward import get_main_reward
 
-from utils.general_utils import initialize_logger, deque_to_csv
+from utils.general_utils import initialize_logger, close_logger, deque_to_csv
 from utils.graph_utils import mols_to_pyg_batch
 
 #####################################################
@@ -305,6 +305,8 @@ def train_gpu_sync(args, embed_model, env):
         episode_count = 0
         sample_count = 0
 
+    close_logger()
+    writer.close()
     # Add a poison pill for each process
     for i in range(args.nb_procs):
         tasks.put(None)
@@ -437,4 +439,7 @@ def train_serial(args, embed_model, env):
             running_reward = 0
             running_main_reward = 0
             avg_length = 0
+
+    close_logger()
+    writer.close()
 

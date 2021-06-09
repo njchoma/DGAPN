@@ -8,7 +8,7 @@ import torch_geometric as pyg
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
 
-from gnn_embed.model import MyGNN
+from gnn_embed import sGAT
 
 from utils.graph_utils import get_batch_shift
 
@@ -125,7 +125,7 @@ class GAPN_Critic(nn.Module):
                  enc_nb_layers,
                  enc_nb_hidden):
         super(GAPN_Critic, self).__init__()
-        self.gnn = MyGNN(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d)
+        self.gnn = sGAT(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d)
         if gnn_nb_layers == 0:
             in_dim = input_dim
         else:
@@ -176,7 +176,7 @@ class GAPN_Actor(nn.Module):
         self.eta = eta
         self.eps_clip = eps_clip
         self.d_k = enc_nb_output
-        self.gnn = MyGNN(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d)
+        self.gnn = sGAT(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d)
         if gnn_nb_layers == 0:
             in_dim = input_dim
         else:

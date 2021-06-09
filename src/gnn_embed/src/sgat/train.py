@@ -18,7 +18,7 @@ import torch_geometric as pyg
 
 import utils.graph_utils as graph_utils
 import utils.general_utils as general_utils
-from gnn_embed.model import MyGNN
+from .sGAT import sGAT, save_sGAT, load_sGAT
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -26,19 +26,18 @@ torch.multiprocessing.set_sharing_strategy('file_system')
 #                   MODEL HANDLING                  #
 #####################################################
 def load_current_model(model_path):
-    net = torch.load(os.path.join(model_path, 'current_model.pth'))
+    net = load_sGAT(os.path.join(model_path, 'current_model.pt'))
     return net
 
 def load_best_model(model_path):
-    net = torch.load(os.path.join(model_path, 'best_model.pth'))
-
+    net = load_sGAT(os.path.join(model_path, 'best_model.pt'))
     return net
 
 def save_current_model(net, model_path):
-    torch.save(net, os.path.join(model_path, 'current_model.pth'))
+    save_sGAT(net, os.path.join(model_path, 'current_model.pt'))
 
 def save_best_model(net, model_path):
-    torch.save(net, os.path.join(model_path, 'best_model.pth'))
+    save_sGAT(net, os.path.join(model_path, 'best_model.pt'))
 
 #############################################
 #            Custom Functions               #
@@ -448,7 +447,7 @@ def main(artifact_path,
         logging.info("Model restored")
     except Exception as e:
         input_dim, nb_edge_types = train_data.get_graph_spec()
-        net = MyGNN(input_dim=input_dim,
+        net = sGAT(input_dim=input_dim,
                         nb_hidden=nb_hidden,
                         nb_layers=nb_layers,
                         nb_edge_types=nb_edge_types,

@@ -4,10 +4,29 @@ import torch.nn as nn
 import torch_geometric as pyg
 from torch_geometric.data import Data, Batch
 
+#####################################################
+#                    MODEL SAVING                   #
+#####################################################
+def load_sGAT(state_path):
+    state = torch.load(state_path)
+    net = sGAT(state['input_dim'],
+                state['nb_hidden'],
+                state['nb_layers'],
+                state['nb_edge_types'],
+                state['use_3d'])
+    net.load_state_dict(state['state_dict'])
+    return net
 
-class MyGNN(nn.Module):
+def save_sGAT(net, state_path):
+    torch.save(net.get_dict(), state_path)
+
+#####################################################
+#                        sGAT                       #
+#####################################################
+
+class sGAT(nn.Module):
     def __init__(self, input_dim, nb_hidden, nb_layers, nb_edge_types, use_3d=False, init_method='uniform'):
-        super(MyGNN, self).__init__()
+        super(sGAT, self).__init__()
         self.input_dim = input_dim
         self.nb_hidden = nb_hidden
         self.nb_layers = nb_layers
@@ -84,6 +103,15 @@ class MyGNN(nn.Module):
             self.layers[i].to(device)
             if self.use_3d:
                 self.layers3D[i].to(device)
+
+    def get_dict(self):
+        state = {'state_dict': self.state_dict(),
+                    'input_dim': self.input_dim,
+                    'nb_hidden': self.nb_hidden,
+                    'nb_layers': self.nb_layers,
+                    'nb_edge_types': self.nb_edge_types,
+                    'use_3d': self.use_3d}
+        return state
 
 
 
@@ -178,6 +206,7 @@ class MyGAT(MessagePassing):
             out = out.view(-1, self.heads * self.out_channels)
             edge_attr = edge_attr.view(-1, self.heads * self.nb_edge_attr)
         else:
+            # TODO (Yulun): Efficiency
             out = out.mean(dim=1)
             edge_attr = edge_attr.mean(dim=1)
 
@@ -351,7 +380,7 @@ class MyHGATConv(MessagePassing):
             out = out.view(-1, self.heads * self.out_channels)
             edge_attr = edge_attr.view(-1, self.heads * self.nb_edge_attr)
         else:
-            out = out.mean(dim=1)  
+            out = out.mean(dim=1)  # TODO(Yulun): simply extract one entry of dim 1.
             edge_attr = edge_attr.mean(dim=1)
 
         out = self.act(out)
@@ -409,4 +438,3 @@ class MyInstanceNorm(_InstanceNorm):
             out = out * self.weight.view(1, -1) + self.bias.view(1, -1)
 
         return out
-

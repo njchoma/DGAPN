@@ -1,5 +1,4 @@
 import os
-import sys
 import argparse
 
 import torch
@@ -8,7 +7,7 @@ import torch.multiprocessing as mp
 from dgapn.train import train_gpu_sync, train_serial
 
 from utils.general_utils import maybe_download_file
-from gnn_embed import model
+from gnn_embed import load_sGAT
 from environment.env import CReM_Env
 
 def molecule_arg_parser():
@@ -77,12 +76,12 @@ def molecule_arg_parser():
 
 def load_embed_model(artifact_path, embed_model_url, embed_model_path):
     if embed_model_url != '':
-        embed_model_path = os.path.join(artifact_path, 'embed_model.pth')
+        embed_model_path = os.path.join(artifact_path, 'embed_model.pt')
 
         maybe_download_file(embed_model_path,
                             embed_model_url,
                             'embed model')
-    embed_model = torch.load(embed_model_path, map_location='cpu')
+    embed_model = load_sGAT(embed_model_path)
     print("embed model loaded")
     return embed_model
 
