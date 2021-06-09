@@ -1,25 +1,30 @@
-# Spatial Graph Attention and Curiosity-driven Policy for Antiviral Drug Discovery
+# Distilled Graph Attention Policy Network
 
-This repository is the official implementation of Spatial Graph Attention Network (sGAT) and Distilled Graph Attention Policy Network (DGAPN) in the paper "Spatial Graph Attention and Curiosity-driven Policy for Antiviral Drug Discovery".
+This repository is the official implementation of Distilled Graph Attention Policy Network (DGAPN) in the paper [**Spatial Graph Attention and Curiosity-driven Policy for Antiviral Drug Discovery**](http://arxiv.org/abs/2106.02190).
 
 
 ## Installation
 
-### Conda Environment
+### 1. Set up modules
+```bash
+git clone https://github.com/njchoma/DGAPN
+cd DGAPN
+git submodule update --init --recursive
+```
 
-1. Create conda environment
+### 2. Create conda environment
 ```bash
 conda create -n my-mol-env --file requirements.txt
 conda activate my-mol-env
 ```
 
-2. Install learning library
+### 3. Install learning library
 - Pytorch **1.8**.0 (https://pytorch.org/get-started/locally/)
 - Pytorch Geometric **1.6**.3 (https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html)
 
   \* *make sure to install the right versions for your toolkit*
 
-3. Install software dependency (if docking reward is desired)
+### 4. Install software dependency (if docking reward is desired)
 
 To evaluate molecular docking scores, the docking program [AutoDock-GPU](https://github.com/ccsb-scripps/AutoDock-GPU/wiki) and [Open Babel](https://open-babel.readthedocs.io/en/latest/Command-line_tools/babel.html) need to be installed. After installations, change `OBABEL_PATH` and `ADT_PATH` in [the reward function](src/reward/adtgpu/get_reward.py) to the corresponding executable paths on your system.
 
@@ -38,11 +43,7 @@ Once the conda environment and Autodock-GPU are set up, the function call to tra
 ./main_dgapn.sh
 ```
 
-A list of flags may be found in `main_dgapn.sh` and `src/main_dgapn.py` for experimentation with different network and training parameters. If you prefer to train DGAPN with pre-trained graph embeddings or just want to try out supervised learning with sGAT, run the following to produce a predictive model:
-
-```bash
-./main_embed.sh
-```
+A list of flags may be found in `main_dgapn.sh` and `src/main_dgapn.py` for experimentation with different network and training parameters. If you wish to produce a pre-trained graph embedding model for DGAPN training, or just want to try out supervised learning with Spatial Graph Attention Network (sGAT), check out the submodule [here](https://github.com/yulun-rayn/sGAT) (installation steps can be skipped if a DGAPN environment is already established).
 
 #### Evaluate
 
