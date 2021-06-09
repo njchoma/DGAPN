@@ -1,0 +1,3 @@
+[submodule "src/gnn_embed"]
+	path = src/gnn_embed
+	url = https://github.com/yulun-rayn/sGAT
