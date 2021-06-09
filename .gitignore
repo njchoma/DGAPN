@@ -1,6 +1,6 @@
 # MY ADDITIONS
+.vscode
 commands
-settings.json
 module_check.py
 *PPO*.pth
 *.png

@@ -20,4 +20,4 @@ PYARGS="$PYARGS --gnn_nb_layers 3"
 PYARGS="$PYARGS --iota 0.08"
 PYARGS="$PYARGS --use_3d"
 
-python src/main_dgapn.py $PYARGS
+python src/main_train.py $PYARGS
