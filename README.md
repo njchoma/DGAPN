@@ -1,6 +1,6 @@
 # Distilled Graph Attention Policy Network
 
-This repository is the official implementation of Distilled Graph Attention Policy Network (DGAPN) in the paper [**Spatial Graph Attention and Curiosity-driven Policy for Antiviral Drug Discovery**](http://arxiv.org/abs/2106.02190).
+This repository is the official implementation of Distilled Graph Attention Policy Network (DGAPN) in the paper [**Spatial Graph Attention and Curiosity-driven Policy for Antiviral Drug Discovery**](http://arxiv.org/abs/2106.02190). The implementation of Spatial Graph Attention Network (sGAT) submodule can be found [here](https://github.com/yulun-rayn/sGAT).
 
 
 ## Requirements
@@ -41,7 +41,7 @@ Once the conda environment and Autodock-GPU are set up, the function call to tra
 ./main_dgapn.sh
 ```
 
-A list of flags may be found in `main_dgapn.sh` and `src/main_dgapn.py` for experimentation with different network and training parameters. If you wish to produce a pre-trained graph embedding model for DGAPN training, or just want to try out supervised learning with Spatial Graph Attention Network (sGAT), check out the submodule [here](https://github.com/yulun-rayn/sGAT) (installation steps can be skipped if a DGAPN environment is already established).
+A list of flags may be found in `main_dgapn.sh` and `src/main_dgapn.py` for experimentation with different network and training parameters. If you wish to produce a pre-trained graph embedding model for DGAPN training, or just want to try out supervised learning with sGAT, check out `src/gnn_embed` for the submodule (installation steps can be skipped if a DGAPN environment is already established).
 
 ## Evaluation
 
@@ -57,18 +57,6 @@ Molecules will be saved in the artifact directory (set via the `--artifact_path`
 ## Pre-trained Models
 The trained DGAPN model used in this paper can be found [here](https://drive.google.com/drive/folders/1gm49zz-XYJUo2V1TK__y5Dgsgu7P1VVr?usp=sharing). 
 After downloading the trained DGAPN model, you can directly run the evaluate command with the trained model to generate molecules.
-
-## Results
-
-Scores represent docking values as evaluated by AutoDock GPU. 
-
-|    Model           | mean | 1st    | 2nd    | 3rd    |
-| ------------------ |------|--------|--------|--------|
-| Reinvent           | -5.6 | -10.22 | -9.76  | -9.50  |
-| JTVAE              | -5.6 | -8.56  | -8.39  | -8.39  |  
-| GCPN               | -4.8 | -16.53 | -10.72 | -10.6  |
-| MolDQN             | -6.7 | -10.88 | -10.51 | -10.36 |
-| DGAPN              | **-8.3** | -12.78 | -12.12 | -11.72 |
 
 ## License
 
