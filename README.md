@@ -54,6 +54,10 @@ The flag `--policy_path` should be modified to direct to a trained DGAPN model.
 
 Molecules will be saved in the artifact directory (set via the `--artifact_path` flag in `main_eval.sh`) as a csv file, where each line contains a molecule's SMILES string and associated docking score.
 
+## Pre-trained Models
+The trained DGAPN model used in this paper can be found [here](https://drive.google.com/drive/folders/1gm49zz-XYJUo2V1TK__y5Dgsgu7P1VVr?usp=sharing). 
+After downloading the trained DGAPN model, you can directly run the evaluate command with the trained model to generate molecules.
+
 ## Results
 
 Scores represent docking values as evaluated by AutoDock GPU. 
@@ -64,4 +68,8 @@ Scores represent docking values as evaluated by AutoDock GPU.
 | JTVAE              | -5.6 | -8.56  | -8.39  | -8.39  |  
 | GCPN               | -4.8 | -16.53 | -10.72 | -10.6  |
 | MolDQN             | -6.7 | -10.88 | -10.51 | -10.36 |
-| DGAPN              | **-8.3** | -12.78 | -12.12 | -11.72 |
+| [DGAPN](https://drive.google.com/file/d/1q44YTJXR3R95hgBZDKpDztotlXhJzHP9/view?usp=sharing) | **-8.3** | -12.78 | -12.12 | -11.72 |
+
+## License
+
+Contributions are welcome! All content here is licensed under the MIT license.
