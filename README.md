@@ -3,28 +3,28 @@
 This repository is the official implementation of Distilled Graph Attention Policy Network (DGAPN) in the paper [**Spatial Graph Attention and Curiosity-driven Policy for Antiviral Drug Discovery**](http://arxiv.org/abs/2106.02190).
 
 
-## Installation
+## Requirements
 
-### 1. Set up modules
+#### 1. Setting up the Repository
 ```bash
 git clone https://github.com/njchoma/DGAPN
 cd DGAPN
 git submodule update --init --recursive
 ```
 
-### 2. Create conda environment
+#### 2. Install Python Dependencies
 ```bash
 conda create -n my-mol-env --file requirements.txt
 conda activate my-mol-env
 ```
 
-### 3. Install learning library
+#### 3. Install Learning Libraries
 - Pytorch **1.8**.0 (https://pytorch.org/get-started/locally/)
 - Pytorch Geometric **1.6**.3 (https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html)
 
   \* *make sure to install the right versions for your toolkit*
 
-### 4. Install software dependency (if docking reward is desired)
+#### 4. Install Docking Software (if docking reward is desired)
 
 To evaluate molecular docking scores, the docking program [AutoDock-GPU](https://github.com/ccsb-scripps/AutoDock-GPU/wiki) and [Open Babel](https://open-babel.readthedocs.io/en/latest/Command-line_tools/babel.html) need to be installed. After installations, change `OBABEL_PATH` and `ADT_PATH` in [the reward function](src/reward/adtgpu/get_reward.py) to the corresponding executable paths on your system.
 
@@ -68,7 +68,7 @@ Scores represent docking values as evaluated by AutoDock GPU.
 | JTVAE              | -5.6 | -8.56  | -8.39  | -8.39  |  
 | GCPN               | -4.8 | -16.53 | -10.72 | -10.6  |
 | MolDQN             | -6.7 | -10.88 | -10.51 | -10.36 |
-| [DGAPN](https://drive.google.com/file/d/1q44YTJXR3R95hgBZDKpDztotlXhJzHP9/view?usp=sharing) | **-8.3** | -12.78 | -12.12 | -11.72 |
+| DGAPN              | **-8.3** | -12.78 | -12.12 | -11.72 |
 
 ## License
 
