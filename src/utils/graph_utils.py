@@ -2,6 +2,8 @@ import numpy as np
 import networkx as nx
 
 from rdkit import Chem
+from rdkit import RDLogger
+RDLogger.DisableLog('rdApp.*')
 from rdkit.Chem import AllChem
 from rdkit.Chem import GraphDescriptors
 

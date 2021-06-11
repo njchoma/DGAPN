@@ -1,7 +1,7 @@
 #!/bin/bash
 
 eval "$(conda shell.bash hook)"
-conda activate my-mol-env
+conda activate dgapn-env
 
 DATA=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
 

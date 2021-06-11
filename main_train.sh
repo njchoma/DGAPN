@@ -1,7 +1,7 @@
 #!/bin/bash
 
 eval "$(conda shell.bash hook)"
-conda activate my-mol-env
+conda activate dgapn-env
 
 DATA=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
 
@@ -17,7 +17,7 @@ PYARGS="$PYARGS --adt_tmp_dir 001"
 # PYARGS="$PYARGS --embed_model_path /path/to/trained/embed_model.pt"
 # PYARGS="$PYARGS --emb_nb_shared 3"
 PYARGS="$PYARGS --gnn_nb_layers 3"
-PYARGS="$PYARGS --iota 0.08"
+PYARGS="$PYARGS --iota 0.05"
 PYARGS="$PYARGS --use_3d"
 
 python src/main_train.py $PYARGS
