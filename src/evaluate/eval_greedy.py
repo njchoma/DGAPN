@@ -8,12 +8,12 @@ from rdkit import Chem
 
 from reward.get_main_reward import get_main_reward
 
-def greedy_rollout(save_path, env, reward_type, K, max_rollout=6):
+def greedy_rollout(save_path, env, reward_type, K, max_rollout=6, args=None):
     mol, mol_candidates, done = env.reset()
     mol_start = mol
     mol_best = mol
 
-    new_rew = get_main_reward(mol, reward_type)[0]
+    new_rew = get_main_reward(mol, reward_type, args=args)[0]
     start_rew = new_rew
     best_rew = new_rew
     steps_remaining = K
@@ -23,7 +23,7 @@ def greedy_rollout(save_path, env, reward_type, K, max_rollout=6):
                                              steps_remaining,
                                              new_rew))
         steps_remaining -= 1
-        next_rewards = get_main_reward(mol_candidates, reward_type)
+        next_rewards = get_main_reward(mol_candidates, reward_type, args=args)
 
         action = np.argmax(next_rewards)
 
@@ -53,7 +53,7 @@ def greedy_rollout(save_path, env, reward_type, K, max_rollout=6):
 
     return start_rew, best_rew
 
-def eval_greedy(artifact_path, env, reward_type, N=30, K=1):
+def eval_greedy(artifact_path, env, reward_type, N=30, K=1, args=None):
     # logging variables
     dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
     save_path = os.path.join(artifact_path, dt + '_greedy.csv')
@@ -62,7 +62,7 @@ def eval_greedy(artifact_path, env, reward_type, N=30, K=1):
     avg_improvement = []
     avg_best = []
     for i in range(N):
-        start_rew, best_rew = greedy_rollout(save_path, env, reward_type, K)
+        start_rew, best_rew = greedy_rollout(save_path, env, reward_type, K, args=args)
         improvement = best_rew - start_rew
         print("{:2d}: {:4.1f} {:4.1f} {:4.1f}\n".format(i+1,
                                                       start_rew,

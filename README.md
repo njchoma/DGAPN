@@ -59,8 +59,7 @@ The flag `--policy_path` should be modified to direct to a trained DGAPN model.
 Molecules will be saved in the artifact directory (set via the `--artifact_path` flag in `main_eval.sh`) as a csv file, where each line contains a molecule's SMILES string and associated docking score.
 
 ## Pre-trained Models
-The trained DGAPN model used in this paper can be found [here](https://github.com/yulun-rayn/SGAnCP4ADD/tree/main/artifact/dgapn).
-After downloading the trained DGAPN model, you can directly run the evaluate command with the trained model to generate molecules.
+A trained DGAPN model can be found [here](https://github.com/yulun-rayn/SGAnCP4ADD/tree/main/artifact/dgapn). After downloading the trained DGAPN model, you can directly run the evaluate command with the trained model to generate molecules.
 
 ## License
 

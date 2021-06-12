@@ -31,10 +31,13 @@ def get_dock_score(states, args=None):
     #Debugging flag
     DEBUG=False
 
-    #Setup parameters (TODO - genearlize/simplify this)
-    obabel_path=OBABEL_PATH
-    adt_path=ADT_PATH
-    receptor_file="./src/reward/adtgpu/receptor/"+RECEPTOR_FILE
+    #Setup parameters
+    if(args and args.obabel_path!=''): obabel_path=args.obabel_path
+    else: obabel_path=OBABEL_PATH
+    if(args and args.adt_path!=''): adt_path=args.adt_path
+    else: adt_path=ADT_PATH
+    if(args and args.receptor_file!=''): receptor_file="./src/reward/adtgpu/receptor/"+args.receptor_file
+    else: receptor_file="./src/reward/adtgpu/receptor/"+RECEPTOR_FILE
     if(args and args.adt_tmp_dir!=''): run_dir="./src/reward/adtgpu/autodockgpu"+str(args.adt_tmp_dir)
     else: run_dir="./src/reward/adtgpu/autodockgpu"
     if(DEBUG): print("adttmp: {}".format(run_dir))

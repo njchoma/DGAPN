@@ -13,25 +13,29 @@ from reward.get_main_reward import get_main_reward
 
 from utils.graph_utils import mols_to_pyg_batch
 
-DEVICE = 'cuda:1' if torch.cuda.is_available() else 'cpu'
-
 def dgapn_rollout(save_path,
-                    policy,
-                    emb_model,
+                    model,
                     env,
                     reward_type,
                     K,
-                    max_rollout=20):
+                    max_rollout=20,
+                    args=None):
+    device = torch.device("cpu") if args.use_cpu else torch.device(
+        'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
+
+    model.to_device(device)
+    model.eval()
+
     mol, mol_candidates, done = env.reset()
     mol_start = mol
     smile_best = Chem.MolToSmiles(mol, isomericSmiles=False)
-    emb_model_3d = emb_model.use_3d if emb_model is not None else policy.use_3d
+    emb_model_3d = model.emb_model.use_3d if model.emb_model is not None else model.use_3d
 
-    g = mols_to_pyg_batch(mol, emb_model_3d, device=DEVICE)
-    if emb_model is not None:
+    g = mols_to_pyg_batch(mol, emb_model_3d, device=device)
+    if model.emb_model is not None:
         with torch.autograd.no_grad():
-            g = emb_model.get_embedding(g, n_layers=policy.emb_nb_shared, return_3d=policy.use_3d, aggr=False)
-    new_rew = get_main_reward(mol, reward_type)[0]
+            g = model.emb_model.get_embedding(g, n_layers=model.emb_nb_shared, return_3d=model.use_3d, aggr=False)
+    new_rew = get_main_reward(mol, reward_type, args=args)[0]
     start_rew = new_rew
     best_rew = new_rew
     steps_remaining = K
@@ -39,14 +43,14 @@ def dgapn_rollout(save_path,
     for i in range(max_rollout):
         print("  {:3d} {:2d} {:4.1f}".format(i+1, steps_remaining, best_rew))
         steps_remaining -= 1
-        g_candidates = mols_to_pyg_batch(mol_candidates, emb_model_3d, device=DEVICE)
-        if emb_model is not None:
+        g_candidates = mols_to_pyg_batch(mol_candidates, emb_model_3d, device=device)
+        if model.emb_model is not None:
             with torch.autograd.no_grad():
-                g_candidates = emb_model.get_embedding(g_candidates, n_layers=policy.emb_nb_shared, return_3d=policy.use_3d, aggr=False)
-        # next_rewards = get_main_reward(mol_candidates, reward_type)
+                g_candidates = model.emb_model.get_embedding(g_candidates, n_layers=model.emb_nb_shared, return_3d=model.use_3d, aggr=False)
+        # next_rewards = get_main_reward(mol_candidates, reward_type, args=args)
 
         with torch.autograd.no_grad():
-            probs, _, _ = policy(g, g_candidates, torch.zeros(len(mol_candidates), dtype=torch.long).to(DEVICE))
+            probs, _, _ = model.policy.actor(g, g_candidates, torch.zeros(len(mol_candidates), dtype=torch.long).to(device))
         max_action = np.argmax(probs.cpu().numpy())
         min_action = np.argmin(probs.cpu().numpy())
 
@@ -54,7 +58,7 @@ def dgapn_rollout(save_path,
         action = max_action
         # print(probs.shape, next_rewards.shape)
         # p = probs.unsqueeze(1)
-        # r = torch.FloatTensor(next_rewards).unsqueeze(1).to(DEVICE)
+        # r = torch.FloatTensor(next_rewards).unsqueeze(1).to(device)
         # c = torch.cat((p, r), dim=1)
         # for s in c:
         #     print("{:5.3f} {:4.1f}".format(s[0], s[1]))
@@ -65,15 +69,15 @@ def dgapn_rollout(save_path,
 
         try:
             # new_rew = next_rewards[action]
-            new_rew = get_main_reward([mol], reward_type)[0]
+            new_rew = get_main_reward([mol], reward_type,args=args)[0]
         except Exception as e:
             print(e)
             break
 
-        g = mols_to_pyg_batch(mol, emb_model_3d, device=DEVICE)
-        if emb_model is not None:
+        g = mols_to_pyg_batch(mol, emb_model_3d, device=device)
+        if model.emb_model is not None:
             with torch.autograd.no_grad():
-                g = emb_model.get_embedding(g, n_layers=policy.emb_nb_shared, return_3d=policy.use_3d, aggr=False)
+                g = model.emb_model.get_embedding(g, n_layers=model.emb_nb_shared, return_3d=model.use_3d, aggr=False)
 
         if new_rew > best_rew:
             smile_best = Chem.MolToSmiles(mol, isomericSmiles=False)
@@ -92,27 +96,21 @@ def dgapn_rollout(save_path,
 
     return start_rew, best_rew
 
-def eval_dgapn(artifact_path, policy, emb_model, env, reward_type, N=120, K=1):
+def eval_dgapn(artifact_path, model, env, reward_type, N=120, K=1, args=None):
     # logging variables
     dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
     save_path = os.path.join(artifact_path, dt + '_dgapn.csv')
-
-    policy = policy.to(DEVICE)
-    policy.eval()
-    if emb_model is not None:
-        emb_model = emb_model.to(DEVICE)
-        emb_model.eval()
 
     print("\nStarting dgapn eval...\n")
     avg_improvement = []
     avg_best = []
     for i in range(N):
         start_rew, best_rew = dgapn_rollout(save_path,
-                                            policy,
-                                            emb_model,
+                                            model,
                                             env,
                                             reward_type,
-                                            K)
+                                            K,
+                                            args=args)
         improvement = best_rew - start_rew
         print("Improvement ", improvement)
         print("{:2d}: {:4.1f} {:4.1f} {:4.1f}".format(i+1,

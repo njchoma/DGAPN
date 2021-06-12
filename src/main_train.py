@@ -70,6 +70,10 @@ def molecule_arg_parser():
     add_arg('--rnd_num_output', type=int, default=8)
 
     # AUTODOCK PARAMETERS
+    add_arg('--obabel_path', default='')
+    add_arg('--adt_path', default='')
+    add_arg('--receptor_file', default='')
+
     add_arg('--adt_tmp_dir', default='')
 
     return parser

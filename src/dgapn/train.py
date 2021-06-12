@@ -115,7 +115,7 @@ def train_gpu_sync(args, embed_model, env):
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
 
-    policy = DGAPN(lr,
+    model = DGAPN(lr,
                 betas,
                 eps,
                 args.eta,
@@ -136,9 +136,9 @@ def train_gpu_sync(args, embed_model, env):
                 args.rnd_num_hidden,
                 args.rnd_num_output)
     if args.running_model_path != '':
-        policy = torch.load(args.running_model_path)
-    policy.to_device(device)
-    logging.info(policy)
+        model = torch.load(args.running_model_path)
+    model.to_device(device)
+    logging.info(model)
 
     sample_count = 0
     episode_count = 0
@@ -175,7 +175,7 @@ def train_gpu_sync(args, embed_model, env):
         while True:
             # action selections (for not done)
             if len(notdone_idx) > 0:
-                states_emb, candidates_emb, action_logprobs, actions = policy.select_action(
+                states_emb, candidates_emb, action_logprobs, actions = model.select_action(
                     [Chem.MolFromSmiles(mols[idx]) for idx in notdone_idx],
                     [Chem.MolFromSmiles(item) for sublist in candidates for item in sublist], batch_idx)
                 if not isinstance(action_logprobs, list):
@@ -245,7 +245,7 @@ def train_gpu_sync(args, embed_model, env):
                 i_episode > args.innovation_reward_episode_delay and 
                 i_episode < args.innovation_reward_episode_cutoff):
                 if len(notdone_idx) > 0:
-                    inno_rewards = policy.get_inno_reward(
+                    inno_rewards = model.get_inno_reward(
                         [Chem.MolFromSmiles(mols[idx]) for idx in notdone_idx])
                     if not isinstance(inno_rewards, list):
                         inno_rewards = [inno_rewards]
@@ -268,8 +268,8 @@ def train_gpu_sync(args, embed_model, env):
             memory.extend(m)
             m.clear()
         # update model
-        logging.info("\n\nupdating policy @ episode %d..." % i_episode)
-        policy.update(memory)
+        logging.info("\n\nupdating model @ episode %d..." % i_episode)
+        model.update(memory)
         memory.clear()
 
         save_counter += episode_count
@@ -278,17 +278,17 @@ def train_gpu_sync(args, embed_model, env):
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > args.solved_reward:
             logging.info("########## Solved! ##########")
-            torch.save(policy, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
+            torch.save(model, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
             break
 
         # save every 500 episodes
         if save_counter >= args.save_interval:
-            torch.save(policy, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
+            torch.save(model, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
             deque_to_csv(molbuffer_env, os.path.join(save_dir, 'mol_dgapn.csv'))
             save_counter = 0
 
         # save running model
-        torch.save(policy, os.path.join(save_dir, 'running_dgapn.pth'))
+        torch.save(model, os.path.join(save_dir, 'running_dgapn.pth'))
 
         if log_counter >= args.log_interval:
             avg_length = int(avg_length / log_counter)
@@ -328,7 +328,7 @@ def train_serial(args, embed_model, env):
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
 
-    policy = DGAPN(lr,
+    model = DGAPN(lr,
                 betas,
                 eps,
                 args.eta,
@@ -349,9 +349,9 @@ def train_serial(args, embed_model, env):
                 args.rnd_num_hidden,
                 args.rnd_num_output)
     if args.running_model_path != '':
-        policy = torch.load(args.running_model_path)
-    policy.to_device(device)
-    logging.info(policy)
+        model = torch.load(args.running_model_path)
+    model.to_device(device)
+    logging.info(model)
 
     time_step = 0
 
@@ -369,7 +369,7 @@ def train_serial(args, embed_model, env):
         for t in range(args.max_timesteps):
             time_step += 1
             # Running policy_old:
-            state_emb, candidates_emb, action_logprob, action = policy.select_action(state, candidates)
+            state_emb, candidates_emb, action_logprob, action = model.select_action(state, candidates)
             memory.states.append(state_emb[0])
             memory.candidates.append(candidates_emb)
             memory.actions.append(action)
@@ -388,7 +388,7 @@ def train_serial(args, embed_model, env):
             if (args.iota > 0 and 
                 i_episode > args.innovation_reward_episode_delay and 
                 i_episode < args.innovation_reward_episode_cutoff):
-                inno_reward = policy.get_inno_reward(state)
+                inno_reward = model.get_inno_reward(state)
                 reward += inno_reward
 
             # Saving reward and is_terminals:
@@ -401,9 +401,9 @@ def train_serial(args, embed_model, env):
 
         # update if it's time
         if time_step >= args.update_timesteps:
-            logging.info("\n\nupdating policy @ episode %d..." % i_episode)
+            logging.info("\n\nupdating model @ episode %d..." % i_episode)
             time_step = 0
-            policy.update(memory)
+            model.update(memory)
             memory.clear()
 
         writer.add_scalar("EpMainRew", main_reward, i_episode-1)
@@ -417,16 +417,16 @@ def train_serial(args, embed_model, env):
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > args.solved_reward:
             logging.info("########## Solved! ##########")
-            torch.save(policy, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
+            torch.save(model, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
             break
 
         # save every save_interval episodes
         if (i_episode-1) % args.save_interval == 0:
-            torch.save(policy, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
+            torch.save(model, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
             deque_to_csv(molbuffer_env, os.path.join(save_dir, 'mol_dgapn.csv'))
 
         # save running model
-        torch.save(policy, os.path.join(save_dir, 'running_dgapn.pth'))
+        torch.save(model, os.path.join(save_dir, 'running_dgapn.pth'))
 
         # logging
         if i_episode % args.log_interval == 0:

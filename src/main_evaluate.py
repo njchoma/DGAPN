@@ -21,9 +21,11 @@ def molecule_arg_parser():
     add_arg('--warm_start_dataset_path', required=True)
     add_arg('--artifact_path', required=True)
     add_arg('--name', default='default_run')
-    add_arg('--greedy', action='store_true')
+    add_arg('--use_cpu', action='store_true')
+    add_arg('--gpu', default='0')
 
-    add_arg('--policy_path', default='')
+    add_arg('--greedy', action='store_true')
+    add_arg('--model_path', default='')
 
     add_arg('--reward_type', type=str, default='plogp', help='plogp;logp;dock')
 
@@ -32,10 +34,17 @@ def molecule_arg_parser():
     add_arg('--nb_test', type=int, default=50)
     add_arg('--nb_bad_steps', type=int, default=5)
 
+    # AUTODOCK PARAMETERS
+    add_arg('--obabel_path', default='')
+    add_arg('--adt_path', default='')
+    add_arg('--receptor_file', default='')
+
+    add_arg('--adt_tmp_dir', default='')
+
     return parser
 
-def load_dgapn(policy_path):
-    dgapn_model = torch.load(policy_path, map_location='cpu')
+def load_dgapn(model_path):
+    dgapn_model = torch.load(model_path, map_location='cpu')
     print("DGAPN model loaded")
     return dgapn_model
 
@@ -57,20 +66,19 @@ def main():
                     env,
                     args.reward_type,
                     N = args.nb_test,
-                    K = args.nb_bad_steps)
+                    K = args.nb_bad_steps,
+                    args = args)
     else:
         # DGAPN
-        dgapn = load_dgapn(args.policy_path)
-        policy = dgapn.policy.actor
-        emb_model = dgapn.emb_model
-        print(policy)
+        model = load_dgapn(args.model_path)
+        print(model)
         eval_dgapn(artifact_path,
-                    policy,
-                    emb_model,
+                    model,
                     env,
                     args.reward_type,
                     N = args.nb_test,
-                    K = args.nb_bad_steps)
+                    K = args.nb_bad_steps,
+                    args = args)
 
 
 if __name__ == '__main__':
