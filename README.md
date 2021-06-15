@@ -43,7 +43,7 @@ Once the conda environment and Autodock-GPU are set up, the function call to tra
 ./main_train.sh &
 ```
 
-A list of flags may be found in `main_dgapn.sh` and `src/main_dgapn.py` for experimentation with different network and training parameters. The run log and models are saved under `*artifact_path*/*name*/saves`, and the tensorboard log is saved under `*artifact_path*/*name*/runs`.
+A list of flags may be found in `main_dgapn.sh` and `src/main_dgapn.py` for experimentation with different network and training parameters (`--reward_type dock` only if docking software has been set up). The run log and models are saved under `*artifact_path*/*name*/saves`, and the tensorboard log is saved under `*artifact_path*/*name*/runs`.
 
 If you wish to produce a pre-trained graph embedding model for DGAPN training, or just want to try out supervised learning with sGAT, check out `src/gnn_embed` for the submodule instructions (installation steps can be skipped if a DGAPN environment is already established).
 

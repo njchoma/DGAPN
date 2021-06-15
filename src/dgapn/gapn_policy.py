@@ -234,6 +234,7 @@ class GAPN_Actor(nn.Module):
     def evaluate(self, g, g_candidates, actions, batch_idx):
         Q = self.gnn.get_embedding(g, detach=False)
         K = self.gnn.get_embedding(g_candidates, detach=False)
+
         for ql, kl in zip(self.Q_layers, self.K_layers):
             Q = self.act(ql(Q))
             K = self.act(kl(K))
