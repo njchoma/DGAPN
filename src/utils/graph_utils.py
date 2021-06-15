@@ -123,7 +123,7 @@ def mol_to_pyg_graph(mol, idm=False, ratio=2.):
 
 def mols_to_pyg_batch(mols, idm=False, ratio=2., device=None):
     if not isinstance(mols, list):
-            mols = [mols]
+        mols = [mols]
     graphs = [mol_to_pyg_graph(mol, idm, ratio) for mol in mols]
 
     g1 = Batch().from_data_list([graph[0] for graph in graphs])
@@ -195,17 +195,6 @@ def state_to_pyg(atoms, bonds):
     if mol is None:
         raise TypeError("Mol is None.")
     return mol_to_pyg_graph(mol)
-
-def wrap_state(ob):
-    adj = ob['adj']
-    nodes = ob['node'].squeeze()
-
-    adj = torch.Tensor(adj)
-    nodes = torch.Tensor(nodes)
-
-    adj = [dense_to_sparse(a) for a in adj]
-    data = Data(x=nodes, edge_index=adj[0][0], edge_attr=adj[0][1])
-    return data
 
 def get_batch_shift(pyg_batch):
     unique = torch.flip(torch.unique(pyg_batch.cpu(), sorted=False).to(pyg_batch.device), dims=(0,)) # temp fix due to torch.unique bug
