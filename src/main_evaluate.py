@@ -3,9 +3,8 @@ import argparse
 
 import torch
 
-from utils.general_utils import load_model
-
 from dgapn.DGAPN import init_DGAPN
+from utils.general_utils import load_model
 from environment.env import CReM_Env
 
 from evaluate.eval_dgapn import eval_dgapn

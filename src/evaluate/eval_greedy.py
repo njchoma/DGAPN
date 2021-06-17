@@ -10,7 +10,6 @@ from reward.get_main_reward import get_main_reward
 
 def greedy_rollout(save_path, env, reward_type, K, max_rollout=6, args=None):
     mol, mol_candidates, done = env.reset()
-    mol_start = mol
     mol_best = mol
 
     new_rew = get_main_reward(mol, reward_type, args=args)[0]

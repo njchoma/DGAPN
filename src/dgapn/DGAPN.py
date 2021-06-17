@@ -207,7 +207,7 @@ class DGAPN(nn.Module):
         # Optimize policy for k epochs:
         logging.info("Optimizing...")
 
-        for i in range(self.k_epochs):
+        for i in range(1, self.k_epochs+1):
             loss, baseline_loss = self.policy.update(states, candidates, actions, rewards, old_logprobs, old_values, batch_idx)
             rnd_loss = self.explore_critic.update(states_next)
             if (i%10)==0:
