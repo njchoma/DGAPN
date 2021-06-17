@@ -12,12 +12,44 @@ import torch
 import torch.multiprocessing as mp
 from torch.utils.tensorboard import SummaryWriter
 
-from .DGAPN import DGAPN, Memory
+from .DGAPN import DGAPN, load_DGAPN, save_DGAPN
 
 from reward.get_main_reward import get_main_reward
 
 from utils.general_utils import initialize_logger, close_logger, deque_to_csv
 from utils.graph_utils import mols_to_pyg_batch
+
+#####################################################
+#                   HELPER MODULES                  #
+#####################################################
+
+class Memory:
+    def __init__(self):
+        self.states = []        # state representations: pyg graph
+        self.candidates = []    # next state (candidate) representations: pyg graph
+        self.states_next = []   # next state (chosen) representations: pyg graph
+        self.actions = []       # action index: long
+        self.logprobs = []      # action log probabilities: float
+        self.rewards = []       # rewards: float
+        self.terminals = []     # trajectory status: logical
+
+    def extend(self, memory):
+        self.states.extend(memory.states)
+        self.candidates.extend(memory.candidates)
+        self.states_next.extend(memory.states_next)
+        self.actions.extend(memory.actions)
+        self.logprobs.extend(memory.logprobs)
+        self.rewards.extend(memory.rewards)
+        self.terminals.extend(memory.terminals)
+
+    def clear(self):
+        del self.states[:]
+        del self.candidates[:]
+        del self.states_next[:]
+        del self.actions[:]
+        del self.logprobs[:]
+        del self.rewards[:]
+        del self.terminals[:]
 
 #####################################################
 #                      PROCESS                      #
@@ -102,7 +134,7 @@ class Result(object):
 #                   TRAINING LOOP                   #
 #####################################################
 
-def train_gpu_sync(args, embed_model, env):
+def train_gpu_sync(args, env):
     lr = (args.actor_lr, args.critic_lr, args.rnd_lr)
     betas = (args.beta1, args.beta2)
     eps = args.eps
@@ -123,28 +155,29 @@ def train_gpu_sync(args, embed_model, env):
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
 
-    model = DGAPN(lr,
-                betas,
-                eps,
-                args.eta,
-                args.gamma,
-                args.eps_clip,
-                args.k_epochs,
-                embed_model,
-                args.emb_nb_shared,
-                args.input_size,
-                args.nb_edge_types,
-                args.use_3d,
-                args.gnn_nb_layers,
-                args.gnn_nb_hidden,
-                args.enc_num_layers,
-                args.enc_num_hidden,
-                args.enc_num_output,
-                args.rnd_num_layers,
-                args.rnd_num_hidden,
-                args.rnd_num_output)
     if args.running_model_path != '':
-        model = torch.load(args.running_model_path)
+        model = load_DGAPN(args.running_model_path)
+    else:
+        model = DGAPN(lr,
+                    betas,
+                    eps,
+                    args.eta,
+                    args.gamma,
+                    args.eps_clip,
+                    args.k_epochs,
+                    args.embed_state,
+                    args.emb_nb_shared,
+                    args.input_size,
+                    args.nb_edge_types,
+                    args.use_3d,
+                    args.gnn_nb_layers,
+                    args.gnn_nb_hidden,
+                    args.enc_num_layers,
+                    args.enc_num_hidden,
+                    args.enc_num_output,
+                    args.rnd_num_layers,
+                    args.rnd_num_hidden,
+                    args.rnd_num_output)
     model.to_device(device)
     logging.info(model)
 
@@ -292,17 +325,17 @@ def train_gpu_sync(args, embed_model, env):
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > args.solved_reward:
             logging.info("########## Solved! ##########")
-            torch.save(model, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
+            save_DGAPN(model, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
             break
 
         # save every 500 episodes
         if save_counter >= args.save_interval:
-            torch.save(model, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
+            save_DGAPN(model, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
             deque_to_csv(molbuffer_env, os.path.join(save_dir, 'mol_dgapn.csv'))
             save_counter = 0
 
         # save running model
-        torch.save(model, os.path.join(save_dir, 'running_dgapn.pth'))
+        save_DGAPN(model, os.path.join(save_dir, 'running_dgapn.pth'))
 
         if log_counter >= args.log_interval:
             avg_length = int(avg_length / log_counter)
@@ -326,7 +359,7 @@ def train_gpu_sync(args, embed_model, env):
         tasks.put(None)
     tasks.join()
 
-def train_serial(args, embed_model, env):
+def train_serial(args, env):
     lr = (args.actor_lr, args.critic_lr, args.rnd_lr)
     betas = (args.beta1, args.beta2)
     eps = args.eps
@@ -342,28 +375,29 @@ def train_serial(args, embed_model, env):
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
 
-    model = DGAPN(lr,
-                betas,
-                eps,
-                args.eta,
-                args.gamma,
-                args.eps_clip,
-                args.k_epochs,
-                embed_model,
-                args.emb_nb_shared,
-                args.input_size,
-                args.nb_edge_types,
-                args.use_3d,
-                args.gnn_nb_layers,
-                args.gnn_nb_hidden,
-                args.enc_num_layers,
-                args.enc_num_hidden,
-                args.enc_num_output,
-                args.rnd_num_layers,
-                args.rnd_num_hidden,
-                args.rnd_num_output)
     if args.running_model_path != '':
-        model = torch.load(args.running_model_path)
+        model = load_DGAPN(args.running_model_path)
+    else:
+        model = DGAPN(lr,
+                    betas,
+                    eps,
+                    args.eta,
+                    args.gamma,
+                    args.eps_clip,
+                    args.k_epochs,
+                    args.embed_state,
+                    args.emb_nb_shared,
+                    args.input_size,
+                    args.nb_edge_types,
+                    args.use_3d,
+                    args.gnn_nb_layers,
+                    args.gnn_nb_hidden,
+                    args.enc_num_layers,
+                    args.enc_num_hidden,
+                    args.enc_num_output,
+                    args.rnd_num_layers,
+                    args.rnd_num_hidden,
+                    args.rnd_num_output)
     model.to_device(device)
     logging.info(model)
 
@@ -434,16 +468,16 @@ def train_serial(args, embed_model, env):
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > args.solved_reward:
             logging.info("########## Solved! ##########")
-            torch.save(model, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
+            save_DGAPN(model, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
             break
 
         # save every save_interval episodes
         if (i_episode-1) % args.save_interval == 0:
-            torch.save(model, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
+            save_DGAPN(model, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
             deque_to_csv(molbuffer_env, os.path.join(save_dir, 'mol_dgapn.csv'))
 
         # save running model
-        torch.save(model, os.path.join(save_dir, 'running_dgapn.pth'))
+        save_DGAPN(model, os.path.join(save_dir, 'running_dgapn.pth'))
 
         # logging
         if i_episode % args.log_interval == 0:

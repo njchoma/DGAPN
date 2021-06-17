@@ -4,13 +4,13 @@
 python=3.8
 
 gym=0.18.0
-bzip2=1.0.8
-networkx=2.5.1
-numpy=1.20.2
-pyyaml=5.4.1
-rdkit=2021.03.1
-scikit-learn=0.24.2
-scipy=1.6.3
-tensorboard=2.5.0
 tqdm=4.60.0
+bzip2=1.0.8
+numpy=1.20.2
+scipy=1.6.3
+pyyaml=5.4.1
+networkx=2.5.1
 python-wget=3.2
+tensorboard=2.5.0
+
+rdkit=2021.03.1

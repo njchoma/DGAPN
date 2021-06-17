@@ -1,6 +1,7 @@
 import os
 import csv
 import wget
+import torch
 import logging
 
 def initialize_logger(artifact_path, name=None, level='INFO'):
@@ -35,6 +36,16 @@ def maybe_download_file(file_path, url, file_descriptor):
     else:
         print("{} found.".format(file_descriptor))
     print()
+
+def load_model(artifact_path, model_url, model_path, name='model'):
+    if model_url != '':
+        model_path = os.path.join(artifact_path, '%s.pt' % name)
+
+        maybe_download_file(model_path,
+                            model_url,
+                            name)
+    state = torch.load(model_path)
+    return state
 
 def deque_to_csv(que, save_path):
     with open(save_path, "w", newline="") as f:

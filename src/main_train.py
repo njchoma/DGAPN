@@ -4,13 +4,11 @@ import argparse
 import torch
 import torch.multiprocessing as mp
 
-from gnn_embed import load_sGAT
-
 from dgapn.train import train_gpu_sync, train_serial
-from utils.general_utils import maybe_download_file
+from utils.general_utils import load_model
 from environment.env import CReM_Env
 
-def molecule_arg_parser():
+def read_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -20,6 +18,7 @@ def molecule_arg_parser():
     add_arg('--data_path', required=True)
     add_arg('--artifact_path', required=True)
     add_arg('--name', default='default_run')
+    add_arg('--run_id', default='')
     add_arg('--use_cpu', action='store_true')
     add_arg('--gpu', default='0')
     add_arg('--nb_procs', type=int, default=4)
@@ -28,7 +27,7 @@ def molecule_arg_parser():
     add_arg('--warm_start_dataset', default='')
     add_arg('--running_model_path', default='')
     add_arg('--log_interval', type=int, default=20)         # print avg reward in the interval
-    add_arg('--save_interval', type=int, default=500)       # save model in the interval
+    add_arg('--save_interval', type=int, default=400)       # save model in the interval
 
     add_arg('--reward_type', type=str, default='plogp', help='plogp;logp;dock')
 
@@ -40,7 +39,7 @@ def molecule_arg_parser():
     add_arg('--solved_reward', type=float, default=100)     # stop training if avg_reward > solved_reward
     add_arg('--max_episodes', type=int, default=50000)      # max training episodes
     add_arg('--max_timesteps', type=int, default=12)        # max timesteps in one episode
-    add_arg('--update_timesteps', type=int, default=300)    # update policy every n timesteps
+    add_arg('--update_timesteps', type=int, default=200)    # update policy every n timesteps
     add_arg('--k_epochs', type=int, default=50)             # update policy for K epochs
     add_arg('--eps_clip', type=float, default=0.2)          # clip parameter for PPO
     add_arg('--gamma', type=float, default=0.99)            # discount factor
@@ -74,37 +73,24 @@ def molecule_arg_parser():
     add_arg('--adt_path', default='')
     add_arg('--receptor_file', default='')
 
-    add_arg('--adt_tmp_dir', default='')
-
-    return parser
-
-def load_embed_model(artifact_path, embed_model_url, embed_model_path):
-    if embed_model_url != '':
-        embed_model_path = os.path.join(artifact_path, 'embed_model.pt')
-
-        maybe_download_file(embed_model_path,
-                            embed_model_url,
-                            'embed model')
-    embed_model = load_sGAT(embed_model_path)
-    print("embed model loaded")
-    return embed_model
+    return parser.parse_args()
 
 def main():
-    args = molecule_arg_parser().parse_args()
+    args = read_args()
     #args.nb_procs = mp.cpu_count()
 
-    embed_model = None
+    embed_state = None
     if args.embed_model_url != '' or args.embed_model_path != '':
-        embed_model = load_embed_model(args.artifact_path,
-                                            args.embed_model_url,
-                                            args.embed_model_path)
-        embed_model.eval()
-        print(embed_model)
-        assert args.emb_nb_shared <= embed_model.nb_layers
-        if not embed_model.use_3d:
+        embed_state = load_model(args.artifact_path,
+                                    args.embed_model_url,
+                                    args.embed_model_path,
+                                    name='embed_model')
+        assert args.emb_nb_shared <= embed_state['nb_layers']
+        if not embed_state['use_3d']:
             assert not args.use_3d
-        args.input_size = embed_model.nb_hidden
-        args.nb_edge_types = embed_model.nb_edge_types
+        args.input_size = embed_state['nb_hidden']
+        args.nb_edge_types = embed_state['nb_edge_types']
+    args.embed_state = embed_state
 
     env = CReM_Env(args.data_path, args.warm_start_dataset, mode='mol')
     #ob, _, _ = env.reset()
@@ -113,9 +99,9 @@ def main():
     print("====args====\n", args)
 
     if args.nb_procs > 1:
-        train_gpu_sync(args, embed_model, env)
+        train_gpu_sync(args, env)
     else:
-        train_serial(args, embed_model, env)
+        train_serial(args, env)
 
 if __name__ == '__main__':
     mp.set_start_method('fork', force=True)

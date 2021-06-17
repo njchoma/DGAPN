@@ -6,6 +6,8 @@ import torch.nn as nn
 import torch_geometric as pyg
 from torch_geometric.data import Data, Batch
 
+from gnn_embed import init_sGAT
+
 from .gapn_policy import ActorCriticGAPN
 from .rnd_explore import RNDistillation
 
@@ -13,33 +15,37 @@ from .rnd_explore import RNDistillation
 #                   HELPER MODULES                  #
 #####################################################
 
-class Memory:
-    def __init__(self):
-        self.states = []        # state representations: pyg graph
-        self.candidates = []    # next state (candidate) representations: pyg graph
-        self.states_next = []   # next state (chosen) representations: pyg graph
-        self.actions = []       # action index: long
-        self.logprobs = []      # action log probabilities: float
-        self.rewards = []       # rewards: float
-        self.terminals = []     # trajectory status: logical
+def init_DGAPN(state):
+    net = DGAPN(state['lr'],
+                state['betas'],
+                state['eps'],
+                state['eta'],
+                state['gamma'],
+                state['eps_clip'],
+                state['k_epochs'],
+                state['emb_state'],
+                state['emb_nb_shared'],
+                state['input_dim'],
+                state['nb_edge_types'],
+                state['use_3d'],
+                state['gnn_nb_layers'],
+                state['gnn_nb_hidden'],
+                state['enc_nb_layers'],
+                state['enc_nb_hidden'],
+                state['enc_nb_output'],
+                state['rnd_nb_layers'],
+                state['rnd_nb_hidden'],
+                state['rnd_nb_output'],
+                state['use_3d'])
+    net.load_state_dict(state['state_dict'])
+    return net
 
-    def extend(self, memory):
-        self.states.extend(memory.states)
-        self.candidates.extend(memory.candidates)
-        self.states_next.extend(memory.states_next)
-        self.actions.extend(memory.actions)
-        self.logprobs.extend(memory.logprobs)
-        self.rewards.extend(memory.rewards)
-        self.terminals.extend(memory.terminals)
+def load_DGAPN(state_path):
+    state = torch.load(state_path)
+    return init_DGAPN(state)
 
-    def clear(self):
-        del self.states[:]
-        del self.candidates[:]
-        del self.states_next[:]
-        del self.actions[:]
-        del self.logprobs[:]
-        del self.rewards[:]
-        del self.terminals[:]
+def save_DGAPN(net, state_path=None):
+    torch.save(net.get_dict(), state_path)
 
 #################################################
 #                  MAIN MODEL                   #
@@ -54,7 +60,7 @@ class DGAPN(nn.Module):
                  gamma,
                  eps_clip,
                  k_epochs,
-                 emb_model,
+                 emb_state,
                  emb_nb_shared,
                  input_dim,
                  nb_edge_types,
@@ -68,12 +74,36 @@ class DGAPN(nn.Module):
                  rnd_nb_hidden,
                  rnd_nb_output):
         super(DGAPN, self).__init__()
-        self.gamma = gamma
-        self.k_epochs = k_epochs
-        self.use_3d = use_3d
+        if emb_state is not None:
+            emb_model = init_sGAT(emb_state)
+            print("embed model loaded")
+            emb_model.eval()
+            print(emb_model)
+        else:
+            emb_model = None
         self.emb_model = emb_model
         self.emb_3d = emb_model.use_3d if emb_model is not None else use_3d
-        self.emb_nb_shared = emb_nb_shared
+
+        self.lr=lr
+        self.betas=betas
+        self.eps=eps
+        self.eta=eta
+        self.gamma=gamma
+        self.eps_clip=eps_clip
+        self.k_epochs=k_epochs
+        self.emb_state=emb_state
+        self.emb_nb_shared=emb_nb_shared
+        self.input_dim=input_dim
+        self.nb_edge_types=nb_edge_types
+        self.use_3d=use_3d
+        self.gnn_nb_layers=gnn_nb_layers
+        self.gnn_nb_hidden=gnn_nb_hidden
+        self.enc_nb_layers=enc_nb_layers
+        self.enc_nb_hidden=enc_nb_hidden
+        self.enc_nb_output=enc_nb_output
+        self.rnd_nb_layers=rnd_nb_layers
+        self.rnd_nb_hidden=rnd_nb_hidden
+        self.rnd_nb_output=rnd_nb_output
 
         self.policy = ActorCriticGAPN(lr[:2],
                                       betas,
@@ -182,6 +212,30 @@ class DGAPN(nn.Module):
             rnd_loss = self.explore_critic.update(states_next)
             if (i%10)==0:
                 logging.info("  {:3d}: Actor Loss: {:7.3f}, Critic Loss: {:7.3f}, RND Loss: {:7.3f}".format(i, loss, baseline_loss, rnd_loss))
+
+    def get_dict(self):
+        state = {'state_dict': self.state_dict(),
+                    'lr': self.lr,
+                    'betas': self.betas,
+                    'eps': self.eps,
+                    'eta': self.eta,
+                    'gamma': self.gamma,
+                    'eps_clip': self.eps_clip,
+                    'k_epochs': self.k_epochs,
+                    'emb_state': self.emb_state,
+                    'emb_nb_shared': self.emb_nb_shared,
+                    'input_dim': self.input_dim,
+                    'nb_edge_types': self.nb_edge_types,
+                    'use_3d': self.use_3d,
+                    'gnn_nb_layers': self.gnn_nb_layers,
+                    'gnn_nb_hidden': self.gnn_nb_hidden,
+                    'enc_nb_layers': self.enc_nb_layers,
+                    'enc_nb_hidden': self.enc_nb_hidden,
+                    'enc_nb_output': self.enc_nb_output,
+                    'rnd_nb_layers': self.rnd_nb_layers,
+                    'rnd_nb_hidden': self.rnd_nb_hidden,
+                    'rnd_nb_output': self.rnd_nb_output}
+        return state
 
     def __repr__(self):
         return "{}\n".format(repr(self.policy))

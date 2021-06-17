@@ -49,7 +49,7 @@ If you wish to produce a pre-trained graph embedding model for DGAPN training, o
 
 ## Evaluation
 
-After training a model, use `main_eval.sh` to produce and evaluate molecules. The flag `--policy_path` should be modified to direct to a trained DGAPN model.
+After training a model, use `main_eval.sh` to produce and evaluate molecules. The flag `--model_path` should be modified to direct to a trained DGAPN model.
 
 ```bash
 ./main_evaluate.sh

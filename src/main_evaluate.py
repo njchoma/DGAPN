@@ -3,14 +3,15 @@ import argparse
 
 import torch
 
-from utils.general_utils import maybe_download_file
+from utils.general_utils import load_model
 
+from dgapn.DGAPN import init_DGAPN
 from environment.env import CReM_Env
 
 from evaluate.eval_dgapn import eval_dgapn
 from evaluate.eval_greedy import eval_greedy
 
-def molecule_arg_parser():
+def read_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -21,10 +22,12 @@ def molecule_arg_parser():
     add_arg('--warm_start_dataset', required=True)
     add_arg('--artifact_path', required=True)
     add_arg('--name', default='default_run')
+    add_arg('--run_id', default='')
     add_arg('--use_cpu', action='store_true')
     add_arg('--gpu', default='0')
 
     add_arg('--greedy', action='store_true')
+    add_arg('--model_url', default='')
     add_arg('--model_path', default='')
 
     add_arg('--reward_type', type=str, default='plogp', help='plogp;logp;dock')
@@ -39,17 +42,10 @@ def molecule_arg_parser():
     add_arg('--adt_path', default='')
     add_arg('--receptor_file', default='')
 
-    add_arg('--adt_tmp_dir', default='')
-
-    return parser
-
-def load_dgapn(model_path):
-    dgapn_model = torch.load(model_path, map_location='cpu')
-    print("DGAPN model loaded")
-    return dgapn_model
+    return parser.parse_args()
 
 def main():
-    args = molecule_arg_parser().parse_args()
+    args = read_args()
     print("====args====\n", args)
 
     env = CReM_Env(args.data_path,
@@ -70,7 +66,8 @@ def main():
                     args = args)
     else:
         # DGAPN
-        model = load_dgapn(args.model_path)
+        state = load_model(artifact_path, args.model_url, args.model_path, name='model')
+        model = init_DGAPN(state)
         print(model)
         eval_dgapn(artifact_path,
                     model,
