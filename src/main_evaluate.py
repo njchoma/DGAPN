@@ -18,7 +18,7 @@ def molecule_arg_parser():
 
     # EXPERIMENT PARAMETERS
     add_arg('--data_path', required=True)
-    add_arg('--warm_start_dataset_path', required=True)
+    add_arg('--warm_start_dataset', required=True)
     add_arg('--artifact_path', required=True)
     add_arg('--name', default='default_run')
     add_arg('--use_cpu', action='store_true')
@@ -53,7 +53,7 @@ def main():
     print("====args====\n", args)
 
     env = CReM_Env(args.data_path,
-                args.warm_start_dataset_path,
+                args.warm_start_dataset,
                 nb_sample_crem = args.nb_sample_crem,
                 mode='mol')
 

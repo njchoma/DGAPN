@@ -1,4 +1,5 @@
 import os
+import gym
 import random
 from rdkit import Chem
 from crem.crem import mutate_mol
@@ -16,7 +17,7 @@ class CReM_Env(object):
                  warm_start_dataset,
                  nb_sample_crem = 16,
                  nb_cores = 1,
-                 mode = 'pyg'):
+                 mode = 'mol'):
         self.scores, self.smiles = preprocess.main(os.path.join(data_path, warm_start_dataset))
         self.nb_sample_crem = nb_sample_crem
         self.nb_cores = nb_cores

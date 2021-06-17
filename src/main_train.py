@@ -4,10 +4,10 @@ import argparse
 import torch
 import torch.multiprocessing as mp
 
-from dgapn.train import train_gpu_sync, train_serial
-
-from utils.general_utils import maybe_download_file
 from gnn_embed import load_sGAT
+
+from dgapn.train import train_gpu_sync, train_serial
+from utils.general_utils import maybe_download_file
 from environment.env import CReM_Env
 
 def molecule_arg_parser():

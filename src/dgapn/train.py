@@ -40,9 +40,13 @@ class Worker(mp.Process):
 
     def run(self):
         # input:
-        ## None:                    kill
-        ## (None, _, _):            dummy task
-        ## (index, state, done):    trajectory id, molecule smiles, trajectory status
+        ## None:                                kill
+        ## (None, None, True):                  dummy task
+        ## (index, state, done):                trajectory id, molecule smiles, trajectory status
+        #
+        # output:
+        ## (None, None, None, True):            dummy task
+        ## (index, state, candidates, done):    trajectory id, molecule smiles, candidate smiles, trajectory status
         proc_name = self.name
         while True:
             next_task = self.task_queue.get()
@@ -185,7 +189,7 @@ def train_gpu_sync(args, embed_model, env):
                     mols_to_pyg_batch([Chem.MolFromSmiles(item) 
                         for sublist in candidates for item in sublist], model.emb_3d, device=model.device),
                     batch_idx)
-                if not isinstance(action_logprobs, list):
+                if not isinstance(actions, list):
                     action_logprobs = [action_logprobs]
                     actions = [actions]
             else:
@@ -194,9 +198,11 @@ def train_gpu_sync(args, embed_model, env):
 
             for i, idx in enumerate(notdone_idx):
                 tasks.put((idx, candidates[i][actions[i]], False))
+                cands = [data for j, data in enumerate(candidates_emb) if batch_idx[j] == idx]
 
                 memories[idx].states.append(states_emb[i])
-                memories[idx].candidates.append([data for j, data in enumerate(candidates_emb) if batch_idx[j] == idx])
+                memories[idx].candidates.append(cands)
+                memories[idx].states_next.append(cands[actions[i]])
                 memories[idx].actions.append(actions[i])
                 memories[idx].logprobs.append(action_logprobs[i])
             for idx in done_idx:
@@ -382,6 +388,7 @@ def train_serial(args, embed_model, env):
                 mols_to_pyg_batch(candidates, model.emb_3d, device=model.device))
             memory.states.append(state_emb[0])
             memory.candidates.append(candidates_emb)
+            memory.states_next.append(candidates_emb[action])
             memory.actions.append(action)
             memory.logprobs.append(action_logprob)
 

@@ -15,25 +15,28 @@ from .rnd_explore import RNDistillation
 
 class Memory:
     def __init__(self):
-        self.actions = []       # action index: long
         self.states = []        # state representations: pyg graph
-        self.candidates = []    # next state candidate representations: pyg graph
+        self.candidates = []    # next state (candidate) representations: pyg graph
+        self.states_next = []   # next state (chosen) representations: pyg graph
+        self.actions = []       # action index: long
         self.logprobs = []      # action log probabilities: float
         self.rewards = []       # rewards: float
         self.terminals = []     # trajectory status: logical
 
     def extend(self, memory):
-        self.actions.extend(memory.actions)
         self.states.extend(memory.states)
         self.candidates.extend(memory.candidates)
+        self.states_next.extend(memory.states_next)
+        self.actions.extend(memory.actions)
         self.logprobs.extend(memory.logprobs)
         self.rewards.extend(memory.rewards)
         self.terminals.extend(memory.terminals)
 
     def clear(self):
-        del self.actions[:]
         del self.states[:]
         del self.candidates[:]
+        del self.states_next[:]
+        del self.actions[:]
         del self.logprobs[:]
         del self.rewards[:]
         del self.terminals[:]
@@ -162,8 +165,8 @@ class DGAPN(nn.Module):
         # convert list to tensor
         states = [Batch().from_data_list([state[i] for state in memory.states]).to(self.device) 
                     for i in range(1+self.use_3d)]
-        states_next = [Batch().from_data_list([cands[a][i] for a, cands in zip(memory.actions, memory.candidates)]).to(self.device) 
-                        for i in range(1+self.use_3d)]
+        states_next = [Batch().from_data_list([state_next[i] for state_next in memory.states_next]).to(self.device) 
+                    for i in range(1+self.use_3d)]
         candidates = [Batch().from_data_list([item[i] for sublist in memory.candidates for item in sublist]).to(self.device)
                         for i in range(1+self.use_3d)]
         actions = torch.tensor(memory.actions).to(self.device)

@@ -37,7 +37,7 @@ For optimizing logP, penalized logP, etc., this step is not necessary.
 
 ## Training
 
-Once the conda environment and Autodock-GPU are set up, the function call to train the DGAPN is:
+Once the conda environment is set up, the function call to train the DGAPN is:
 
 ```bash
 ./main_train.sh &
@@ -49,8 +49,7 @@ If you wish to produce a pre-trained graph embedding model for DGAPN training, o
 
 ## Evaluation
 
-After training a model, use `main_eval.sh` to produce and evaluate molecules.
-The flag `--policy_path` should be modified to direct to a trained DGAPN model.
+After training a model, use `main_eval.sh` to produce and evaluate molecules. The flag `--policy_path` should be modified to direct to a trained DGAPN model.
 
 ```bash
 ./main_evaluate.sh

@@ -7,7 +7,6 @@ from datetime import datetime
 from rdkit import Chem
 
 import torch
-from torch_geometric.data import Batch
 
 from reward.get_main_reward import get_main_reward
 
@@ -27,7 +26,6 @@ def dgapn_rollout(save_path,
     model.eval()
 
     mol, mol_candidates, done = env.reset()
-    mol_start = mol
     smile_best = Chem.MolToSmiles(mol, isomericSmiles=False)
     emb_model_3d = model.emb_model.use_3d if model.emb_model is not None else model.use_3d
 
@@ -51,11 +49,11 @@ def dgapn_rollout(save_path,
 
         with torch.autograd.no_grad():
             probs, _, _ = model.policy.actor(g, g_candidates, torch.zeros(len(mol_candidates), dtype=torch.long).to(device))
-        max_action = np.argmax(probs.cpu().numpy())
-        min_action = np.argmin(probs.cpu().numpy())
+        probs = probs.cpu().numpy()
 
+        max_action = np.argmax(probs)
+        min_action = np.argmin(probs)
         # print(next_rewards[max_action], next_rewards[min_action])
-        action = max_action
         # print(probs.shape, next_rewards.shape)
         # p = probs.unsqueeze(1)
         # r = torch.FloatTensor(next_rewards).unsqueeze(1).to(device)
@@ -65,6 +63,7 @@ def dgapn_rollout(save_path,
         # # print(c)
         # exit()
 
+        action = max_action
         mol, mol_candidates, done = env.step(action, include_current_state=False)
 
         try:
