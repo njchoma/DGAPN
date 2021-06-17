@@ -5,8 +5,6 @@ import torch.nn as nn
 from torch.distributions.categorical import Categorical
 
 import torch_geometric as pyg
-from torch_geometric.nn import MessagePassing
-from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
 
 from gnn_embed import sGAT
 
@@ -18,21 +16,11 @@ from utils.graph_utils import get_batch_shift
 EPS = 1e-4
 
 def batched_expand(emb, batch):
-    unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), 
-                        dims=(0,)) 
+    unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device),
+                        dims=(0,)) # temp fix due to torch.unique bug
 
     X = torch.repeat_interleave(emb, torch.bincount(batch)[unique], dim=0)
     return X
-
-def batched_sample(probs, batch):
-    unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device), 
-                        dims=(0,)) 
-    mask = batch.unsqueeze(0) == unique.unsqueeze(1)
-
-    p = probs * mask
-    m = Categorical(p * (p > EPS))
-    a = m.sample()
-    return a
 
 def batched_softmax(logits, batch):
     logit_max = pyg.nn.global_max_pool(logits, batch)
@@ -45,6 +33,16 @@ def batched_softmax(logits, batch):
     logit_sum = torch.index_select(logit_sum, 0, batch)
     probs = torch.div(logits, logit_sum)
     return probs
+
+def batched_sample(probs, batch):
+    unique = torch.flip(torch.unique(batch.cpu(), sorted=False).to(batch.device),
+                        dims=(0,)) # temp fix due to torch.unique bug
+    mask = batch.unsqueeze(0) == unique.unsqueeze(1)
+
+    p = probs * mask
+    m = Categorical(p * (p > EPS))
+    a = m.sample()
+    return a
 
 #####################################################
 #                       GAPN                        #
@@ -97,16 +95,16 @@ class ActorCriticGAPN(nn.Module):
     def get_value(self, states):
         return self.critic.get_value(states)
 
-    def update(self, old_states, old_candidates, old_actions, old_logprobs, old_values, rewards, batch_idx):
+    def update(self, states, candidates, actions, rewards, old_logprobs, old_values, batch_idx):
         # Update actor
-        loss = self.actor.loss(old_states, old_candidates, old_actions, old_logprobs, old_values, rewards, batch_idx)
+        loss = self.actor.loss(states, candidates, actions, rewards, old_logprobs, old_values, batch_idx)
 
         self.optimizer_actor.zero_grad()
         loss.backward()
         self.optimizer_actor.step()
 
         # Update critic
-        baseline_loss = self.critic.loss(old_states, rewards)
+        baseline_loss = self.critic.loss(states, rewards)
 
         self.optimizer_critic.zero_grad()
         baseline_loss.backward()
@@ -142,19 +140,19 @@ class GAPN_Critic(nn.Module):
 
         self.MseLoss = nn.MSELoss()
 
-    def forward(self, g_emb):
-        X = self.gnn.get_embedding(g_emb, detach=False)
+    def forward(self, states):
+        X = self.gnn.get_embedding(states, detach=False)
         for i, l in enumerate(self.layers):
             X = self.act(l(X))
         return self.final_layer(X).squeeze(1)
 
-    def get_value(self, g_emb):
+    def get_value(self, states):
         with torch.autograd.no_grad():
-            values = self(g_emb)
+            values = self(states)
         return values.detach()
 
-    def loss(self, g_emb, rewards):
-        values = self(g_emb)
+    def loss(self, states, rewards):
+        values = self(states)
         loss = self.MseLoss(values, rewards)
 
         return loss
@@ -175,7 +173,7 @@ class GAPN_Actor(nn.Module):
         super(GAPN_Actor, self).__init__()
         self.eta = eta
         self.eps_clip = eps_clip
-        self.d_k = enc_nb_output
+
         self.gnn = sGAT(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d)
         if gnn_nb_layers == 0:
             in_dim = input_dim
@@ -198,9 +196,9 @@ class GAPN_Actor(nn.Module):
                                             nn.Linear(enc_nb_output, 1)])
         self.act = nn.ReLU()
 
-    def forward(self, g, g_candidates, batch_idx):
-        Q = self.gnn.get_embedding(g, detach=False)
-        K = self.gnn.get_embedding(g_candidates, detach=False)
+    def forward(self, states, candidates, batch_idx):
+        Q = self.gnn.get_embedding(states, detach=False)
+        K = self.gnn.get_embedding(candidates, detach=False)
 
         for ql, kl in zip(self.Q_layers, self.K_layers):
             Q = self.act(ql(Q))
@@ -209,7 +207,6 @@ class GAPN_Actor(nn.Module):
         K = self.K_final_layer(K)
 
         Q = batched_expand(Q, batch_idx)
-        #logits = torch.sum(Q * K, dim=1) / self.d_k**.5
         logits = torch.cat([Q, K], dim=-1)
         for l in self.final_layers:
             logits = l(self.act(logits))
@@ -223,17 +220,17 @@ class GAPN_Actor(nn.Module):
         # probs for eval
         return probs, action_logprobs, actions
 
-    def select_action(self, g, g_candidates, batch_idx):
-        _, action_logprobs, actions = self(g, g_candidates, batch_idx)
+    def select_action(self, states, candidates, batch_idx):
+        _, action_logprobs, actions = self(states, candidates, batch_idx)
 
         action_logprobs = action_logprobs.squeeze_().tolist()
         actions = actions.squeeze_().tolist()
 
         return action_logprobs, actions
 
-    def evaluate(self, g, g_candidates, actions, batch_idx):
-        Q = self.gnn.get_embedding(g, detach=False)
-        K = self.gnn.get_embedding(g_candidates, detach=False)
+    def evaluate(self, states, candidates, actions, batch_idx):
+        Q = self.gnn.get_embedding(states, detach=False)
+        K = self.gnn.get_embedding(candidates, detach=False)
 
         for ql, kl in zip(self.Q_layers, self.K_layers):
             Q = self.act(ql(Q))
@@ -242,7 +239,6 @@ class GAPN_Actor(nn.Module):
         K = self.K_final_layer(K)
 
         Q = batched_expand(Q, batch_idx)
-        #logits = torch.sum(Q * K, dim=1) / self.d_k**.5
         logits = torch.cat([Q, K], dim=-1)
         for l in self.final_layers:
             logits = l(self.act(logits))
@@ -253,14 +249,14 @@ class GAPN_Actor(nn.Module):
         shifted_actions = actions + batch_shift
         return probs[shifted_actions]
 
-    def loss(self, g, g_candidates, actions, old_logprobs, state_values, rewards, batch_idx):
-        probs = self.evaluate(g, g_candidates, actions, batch_idx)
+    def loss(self, states, candidates, actions, rewards, old_logprobs, old_values, batch_idx):
+        probs = self.evaluate(states, candidates, actions, batch_idx)
         logprobs = torch.log(probs)
         entropies = probs * logprobs
 
         # Finding the ratio (pi_theta / pi_theta_old):
         ratios = torch.exp(logprobs - old_logprobs)
-        advantages = rewards - state_values
+        advantages = rewards - old_values
 
         surr1 = ratios * advantages
         surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
@@ -272,4 +268,3 @@ class GAPN_Actor(nn.Module):
         loss += self.eta * entropies
 
         return loss.mean()
-

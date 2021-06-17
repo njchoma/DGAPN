@@ -39,6 +39,10 @@ class Worker(mp.Process):
         self.timestep_counter = 0
 
     def run(self):
+        # input:
+        ## None:                    kill
+        ## (None, _, _):            dummy task
+        ## (index, state, done):    trajectory id, molecule smiles, trajectory status
         proc_name = self.name
         while True:
             next_task = self.task_queue.get()
@@ -48,7 +52,7 @@ class Worker(mp.Process):
                 self.task_queue.task_done()
                 break
 
-            index, mol, done = next_task
+            index, state, done = next_task
             if index is None:
                 self.result_queue.put((None, None, None, True))
                 self.task_queue.task_done()
@@ -56,14 +60,14 @@ class Worker(mp.Process):
             # print('%s: Working' % proc_name)
             if done:
                 self.timestep_counter = 0
-                mol, candidates, done = self.env.reset(return_type='smiles')
+                state, candidates, done = self.env.reset(return_type='smiles')
             else:
                 self.timestep_counter += 1
-                mol, candidates, done = self.env.reset(mol, return_type='smiles')
+                state, candidates, done = self.env.reset(state, return_type='smiles')
                 if self.timestep_counter >= self.max_timesteps:
                     done = True
 
-            self.result_queue.put((index, mol, candidates, done))
+            self.result_queue.put((index, state, candidates, done))
             self.task_queue.task_done()
         return
 
@@ -120,8 +124,8 @@ def train_gpu_sync(args, embed_model, env):
                 eps,
                 args.eta,
                 args.gamma,
-                args.K_epochs,
                 args.eps_clip,
+                args.k_epochs,
                 embed_model,
                 args.emb_nb_shared,
                 args.input_size,
@@ -156,18 +160,18 @@ def train_gpu_sync(args, embed_model, env):
     # training loop
     i_episode = 0
     while i_episode < args.max_episodes:
-        logging.info("collecting rollouts")
+        logging.info("\n\ncollecting rollouts")
         for i in range(args.nb_procs):
             tasks.put((i, None, True))
         tasks.join()
         # unpack results
-        mols = [None] * args.nb_procs
+        states = [None] * args.nb_procs
         done_idx = []
         notdone_idx, candidates, batch_idx = [], [], []
         for i in range(args.nb_procs):
-            index, mol, cands, done = results.get()
+            index, state, cands, done = results.get()
 
-            mols[index] = mol
+            states[index] = state
 
             notdone_idx.append(index)
             candidates.append(cands)
@@ -176,8 +180,11 @@ def train_gpu_sync(args, embed_model, env):
             # action selections (for not done)
             if len(notdone_idx) > 0:
                 states_emb, candidates_emb, action_logprobs, actions = model.select_action(
-                    [Chem.MolFromSmiles(mols[idx]) for idx in notdone_idx],
-                    [Chem.MolFromSmiles(item) for sublist in candidates for item in sublist], batch_idx)
+                    mols_to_pyg_batch([Chem.MolFromSmiles(states[idx])
+                        for idx in notdone_idx], model.emb_3d, device=model.device),
+                    mols_to_pyg_batch([Chem.MolFromSmiles(item) 
+                        for sublist in candidates for item in sublist], model.emb_3d, device=model.device),
+                    batch_idx)
                 if not isinstance(action_logprobs, list):
                     action_logprobs = [action_logprobs]
                     actions = [actions]
@@ -199,14 +206,14 @@ def train_gpu_sync(args, embed_model, env):
                     tasks.put((idx, None, True))
             tasks.join()
             # unpack results
-            mols = [None] * args.nb_procs
+            states = [None] * args.nb_procs
             new_done_idx = []
             new_notdone_idx, candidates, batch_idx = [], [], []
             for i in range(args.nb_procs):
-                index, mol, cands, done = results.get()
+                index, state, cands, done = results.get()
 
                 if index is not None:
-                    mols[index] = mol
+                    states[index] = state
                 if done:
                     new_done_idx.append(index)
                 else:
@@ -218,7 +225,7 @@ def train_gpu_sync(args, embed_model, env):
             stillnotdone_idx = [idx for idx in notdone_idx if idx in new_notdone_idx]
             if len(nowdone_idx) > 0:
                 main_rewards = get_main_reward(
-                    [Chem.MolFromSmiles(mols[idx]) for idx in nowdone_idx], reward_type=args.reward_type, args=args)
+                    [Chem.MolFromSmiles(states[idx]) for idx in nowdone_idx], reward_type=args.reward_type, args=args)
                 if not isinstance(main_rewards, list):
                     main_rewards = [main_rewards]
 
@@ -230,23 +237,24 @@ def train_gpu_sync(args, embed_model, env):
                 running_main_reward += main_reward
                 writer.add_scalar("EpMainRew", main_reward, i_episode - 1)
                 rewbuffer_env.append(main_reward)
-                molbuffer_env.append((mols[idx], main_reward))
+                molbuffer_env.append((states[idx], main_reward))
                 writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode - 1)
 
                 memories[idx].rewards.append(main_reward)
-                memories[idx].is_terminals.append(True)
+                memories[idx].terminals.append(True)
             for idx in stillnotdone_idx:
                 running_reward += 0
 
                 memories[idx].rewards.append(0)
-                memories[idx].is_terminals.append(False)
+                memories[idx].terminals.append(False)
             # get innovation rewards
             if (args.iota > 0 and 
                 i_episode > args.innovation_reward_episode_delay and 
                 i_episode < args.innovation_reward_episode_cutoff):
                 if len(notdone_idx) > 0:
                     inno_rewards = model.get_inno_reward(
-                        [Chem.MolFromSmiles(mols[idx]) for idx in notdone_idx])
+                        mols_to_pyg_batch([Chem.MolFromSmiles(states[idx]) 
+                            for idx in notdone_idx], model.emb_3d, device=model.device))
                     if not isinstance(inno_rewards, list):
                         inno_rewards = [inno_rewards]
 
@@ -268,7 +276,7 @@ def train_gpu_sync(args, embed_model, env):
             memory.extend(m)
             m.clear()
         # update model
-        logging.info("\n\nupdating model @ episode %d..." % i_episode)
+        logging.info("\nupdating model @ episode %d..." % i_episode)
         model.update(memory)
         memory.clear()
 
@@ -333,8 +341,8 @@ def train_serial(args, embed_model, env):
                 eps,
                 args.eta,
                 args.gamma,
-                args.K_epochs,
                 args.eps_clip,
+                args.k_epochs,
                 embed_model,
                 args.emb_nb_shared,
                 args.input_size,
@@ -368,8 +376,10 @@ def train_serial(args, embed_model, env):
 
         for t in range(args.max_timesteps):
             time_step += 1
-            # Running policy_old:
-            state_emb, candidates_emb, action_logprob, action = model.select_action(state, candidates)
+            # Running policy:
+            state_emb, candidates_emb, action_logprob, action = model.select_action(
+                mols_to_pyg_batch(state, model.emb_3d, device=model.device),
+                mols_to_pyg_batch(candidates, model.emb_3d, device=model.device))
             memory.states.append(state_emb[0])
             memory.candidates.append(candidates_emb)
             memory.actions.append(action)
@@ -388,12 +398,12 @@ def train_serial(args, embed_model, env):
             if (args.iota > 0 and 
                 i_episode > args.innovation_reward_episode_delay and 
                 i_episode < args.innovation_reward_episode_cutoff):
-                inno_reward = model.get_inno_reward(state)
+                inno_reward = model.get_inno_reward(mols_to_pyg_batch(state, model.emb_3d, device=model.device))
                 reward += inno_reward
 
-            # Saving reward and is_terminals:
+            # Saving rewards and terminals:
             memory.rewards.append(reward)
-            memory.is_terminals.append(done)
+            memory.terminals.append(done)
 
             running_reward += reward
             if done:
@@ -401,7 +411,7 @@ def train_serial(args, embed_model, env):
 
         # update if it's time
         if time_step >= args.update_timesteps:
-            logging.info("\n\nupdating model @ episode %d..." % i_episode)
+            logging.info("\nupdating model @ episode %d..." % i_episode)
             time_step = 0
             model.update(memory)
             memory.clear()
@@ -442,4 +452,3 @@ def train_serial(args, embed_model, env):
 
     close_logger()
     writer.close()
-

@@ -6,7 +6,6 @@ from rdkit.Chem import RDConfig
 import os
 import sys
 sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
-
 import sascorer
 
 def get_logp_score(states):
@@ -20,9 +19,6 @@ def get_penalized_logp(states):
         return penalized_logp(states)
     else:
         return [penalized_logp(state) for state in states]
-
-# From MolDQN 
-# https://github.com/caiyingchun/MolDQN/blob/cd2b738446f13cd76c6ab2d041ff03cd28e2a440/chemgraph/dqn/py/molecules.py
 
 def get_largest_ring_size(molecule):
     """Calculates the largest ring size in the molecule.
@@ -63,5 +59,3 @@ def penalized_logp(molecule):
     largest_ring_size = get_largest_ring_size(molecule)
     cycle_score = max(largest_ring_size - 6, 0)
     return log_p - sas_score - cycle_score
-
-#print(penalized_logp(Chem.MolFromSmiles('Cc1ccccc1')))

@@ -25,7 +25,7 @@ def molecule_arg_parser():
     add_arg('--nb_procs', type=int, default=4)
     #add_arg('--seed', help='RNG seed', type=int, default=666)
 
-    add_arg('--warm_start_dataset_path', default='')
+    add_arg('--warm_start_dataset', default='')
     add_arg('--running_model_path', default='')
     add_arg('--log_interval', type=int, default=20)         # print avg reward in the interval
     add_arg('--save_interval', type=int, default=500)       # save model in the interval
@@ -41,7 +41,7 @@ def molecule_arg_parser():
     add_arg('--max_episodes', type=int, default=50000)      # max training episodes
     add_arg('--max_timesteps', type=int, default=12)        # max timesteps in one episode
     add_arg('--update_timesteps', type=int, default=300)    # update policy every n timesteps
-    add_arg('--K_epochs', type=int, default=50)             # update policy for K epochs
+    add_arg('--k_epochs', type=int, default=50)             # update policy for K epochs
     add_arg('--eps_clip', type=float, default=0.2)          # clip parameter for PPO
     add_arg('--gamma', type=float, default=0.99)            # discount factor
     add_arg('--eta', type=float, default=0.01)              # relative weight for entropy loss
@@ -106,7 +106,7 @@ def main():
         args.input_size = embed_model.nb_hidden
         args.nb_edge_types = embed_model.nb_edge_types
 
-    env = CReM_Env(args.data_path, args.warm_start_dataset_path, mode='mol')
+    env = CReM_Env(args.data_path, args.warm_start_dataset, mode='mol')
     #ob, _, _ = env.reset()
     #args.input_size = ob.x.shape[1]
 

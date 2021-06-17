@@ -5,8 +5,6 @@ import torch
 import torch.nn as nn
 
 import torch_geometric as pyg
-from torch_geometric.nn import MessagePassing
-from torch_geometric.utils import remove_self_loops, add_self_loops, softmax, degree
 
 from gnn_embed import sGAT
 
@@ -60,21 +58,21 @@ class RNDistillation(nn.Module):
 
         self.running_error = deque(maxlen=5000)
 
-    def forward(self, g_next_emb):
-        errors = torch.norm(self.f(g_next_emb).detach() - self.f_hat(g_next_emb), dim=1)
+    def forward(self, states_next):
+        errors = torch.norm(self.f(states_next).detach() - self.f_hat(states_next), dim=1)
         return errors
 
-    def get_score(self, g_next_emb, out_min=-5., out_max=5., min_running=100, eps=0.01):
+    def get_score(self, states_next, out_min=-5., out_max=5., min_running=100, eps=0.01):
         with torch.autograd.no_grad():
-            errors = self(g_next_emb).detach().cpu().numpy()
+            errors = self(states_next).detach().cpu().numpy()
 
         if len(self.running_error) < min_running:
             return np.zeros_like(errors)
         scores = (errors - np.mean(self.running_error)) / (np.std(self.running_error) + eps)
         return np.clip(scores, out_min, out_max)
 
-    def update(self, g_next_emb):
-        errors = self(g_next_emb)
+    def update(self, states_next):
+        errors = self(states_next)
         loss = errors.mean()
 
         self.optimizer.zero_grad()
@@ -115,9 +113,8 @@ class RandomNetwork(nn.Module):
         self.final_layer = nn.Linear(in_dim, rnd_nb_output)
         self.act = nn.ReLU()
 
-    def forward(self, g_emb):
-        X = self.gnn.get_embedding(g_emb, detach=False)
+    def forward(self, states_next):
+        X = self.gnn.get_embedding(states_next, detach=False)
         for i, l in enumerate(self.layers):
             X = self.act(l(X))
         return self.final_layer(X)
-

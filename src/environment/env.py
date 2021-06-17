@@ -1,4 +1,4 @@
-import gym
+import os
 import random
 from rdkit import Chem
 from crem.crem import mutate_mol
@@ -12,20 +12,20 @@ DATASET_NAME = 'replacements02_sc2.db'
 
 class CReM_Env(object):
     def __init__(self,
-                 storage_path,
-                 warm_start_dataset_path,
+                 data_path,
+                 warm_start_dataset,
                  nb_sample_crem = 16,
                  nb_cores = 1,
                  mode = 'pyg'):
-        self.scores, self.smiles = preprocess.main(warm_start_dataset_path)
+        self.scores, self.smiles = preprocess.main(os.path.join(data_path, warm_start_dataset))
         self.nb_sample_crem = nb_sample_crem
         self.nb_cores = nb_cores
         self.mode = mode
 
-        _ = download_dataset(storage_path,
+        _ = download_dataset(data_path,
                              DATASET_NAME+'.gz',
                              DATASET_URL)
-        self.db_fname = unpack_dataset(storage_path,
+        self.db_fname = unpack_dataset(data_path,
                                        DATASET_NAME+'.gz',
                                        DATASET_NAME)
 
