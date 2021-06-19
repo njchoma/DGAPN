@@ -16,7 +16,7 @@ PYARGS="$PYARGS --artifact_path $DATA/artifact/dgapn"
 PYARGS="$PYARGS --reward_type dock" # options: logp, plogp, dock
 
 # PYARGS="$PYARGS --greedy"
-PYARGS="$PYARGS --model_path /path/to/trained/dgapn.pth"
+PYARGS="$PYARGS --model_path /path/to/trained/dgapn.pt"
 PYARGS="$PYARGS --nb_test 1000"
 
 python src/main_evaluate.py $PYARGS

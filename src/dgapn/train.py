@@ -325,17 +325,17 @@ def train_gpu_sync(args, env):
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > args.solved_reward:
             logging.info("########## Solved! ##########")
-            save_DGAPN(model, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
+            save_DGAPN(model, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pt'.format('test')))
             break
 
         # save every 500 episodes
         if save_counter >= args.save_interval:
-            save_DGAPN(model, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
+            save_DGAPN(model, os.path.join(save_dir, '{:05d}_dgapn.pt'.format(i_episode)))
             deque_to_csv(molbuffer_env, os.path.join(save_dir, 'mol_dgapn.csv'))
             save_counter = 0
 
         # save running model
-        save_DGAPN(model, os.path.join(save_dir, 'running_dgapn.pth'))
+        save_DGAPN(model, os.path.join(save_dir, 'running_dgapn.pt'))
 
         if log_counter >= args.log_interval:
             avg_length = int(avg_length / log_counter)
@@ -468,16 +468,16 @@ def train_serial(args, env):
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > args.solved_reward:
             logging.info("########## Solved! ##########")
-            save_DGAPN(model, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pth'.format('test')))
+            save_DGAPN(model, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pt'.format('test')))
             break
 
         # save every save_interval episodes
         if (i_episode-1) % args.save_interval == 0:
-            save_DGAPN(model, os.path.join(save_dir, '{:05d}_dgapn.pth'.format(i_episode)))
+            save_DGAPN(model, os.path.join(save_dir, '{:05d}_dgapn.pt'.format(i_episode)))
             deque_to_csv(molbuffer_env, os.path.join(save_dir, 'mol_dgapn.csv'))
 
         # save running model
-        save_DGAPN(model, os.path.join(save_dir, 'running_dgapn.pth'))
+        save_DGAPN(model, os.path.join(save_dir, 'running_dgapn.pt'))
 
         # logging
         if i_episode % args.log_interval == 0:
