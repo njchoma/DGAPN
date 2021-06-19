@@ -32,8 +32,6 @@ To evaluate molecular docking scores, the docking program [AutoDock-GPU](https:/
 
 [The provided resources](src/reward/adtgpu/receptor) are for docking in the catalytic site of NSP15. If docking against a new protein is desired, several input receptor files need to be generated, see [the sub-directory](src/reward/adtgpu) for more details.
 
-For optimizing logP, penalized logP, etc., this step is not necessary.
-
 
 ## Training
 
@@ -58,7 +56,7 @@ After training a model, use `main_evaluate.sh` to produce and evaluate molecules
 Molecules will be saved in the artifact directory (set via the `--artifact_path` flag in `main_evaluate.sh`) as a csv file, where each line contains a molecule's SMILES string and associated docking score.
 
 ## Pre-trained Models
-A trained DGAPN model can be found [here](https://github.com/yulun-rayn/SGAnCP4ADD/tree/main/artifact/dgapn). After downloading the trained DGAPN model, you can directly run the evaluate command with the trained model to generate molecules.
+Trained DGAPN models on docking reward and samples of molecules in evaluation can be found [here](https://github.com/yulun-rayn/SGAnCP4ADD/tree/main/artifact/dgapn).
 
 ## License
 

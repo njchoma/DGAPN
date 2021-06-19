@@ -35,8 +35,7 @@ def init_DGAPN(state):
                 state['enc_nb_output'],
                 state['rnd_nb_layers'],
                 state['rnd_nb_hidden'],
-                state['rnd_nb_output'],
-                state['use_3d'])
+                state['rnd_nb_output'])
     net.load_state_dict(state['state_dict'])
     return net
 
