@@ -144,7 +144,8 @@ class DGAPN(nn.Module):
 
     def select_action(self, states, candidates, batch_idx=None):
         if batch_idx is None:
-            batch_idx = torch.zeros(len(candidates), dtype=torch.long)
+            size = max(candidates.batch)+1 if not isinstance(candidates, list) else max(candidates[0].batch)+1
+            batch_idx = torch.zeros(size, dtype=torch.long)
         batch_idx = torch.LongTensor(batch_idx).to(self.device)
 
         with torch.autograd.no_grad():

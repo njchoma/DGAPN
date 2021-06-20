@@ -432,7 +432,7 @@ def train_serial(args, env):
             reward = 0
 
             if (t==(args.max_timesteps-1)) or done:
-                main_reward = get_main_reward(state, reward_type=args.reward_type, args=args)
+                main_reward = get_main_reward(state, reward_type=args.reward_type, args=args)[0]
                 reward = main_reward
                 running_main_reward += main_reward
 
