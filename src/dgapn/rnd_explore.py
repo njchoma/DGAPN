@@ -95,7 +95,7 @@ class RandomNetwork(nn.Module):
                  rnd_nb_output,
                  init_method=None):
         super(RandomNetwork, self).__init__()
-        self.gnn = sGAT(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d, init_method=init_method)
+        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, use_3d=use_3d, init_method=init_method)
         if gnn_nb_layers == 0:
             in_dim = input_dim
         else:

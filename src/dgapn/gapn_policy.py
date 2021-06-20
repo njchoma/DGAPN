@@ -123,7 +123,7 @@ class GAPN_Critic(nn.Module):
                  enc_nb_layers,
                  enc_nb_hidden):
         super(GAPN_Critic, self).__init__()
-        self.gnn = sGAT(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d)
+        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, use_3d=use_3d)
         if gnn_nb_layers == 0:
             in_dim = input_dim
         else:
@@ -174,7 +174,7 @@ class GAPN_Actor(nn.Module):
         self.eta = eta
         self.eps_clip = eps_clip
 
-        self.gnn = sGAT(input_dim, gnn_nb_hidden, gnn_nb_layers, nb_edge_types, use_3d=use_3d)
+        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, use_3d=use_3d)
         if gnn_nb_layers == 0:
             in_dim = input_dim
         else:

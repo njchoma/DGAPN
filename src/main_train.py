@@ -90,13 +90,13 @@ def main():
             assert not args.use_3d
         args.input_size = embed_state['nb_hidden']
         args.nb_edge_types = embed_state['nb_edge_types']
-    args.embed_state = embed_state
 
     env = CReM_Env(args.data_path, args.warm_start_dataset, mode='mol')
     #ob, _, _ = env.reset()
     #args.input_size = ob.x.shape[1]
 
     print("====args====\n", args)
+    args.embed_state = embed_state
 
     if args.nb_procs > 1:
         train_gpu_sync(args, env)
