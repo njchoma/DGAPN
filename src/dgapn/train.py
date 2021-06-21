@@ -412,6 +412,8 @@ def train_serial(args, env):
     molbuffer_env = deque(maxlen=1000)
     # training loop
     for i_episode in range(1, args.max_episodes+1):
+        if time_step == 0:
+            logging.info("\n\ncollecting rollouts")
         state, candidates, done = env.reset()
 
         for t in range(args.max_timesteps):
@@ -435,6 +437,7 @@ def train_serial(args, env):
                 main_reward = get_main_reward(state, reward_type=args.reward_type, args=args)[0]
                 reward = main_reward
                 running_main_reward += main_reward
+                done = True
 
             if (args.iota > 0 and 
                 i_episode > args.innovation_reward_episode_delay and 
