@@ -56,7 +56,7 @@ After training a model, use `main_evaluate.sh` to produce and evaluate molecules
 Molecules will be saved in the artifact directory (set via the `--artifact_path` flag in `main_evaluate.sh`) as a csv file, where each line contains a molecule's SMILES string and associated docking score.
 
 ## Pre-trained Models
-Trained DGAPN models on docking reward and samples of molecules in evaluation can be found [here](https://github.com/yulun-rayn/SGAnCP4ADD/tree/main/artifact/dgapn).
+Trained DGAPN models on docking reward and samples of molecules in evaluation can be found [here](https://github.com/yulun-rayn/SGAnCP4ADD/tree/master/artifact/dgapn).
 
 ## License
 
