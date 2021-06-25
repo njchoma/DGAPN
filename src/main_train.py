@@ -54,7 +54,7 @@ def read_args():
     # NETWORK PARAMETERS
     add_arg('--embed_model_url', default='')
     add_arg('--embed_model_path', default='')
-    add_arg('--emb_nb_shared', type=int, default=2)         # number of layers for the shared embedding model to inherit
+    add_arg('--emb_nb_shared', type=int, default=2)         # number of layers to inherit from the embedding model
 
     add_arg('--input_size', type=int, default=121)
     add_arg('--nb_edge_types', type=int, default=1)
