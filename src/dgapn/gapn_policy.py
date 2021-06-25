@@ -123,16 +123,27 @@ class GAPN_Critic(nn.Module):
                  enc_nb_layers,
                  enc_nb_hidden):
         super(GAPN_Critic, self).__init__()
+        if not isinstance(gnn_nb_hidden, list):
+            gnn_nb_hidden = [gnn_nb_hidden] * gnn_nb_layers
+        else:
+            assert len(gnn_nb_hidden) == gnn_nb_layers
+        if not isinstance(enc_nb_hidden, list):
+            enc_nb_hidden = [enc_nb_hidden] * enc_nb_layers
+        else:
+            assert len(enc_nb_hidden) == enc_nb_layers
+
+        # gnn encoder
         self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, use_3d=use_3d)
         if gnn_nb_layers == 0:
             in_dim = input_dim
         else:
-            in_dim = gnn_nb_hidden
+            in_dim = gnn_nb_hidden[-1]
 
+        # mlp encoder
         layers = []
-        for _ in range(enc_nb_layers):
-            layers.append(nn.Linear(in_dim, enc_nb_hidden))
-            in_dim = enc_nb_hidden
+        for i in range(enc_nb_layers):
+            layers.append(nn.Linear(in_dim, enc_nb_hidden[i]))
+            in_dim = enc_nb_hidden[i]
 
         self.layers = nn.ModuleList(layers)
         self.final_layer = nn.Linear(in_dim, 1)
@@ -174,31 +185,53 @@ class GAPN_Actor(nn.Module):
         self.eta = eta
         self.eps_clip = eps_clip
 
+        if not isinstance(gnn_nb_hidden, list):
+            gnn_nb_hidden = [gnn_nb_hidden] * gnn_nb_layers
+        else:
+            assert len(gnn_nb_hidden) == gnn_nb_layers
+        if not isinstance(enc_nb_hidden, list):
+            enc_nb_hidden = [enc_nb_hidden] * enc_nb_layers
+        else:
+            assert len(enc_nb_hidden) == enc_nb_layers
+
+        # shared gnn encoder
         self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, use_3d=use_3d)
         if gnn_nb_layers == 0:
             in_dim = input_dim
         else:
-            in_dim = gnn_nb_hidden
+            in_dim = gnn_nb_hidden[-1]
 
+        # gnn encoder
+        self.Q_emb = sGAT(in_dim, nb_edge_types, enc_nb_hidden[0], 1,
+                            output_dim=enc_nb_hidden[0], use_3d=use_3d)
+        self.K_emb = sGAT(in_dim, nb_edge_types, enc_nb_hidden[0], 1,
+                            output_dim=enc_nb_hidden[0], use_3d=use_3d)
+        in_dim = enc_nb_hidden[0]
+
+        # mlp encoder
         Q_layers = []
         K_layers = []
-        for _ in range(enc_nb_layers):
-            Q_layers.append(nn.Linear(in_dim, enc_nb_hidden))
-            K_layers.append(nn.Linear(in_dim, enc_nb_hidden))
-            in_dim = enc_nb_hidden
-
+        for i in range(enc_nb_layers):
+            Q_layers.append(nn.Linear(in_dim, enc_nb_hidden[i]))
+            K_layers.append(nn.Linear(in_dim, enc_nb_hidden[i]))
+            in_dim = enc_nb_hidden[i]
         self.Q_layers = nn.ModuleList(Q_layers)
         self.K_layers = nn.ModuleList(K_layers)
         self.Q_final_layer = nn.Linear(in_dim, enc_nb_output)
         self.K_final_layer = nn.Linear(in_dim, enc_nb_output)
 
+        # attention network
         self.final_layers = nn.ModuleList([nn.Linear(2*enc_nb_output, enc_nb_output), 
                                             nn.Linear(enc_nb_output, 1)])
+
         self.act = nn.ReLU()
 
     def forward(self, states, candidates, batch_idx):
-        Q = self.gnn.get_embedding(states, detach=False)
-        K = self.gnn.get_embedding(candidates, detach=False)
+        Q = self.gnn.get_embedding(states, detach=False, aggr=False)
+        K = self.gnn.get_embedding(candidates, detach=False, aggr=False)
+
+        Q = self.act(self.Q_emb(Q))
+        K = self.act(self.K_emb(K))
 
         for ql, kl in zip(self.Q_layers, self.K_layers):
             Q = self.act(ql(Q))
@@ -229,8 +262,11 @@ class GAPN_Actor(nn.Module):
         return action_logprobs, actions
 
     def evaluate(self, states, candidates, actions, batch_idx):
-        Q = self.gnn.get_embedding(states, detach=False)
-        K = self.gnn.get_embedding(candidates, detach=False)
+        Q = self.gnn.get_embedding(states, detach=False, aggr=False)
+        K = self.gnn.get_embedding(candidates, detach=False, aggr=False)
+
+        Q = self.act(self.Q_emb(Q))
+        K = self.act(self.K_emb(K))
 
         for ql, kl in zip(self.Q_layers, self.K_layers):
             Q = self.act(ql(Q))
