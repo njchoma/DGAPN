@@ -95,19 +95,29 @@ class RandomNetwork(nn.Module):
                  rnd_nb_output,
                  init_method=None):
         super(RandomNetwork, self).__init__()
+        if not isinstance(gnn_nb_hidden, list):
+            gnn_nb_hidden = [gnn_nb_hidden] * gnn_nb_layers
+        if not isinstance(rnd_nb_hidden, list):
+            rnd_nb_hidden = [rnd_nb_hidden] * rnd_nb_layers
+        else:
+            assert len(rnd_nb_hidden) == rnd_nb_layers
+            assert rnd_nb_layers > 0
+
+        # gnn encoder
         self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, use_3d=use_3d, init_method=init_method)
         if gnn_nb_layers == 0:
             in_dim = input_dim
         else:
-            in_dim = gnn_nb_hidden
+            in_dim = gnn_nb_hidden[-1]
 
+        # mlp encoder
         layers = []
-        for _ in range(rnd_nb_layers):
-            curr_layer = nn.Linear(in_dim, rnd_nb_hidden)
+        for i in range(rnd_nb_layers):
+            curr_layer = nn.Linear(in_dim, rnd_nb_hidden[i])
             if init_method is not None:
                 init_network(curr_layer, init_method)
             layers.append(curr_layer)
-            in_dim = rnd_nb_hidden
+            in_dim = rnd_nb_hidden[i]
 
         self.layers = nn.ModuleList(layers)
         self.final_layer = nn.Linear(in_dim, rnd_nb_output)

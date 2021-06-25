@@ -125,12 +125,8 @@ class GAPN_Critic(nn.Module):
         super(GAPN_Critic, self).__init__()
         if not isinstance(gnn_nb_hidden, list):
             gnn_nb_hidden = [gnn_nb_hidden] * gnn_nb_layers
-        else:
-            assert len(gnn_nb_hidden) == gnn_nb_layers
         if not isinstance(enc_nb_hidden, list):
             enc_nb_hidden = [enc_nb_hidden] * enc_nb_layers
-        else:
-            assert len(enc_nb_hidden) == enc_nb_layers
 
         # gnn encoder
         self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, use_3d=use_3d)
@@ -189,29 +185,31 @@ class GAPN_Actor(nn.Module):
             gnn_nb_hidden = [gnn_nb_hidden] * gnn_nb_layers
         else:
             assert len(gnn_nb_hidden) == gnn_nb_layers
+            assert gnn_nb_layers > 0
         if not isinstance(enc_nb_hidden, list):
             enc_nb_hidden = [enc_nb_hidden] * enc_nb_layers
         else:
             assert len(enc_nb_hidden) == enc_nb_layers
+            assert enc_nb_layers > 0
 
         # shared gnn encoder
-        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, use_3d=use_3d)
-        if gnn_nb_layers == 0:
+        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden[:-1], gnn_nb_layers-1, use_3d=use_3d)
+        if gnn_nb_layers == 1:
             in_dim = input_dim
         else:
-            in_dim = gnn_nb_hidden[-1]
+            in_dim = gnn_nb_hidden[-2]
 
-        # gnn encoder
-        self.Q_emb = sGAT(in_dim, nb_edge_types, enc_nb_hidden[0], 1,
+        # gnn encoder (w/ 1 mlp layer)
+        self.Q_emb = sGAT(in_dim, nb_edge_types, gnn_nb_hidden[-1], 1,
                             output_dim=enc_nb_hidden[0], use_3d=use_3d)
-        self.K_emb = sGAT(in_dim, nb_edge_types, enc_nb_hidden[0], 1,
+        self.K_emb = sGAT(in_dim, nb_edge_types, gnn_nb_hidden[-1], 1,
                             output_dim=enc_nb_hidden[0], use_3d=use_3d)
         in_dim = enc_nb_hidden[0]
 
         # mlp encoder
         Q_layers = []
         K_layers = []
-        for i in range(enc_nb_layers):
+        for i in range(1, enc_nb_layers):
             Q_layers.append(nn.Linear(in_dim, enc_nb_hidden[i]))
             K_layers.append(nn.Linear(in_dim, enc_nb_hidden[i]))
             in_dim = enc_nb_hidden[i]
