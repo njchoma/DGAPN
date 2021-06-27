@@ -51,7 +51,7 @@ def batched_sample(probs, batch):
 class ActorCriticGAPN(nn.Module):
     def __init__(self,
                  lr,
-                 betas,
+                 alpha,
                  eps,
                  eta,
                  eps_clip,
@@ -75,7 +75,7 @@ class ActorCriticGAPN(nn.Module):
                                 enc_nb_layers,
                                 enc_nb_hidden,
                                 enc_nb_output)
-        self.optimizer_actor = torch.optim.Adam(self.actor.parameters(), lr=lr[0], betas=betas, eps=eps)
+        self.optimizer_actor = torch.optim.RMSprop(self.actor.parameters(), lr=lr[0], alpha=alpha, eps=eps)
         # critic
         self.critic = GAPN_Critic(input_dim,
                                   nb_edge_types,
@@ -84,7 +84,7 @@ class ActorCriticGAPN(nn.Module):
                                   gnn_nb_hidden,
                                   enc_nb_layers,
                                   enc_nb_hidden)
-        self.optimizer_critic = torch.optim.Adam(self.critic.parameters(), lr=lr[1], betas=betas, eps=eps)
+        self.optimizer_critic = torch.optim.RMSprop(self.critic.parameters(), lr=lr[1], alpha=alpha, eps=eps)
 
     def forward(self):
         raise NotImplementedError

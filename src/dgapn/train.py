@@ -136,9 +136,9 @@ class Result(object):
 
 def train_gpu_sync(args, env):
     lr = (args.actor_lr, args.critic_lr, args.rnd_lr)
-    betas = (args.beta1, args.beta2)
+    alpha = args.alpha
+    #betas = (args.beta1, args.beta2)
     eps = args.eps
-    print("lr:", lr, "beta:", betas, "eps:", eps)  # parameters for Adam optimizer
 
     print('Creating %d processes' % args.nb_procs)
     workers = [Worker(env, tasks, results, args.max_timesteps) for i in range(args.nb_procs)]
@@ -159,7 +159,7 @@ def train_gpu_sync(args, env):
         model = load_DGAPN(args.running_model_path)
     else:
         model = DGAPN(lr,
-                    betas,
+                    alpha,
                     eps,
                     args.eta,
                     args.gamma,
@@ -361,9 +361,9 @@ def train_gpu_sync(args, env):
 
 def train_serial(args, env):
     lr = (args.actor_lr, args.critic_lr, args.rnd_lr)
-    betas = (args.beta1, args.beta2)
+    alpha = args.alpha
+    #betas = (args.beta1, args.beta2)
     eps = args.eps
-    print("lr:", lr, "beta:", betas, "eps:", eps) # parameters for Adam optimizer
 
     # logging variables
     dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
@@ -379,7 +379,7 @@ def train_serial(args, env):
         model = load_DGAPN(args.running_model_path)
     else:
         model = DGAPN(lr,
-                    betas,
+                    alpha,
                     eps,
                     args.eta,
                     args.gamma,

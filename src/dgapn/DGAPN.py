@@ -17,7 +17,7 @@ from .rnd_explore import RNDistillation
 
 def init_DGAPN(state):
     net = DGAPN(state['lr'],
-                state['betas'],
+                state['alpha'],
                 state['eps'],
                 state['eta'],
                 state['gamma'],
@@ -53,7 +53,7 @@ def save_DGAPN(net, state_path=None):
 class DGAPN(nn.Module):
     def __init__(self,
                  lr,
-                 betas,
+                 alpha,
                  eps,
                  eta,
                  gamma,
@@ -84,7 +84,7 @@ class DGAPN(nn.Module):
         self.emb_3d = emb_model.use_3d if emb_model is not None else use_3d
 
         self.lr=lr
-        self.betas=betas
+        self.alpha=alpha
         self.eps=eps
         self.eta=eta
         self.gamma=gamma
@@ -105,7 +105,7 @@ class DGAPN(nn.Module):
         self.rnd_nb_output=rnd_nb_output
 
         self.policy = ActorCriticGAPN(lr[:2],
-                                      betas,
+                                      alpha,
                                       eps,
                                       eta,
                                       eps_clip,
@@ -119,7 +119,7 @@ class DGAPN(nn.Module):
                                       enc_nb_output)
 
         self.explore_critic = RNDistillation(lr[2],
-                                             betas,
+                                             alpha,
                                              eps,
                                              input_dim,
                                              nb_edge_types,
@@ -216,7 +216,7 @@ class DGAPN(nn.Module):
     def get_dict(self):
         state = {'state_dict': self.state_dict(),
                     'lr': self.lr,
-                    'betas': self.betas,
+                    'alpha': self.alpha,
                     'eps': self.eps,
                     'eta': self.eta,
                     'gamma': self.gamma,

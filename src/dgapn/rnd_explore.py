@@ -23,7 +23,7 @@ def init_network(model, method='uniform'):
 class RNDistillation(nn.Module):
     def __init__(self,
                  lr,
-                 betas,
+                 alpha,
                  eps,
                  input_dim,
                  nb_edge_types,
@@ -54,7 +54,7 @@ class RNDistillation(nn.Module):
                                    rnd_nb_output,
                                    init_method='normal')
 
-        self.optimizer = torch.optim.Adam(self.f_hat.parameters(), lr=lr, betas=betas, eps=eps)
+        self.optimizer = torch.optim.RMSprop(self.f_hat.parameters(), lr=lr, alpha=alpha, eps=eps)
 
         self.running_error = deque(maxlen=5000)
 

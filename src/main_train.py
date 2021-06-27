@@ -47,9 +47,10 @@ def read_args():
     add_arg('--actor_lr', type=float, default=5e-4)         # learning rate for actor
     add_arg('--critic_lr', type=float, default=1e-4)        # learning rate for critic
     add_arg('--rnd_lr', type=float, default=2e-3)           # learning rate for random network
-    add_arg('--beta1', type=float, default=0.9)             # beta1 for Adam optimizer
-    add_arg('--beta2', type=float, default=0.999)           # beta2 for Adam optimizer
-    add_arg('--eps', type=float, default=0.01)              # eps for Adam optimizer
+    add_arg('--alpha', type=float, default=0.99)            # alpha for RMSprop optimizer
+    #add_arg('--beta1', type=float, default=0.9)             # beta1 for Adam optimizer
+    #add_arg('--beta2', type=float, default=0.999)           # beta2 for Adam optimizer
+    add_arg('--eps', type=float, default=0.01)              # eps for the optimizers
 
     # NETWORK PARAMETERS
     add_arg('--embed_model_url', default='')
