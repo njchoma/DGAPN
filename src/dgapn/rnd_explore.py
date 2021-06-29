@@ -103,16 +103,14 @@ class RandomNetwork(nn.Module):
             assert len(rnd_nb_hidden) == rnd_nb_layers
             assert rnd_nb_layers > 0
 
-        # gnn encoder
-        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, use_3d=use_3d, init_method=init_method)
-        if gnn_nb_layers == 0:
-            in_dim = input_dim
-        else:
-            in_dim = gnn_nb_hidden[-1]
+        # gnn encoder (w/ 1 mlp layer)
+        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, 
+                        output_dim=rnd_nb_hidden[0], use_3d=use_3d)
+        in_dim = rnd_nb_hidden[0]
 
         # mlp encoder
         layers = []
-        for i in range(rnd_nb_layers):
+        for i in range(1, rnd_nb_layers):
             curr_layer = nn.Linear(in_dim, rnd_nb_hidden[i])
             if init_method is not None:
                 init_network(curr_layer, init_method)
@@ -124,7 +122,7 @@ class RandomNetwork(nn.Module):
         self.act = nn.ReLU()
 
     def forward(self, states_next):
-        X = self.gnn.get_embedding(states_next, detach=False)
-        for i, l in enumerate(self.layers):
+        X = self.act(self.gnn(states_next))
+        for l in self.layers:
             X = self.act(l(X))
         return self.final_layer(X)

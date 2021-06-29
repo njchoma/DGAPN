@@ -128,16 +128,14 @@ class GAPN_Critic(nn.Module):
         if not isinstance(enc_nb_hidden, list):
             enc_nb_hidden = [enc_nb_hidden] * enc_nb_layers
 
-        # gnn encoder
-        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, use_3d=use_3d)
-        if gnn_nb_layers == 0:
-            in_dim = input_dim
-        else:
-            in_dim = gnn_nb_hidden[-1]
+        # gnn encoder (w/ 1 mlp layer)
+        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, 
+                        output_dim=enc_nb_hidden[0], use_3d=use_3d)
+        in_dim = enc_nb_hidden[0]
 
         # mlp encoder
         layers = []
-        for i in range(enc_nb_layers):
+        for i in range(1, enc_nb_layers):
             layers.append(nn.Linear(in_dim, enc_nb_hidden[i]))
             in_dim = enc_nb_hidden[i]
 
@@ -148,8 +146,8 @@ class GAPN_Critic(nn.Module):
         self.MseLoss = nn.MSELoss()
 
     def forward(self, states):
-        X = self.gnn.get_embedding(states, detach=False)
-        for i, l in enumerate(self.layers):
+        X = self.act(self.gnn(states))
+        for l in self.layers:
             X = self.act(l(X))
         return self.final_layer(X).squeeze(1)
 
