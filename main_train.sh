@@ -17,8 +17,9 @@ PYARGS="$PYARGS --warm_start_dataset NSP15_6W01_A_3_H.negonly_unique_30k.csv"
 PYARGS="$PYARGS --reward_type dock" # options: logp, plogp, dock
 
 # PYARGS="$PYARGS --embed_model_path /path/to/trained/sgat.pt"
-# PYARGS="$PYARGS --emb_nb_shared 3"
+# PYARGS="$PYARGS --emb_nb_inherit 3"
 PYARGS="$PYARGS --gnn_nb_layers 3"
+PYARGS="$PYARGS --gnn_nb_shared 3"
 PYARGS="$PYARGS --iota 0.1"
 PYARGS="$PYARGS --use_3d"
 

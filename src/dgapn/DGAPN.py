@@ -24,11 +24,12 @@ def init_DGAPN(state):
                 state['eps_clip'],
                 state['k_epochs'],
                 state['emb_state'],
-                state['emb_nb_shared'],
+                state['emb_nb_inherit'],
                 state['input_dim'],
                 state['nb_edge_types'],
                 state['use_3d'],
                 state['gnn_nb_layers'],
+                state['gnn_nb_shared'],
                 state['gnn_nb_hidden'],
                 state['enc_nb_layers'],
                 state['enc_nb_hidden'],
@@ -60,11 +61,12 @@ class DGAPN(nn.Module):
                  eps_clip,
                  k_epochs,
                  emb_state,
-                 emb_nb_shared,
+                 emb_nb_inherit,
                  input_dim,
                  nb_edge_types,
                  use_3d,
                  gnn_nb_layers,
+                 gnn_nb_shared,
                  gnn_nb_hidden,
                  enc_nb_layers,
                  enc_nb_hidden,
@@ -91,11 +93,12 @@ class DGAPN(nn.Module):
         self.eps_clip=eps_clip
         self.k_epochs=k_epochs
         self.emb_state=emb_state
-        self.emb_nb_shared=emb_nb_shared
+        self.emb_nb_inherit=emb_nb_inherit
         self.input_dim=input_dim
         self.nb_edge_types=nb_edge_types
         self.use_3d=use_3d
         self.gnn_nb_layers=gnn_nb_layers
+        self.gnn_nb_shared=gnn_nb_shared
         self.gnn_nb_hidden=gnn_nb_hidden
         self.enc_nb_layers=enc_nb_layers
         self.enc_nb_hidden=enc_nb_hidden
@@ -113,6 +116,7 @@ class DGAPN(nn.Module):
                                       nb_edge_types,
                                       use_3d,
                                       gnn_nb_layers,
+                                      gnn_nb_shared,
                                       gnn_nb_hidden,
                                       enc_nb_layers,
                                       enc_nb_hidden,
@@ -134,7 +138,7 @@ class DGAPN(nn.Module):
 
     def to_device(self, device):
         if self.emb_model is not None:
-            self.emb_model.to_device(device, n_layers=self.emb_nb_shared)
+            self.emb_model.to_device(device, n_layers=self.emb_nb_inherit)
         self.policy.to(device)
         self.explore_critic.to(device)
         self.device = device
@@ -150,8 +154,8 @@ class DGAPN(nn.Module):
 
         with torch.autograd.no_grad():
             if self.emb_model is not None:
-                states = self.emb_model.get_embedding(states, n_layers=self.emb_nb_shared, return_3d=self.use_3d, aggr=False)
-                candidates = self.emb_model.get_embedding(candidates, n_layers=self.emb_nb_shared, return_3d=self.use_3d, aggr=False)
+                states = self.emb_model.get_embedding(states, n_layers=self.emb_nb_inherit, return_3d=self.use_3d, aggr=False)
+                candidates = self.emb_model.get_embedding(candidates, n_layers=self.emb_nb_inherit, return_3d=self.use_3d, aggr=False)
             action_logprobs, actions = self.policy.select_action(
                 states, candidates, batch_idx)
 
@@ -223,11 +227,12 @@ class DGAPN(nn.Module):
                     'eps_clip': self.eps_clip,
                     'k_epochs': self.k_epochs,
                     'emb_state': self.emb_state,
-                    'emb_nb_shared': self.emb_nb_shared,
+                    'emb_nb_inherit': self.emb_nb_inherit,
                     'input_dim': self.input_dim,
                     'nb_edge_types': self.nb_edge_types,
                     'use_3d': self.use_3d,
                     'gnn_nb_layers': self.gnn_nb_layers,
+                    'gnn_nb_shared': self.gnn_nb_shared,
                     'gnn_nb_hidden': self.gnn_nb_hidden,
                     'enc_nb_layers': self.enc_nb_layers,
                     'enc_nb_hidden': self.enc_nb_hidden,

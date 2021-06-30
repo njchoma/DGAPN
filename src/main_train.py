@@ -54,12 +54,13 @@ def read_args():
     # NETWORK PARAMETERS
     add_arg('--embed_model_url', default='')
     add_arg('--embed_model_path', default='')
-    add_arg('--emb_nb_shared', type=int, default=2)         # number of layers to inherit from the embedding model
+    add_arg('--emb_nb_inherit', type=int, default=2)         # number of layers to inherit from the embedding model
 
     add_arg('--input_size', type=int, default=121)
     add_arg('--nb_edge_types', type=int, default=1)
     add_arg('--use_3d', action='store_true')
-    add_arg('--gnn_nb_layers', type=int, default=3)         # number of shared layers on top of the inherited layers
+    add_arg('--gnn_nb_layers', type=int, default=3)         # number of gnn layers on top of the inherited layers
+    add_arg('--gnn_nb_shared', type=int, default=2)         # number of shared layers for Q, K within the gnn layers
     add_arg('--gnn_nb_hidden', type=int, default=256, help='hidden size of Graph Networks')
     add_arg('--enc_num_layers', type=int, default=3)
     add_arg('--enc_num_hidden', type=int, default=256, help='hidden size of Encoding Networks')
@@ -85,7 +86,7 @@ def main():
                                     args.embed_model_url,
                                     args.embed_model_path,
                                     name='embed_model')
-        assert args.emb_nb_shared <= embed_state['nb_layers']
+        assert args.emb_nb_inherit <= embed_state['nb_layers']
         if not embed_state['use_3d']:
             assert not args.use_3d
         args.input_size = embed_state['nb_hidden']

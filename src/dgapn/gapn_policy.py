@@ -59,6 +59,7 @@ class ActorCriticGAPN(nn.Module):
                  nb_edge_types,
                  use_3d,
                  gnn_nb_layers,
+                 gnn_nb_shared,
                  gnn_nb_hidden,
                  enc_nb_layers,
                  enc_nb_hidden,
@@ -71,6 +72,7 @@ class ActorCriticGAPN(nn.Module):
                                 nb_edge_types,
                                 use_3d,
                                 gnn_nb_layers,
+                                gnn_nb_shared,
                                 gnn_nb_hidden,
                                 enc_nb_layers,
                                 enc_nb_hidden,
@@ -128,14 +130,16 @@ class GAPN_Critic(nn.Module):
         if not isinstance(enc_nb_hidden, list):
             enc_nb_hidden = [enc_nb_hidden] * enc_nb_layers
 
-        # gnn encoder (w/ 1 mlp layer)
-        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, 
-                        output_dim=enc_nb_hidden[0], use_3d=use_3d)
-        in_dim = enc_nb_hidden[0]
+        # gnn encoder
+        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden, gnn_nb_layers, use_3d=use_3d)
+        if gnn_nb_layers == 0:
+            in_dim = input_dim
+        else:
+            in_dim = gnn_nb_hidden[-1]
 
         # mlp encoder
         layers = []
-        for i in range(1, enc_nb_layers):
+        for i in range(enc_nb_layers):
             layers.append(nn.Linear(in_dim, enc_nb_hidden[i]))
             in_dim = enc_nb_hidden[i]
 
@@ -146,7 +150,7 @@ class GAPN_Critic(nn.Module):
         self.MseLoss = nn.MSELoss()
 
     def forward(self, states):
-        X = self.act(self.gnn(states))
+        X = self.gnn.get_embedding(states, detach=False)
         for l in self.layers:
             X = self.act(l(X))
         return self.final_layer(X).squeeze(1)
@@ -171,6 +175,7 @@ class GAPN_Actor(nn.Module):
                  nb_edge_types,
                  use_3d,
                  gnn_nb_layers,
+                 gnn_nb_shared,
                  gnn_nb_hidden,
                  enc_nb_layers,
                  enc_nb_hidden,
@@ -183,31 +188,32 @@ class GAPN_Actor(nn.Module):
             gnn_nb_hidden = [gnn_nb_hidden] * gnn_nb_layers
         else:
             assert len(gnn_nb_hidden) == gnn_nb_layers
-            assert gnn_nb_layers > 0
+            assert gnn_nb_layers >= gnn_nb_shared
         if not isinstance(enc_nb_hidden, list):
             enc_nb_hidden = [enc_nb_hidden] * enc_nb_layers
         else:
             assert len(enc_nb_hidden) == enc_nb_layers
-            assert enc_nb_layers > 0
 
         # shared gnn encoder
-        self.gnn = sGAT(input_dim, nb_edge_types, gnn_nb_hidden[:-1], gnn_nb_layers-1, use_3d=use_3d)
-        if gnn_nb_layers == 1:
+        self.gnn = sGAT(input_dim, nb_edge_types, 
+                        gnn_nb_hidden[:gnn_nb_shared], gnn_nb_shared, use_3d=use_3d)
+        if gnn_nb_shared == 0:
             in_dim = input_dim
         else:
-            in_dim = gnn_nb_hidden[-2]
+            in_dim = gnn_nb_hidden[gnn_nb_shared-1]
 
-        # gnn encoder (w/ 1 mlp layer)
-        self.Q_emb = sGAT(in_dim, nb_edge_types, gnn_nb_hidden[-1], 1,
-                            output_dim=enc_nb_hidden[0], use_3d=use_3d)
-        self.K_emb = sGAT(in_dim, nb_edge_types, gnn_nb_hidden[-1], 1,
-                            output_dim=enc_nb_hidden[0], use_3d=use_3d)
-        in_dim = enc_nb_hidden[0]
+        # gnn encoder
+        self.Q_gnn = sGAT(in_dim, nb_edge_types, 
+                            gnn_nb_hidden[gnn_nb_shared:], gnn_nb_layers-gnn_nb_shared, use_3d=use_3d)
+        self.K_gnn = sGAT(in_dim, nb_edge_types, 
+                            gnn_nb_hidden[gnn_nb_shared:], gnn_nb_layers-gnn_nb_shared, use_3d=use_3d)
+        if gnn_nb_layers != gnn_nb_shared:
+            in_dim = gnn_nb_hidden[-1]
 
         # mlp encoder
         Q_layers = []
         K_layers = []
-        for i in range(1, enc_nb_layers):
+        for i in range(enc_nb_layers):
             Q_layers.append(nn.Linear(in_dim, enc_nb_hidden[i]))
             K_layers.append(nn.Linear(in_dim, enc_nb_hidden[i]))
             in_dim = enc_nb_hidden[i]
@@ -226,8 +232,8 @@ class GAPN_Actor(nn.Module):
         Q = self.gnn.get_embedding(states, detach=False, aggr=False)
         K = self.gnn.get_embedding(candidates, detach=False, aggr=False)
 
-        Q = self.act(self.Q_emb(Q))
-        K = self.act(self.K_emb(K))
+        Q = self.Q_gnn.get_embedding(Q, detach=False)
+        K = self.K_gnn.get_embedding(K, detach=False)
 
         for ql, kl in zip(self.Q_layers, self.K_layers):
             Q = self.act(ql(Q))
@@ -261,8 +267,8 @@ class GAPN_Actor(nn.Module):
         Q = self.gnn.get_embedding(states, detach=False, aggr=False)
         K = self.gnn.get_embedding(candidates, detach=False, aggr=False)
 
-        Q = self.act(self.Q_emb(Q))
-        K = self.act(self.K_emb(K))
+        Q = self.Q_gnn.get_embedding(Q, detach=False)
+        K = self.K_gnn.get_embedding(K, detach=False)
 
         for ql, kl in zip(self.Q_layers, self.K_layers):
             Q = self.act(ql(Q))
