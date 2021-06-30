@@ -184,11 +184,11 @@ class GAPN_Actor(nn.Module):
         self.eta = eta
         self.eps_clip = eps_clip
 
+        assert gnn_nb_layers >= gnn_nb_shared
         if not isinstance(gnn_nb_hidden, list):
             gnn_nb_hidden = [gnn_nb_hidden] * gnn_nb_layers
         else:
             assert len(gnn_nb_hidden) == gnn_nb_layers
-            assert gnn_nb_layers >= gnn_nb_shared
         if not isinstance(enc_nb_hidden, list):
             enc_nb_hidden = [enc_nb_hidden] * enc_nb_layers
         else:
