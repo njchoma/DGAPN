@@ -4,11 +4,12 @@ import argparse
 import torch
 import torch.multiprocessing as mp
 
+from train.train_serial import train_serial
+from train.train_cpu_async import train_cpu_async
+from train.train_gpu_sync import train_gpu_sync
+from train.train_gpu_async import train_gpu_async
+
 from dgapn.DGAPN import DGAPN, load_DGAPN
-from dgapn.train.train_serial import train_serial
-from dgapn.train.train_cpu_async import train_cpu_async
-from dgapn.train.train_gpu_sync import train_gpu_sync
-from dgapn.train.train_gpu_async import train_gpu_async
 
 from utils.general_utils import load_model
 

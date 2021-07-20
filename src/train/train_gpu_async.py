@@ -12,7 +12,7 @@ import torch
 import torch.multiprocessing as mp
 from torch.utils.tensorboard import SummaryWriter
 
-from ..DGAPN import DGAPN, Memory, save_DGAPN
+from dgapn.DGAPN import DGAPN, save_DGAPN
 
 from reward.get_main_reward import get_main_reward
 
@@ -23,13 +23,33 @@ from utils.graph_utils import mols_to_pyg_batch
 #                   HELPER MODULES                  #
 #####################################################
 
-lock = mp.Lock()
+class Memory:
+    def __init__(self):
+        self.states = []        # state representations: pyg graph
+        self.candidates = []    # next state (candidate) representations: pyg graph
+        self.states_next = []   # next state (chosen) representations: pyg graph
+        self.actions = []       # action index: long
+        self.logprobs = []      # action log probabilities: float
+        self.rewards = []       # rewards: float
+        self.terminals = []     # trajectory status: logical
 
-tasks = mp.JoinableQueue()
-results = mp.Queue()
+    def extend(self, memory):
+        self.states.extend(memory.states)
+        self.candidates.extend(memory.candidates)
+        self.states_next.extend(memory.states_next)
+        self.actions.extend(memory.actions)
+        self.logprobs.extend(memory.logprobs)
+        self.rewards.extend(memory.rewards)
+        self.terminals.extend(memory.terminals)
 
-episode_count = mp.Value("i", 0)
-sample_count = mp.Value("i", 0)
+    def clear(self):
+        del self.states[:]
+        del self.candidates[:]
+        del self.states_next[:]
+        del self.actions[:]
+        del self.logprobs[:]
+        del self.rewards[:]
+        del self.terminals[:]
 
 
 class Log:
@@ -51,39 +71,27 @@ class Log:
         del self.ep_rewards[:]
         del self.ep_main_rewards[:]
 
+#####################################################
+#                     SUBPROCESS                    #
+#####################################################
 
 class Sampler(mp.Process):
-    def __init__(self, args, env, task_queue, result_queue,
-                    max_episodes, max_timesteps, update_timesteps):
+    def __init__(self, env, model, lock, task_queue, result_queue, episode_count, sample_count,
+                max_episodes, max_timesteps, update_timesteps):
         super(Sampler, self).__init__()
+        self.lock = lock
         self.task_queue = task_queue
         self.result_queue = result_queue
+        self.episode_count = episode_count
+        self.sample_count = sample_count
+
         self.max_episodes = max_episodes
         self.max_timesteps = max_timesteps
         self.update_timesteps = update_timesteps
 
         self.env = env
-        self.model = DGAPN(args.lr,
-                    args.betas,
-                    args.eps,
-                    args.eta,
-                    args.gamma,
-                    args.eps_clip,
-                    args.k_epochs,
-                    args.embed_state,
-                    args.emb_nb_inherit,
-                    args.input_size,
-                    args.nb_edge_types,
-                    args.use_3d,
-                    args.gnn_nb_layers,
-                    args.gnn_nb_shared,
-                    args.gnn_nb_hidden,
-                    args.enc_num_layers,
-                    args.enc_num_hidden,
-                    args.enc_num_output,
-                    args.rnd_num_layers,
-                    args.rnd_num_hidden,
-                    args.rnd_num_output)
+        self.model = model
+
         self.memory = Memory()
         self.log = Log()
 
@@ -91,21 +99,20 @@ class Sampler(mp.Process):
         proc_name = self.name
         while True:
             next_task = self.task_queue.get()
-            if next_task is None:
+            signal = next_task()
+            if signal is None:
                 # Poison pill means shutdown
                 print('%s: Exiting' % proc_name)
                 self.task_queue.task_done()
                 break
 
-            model_state = next_task()
-            self.model.load_state_dict(model_state)
             self.memory.clear()
             self.log.clear()
 
             print('%s: Sampling' % proc_name)
             state, candidates, done = self.env.reset()
 
-            while sample_count.value < self.update_timesteps and episode_count.value < self.max_episodes:
+            while self.sample_count.value < self.update_timesteps and self.episode_count.value < self.max_episodes:
                 for t in range(self.max_timesteps):
                     # Running policy:
                     state_emb, candidates_emb, action_logprob, action = self.model.select_action(
@@ -125,8 +132,8 @@ class Sampler(mp.Process):
                         reward = main_reward
                         done = True
                     if (self.args.iota > 0 and 
-                        episode_count.value > self.args.innovation_reward_episode_delay and 
-                        episode_count.value < self.args.innovation_reward_episode_cutoff):
+                        self.episode_count.value > self.args.innovation_reward_episode_delay and 
+                        self.episode_count.value < self.args.innovation_reward_episode_cutoff):
                         inno_reward = self.model.get_inno_reward(mols_to_pyg_batch(state, self.model.emb_3d, device=self.model.device))
                         reward += inno_reward
 
@@ -137,10 +144,9 @@ class Sampler(mp.Process):
                     if done:
                         break
 
-                lock.acquire() # C[]
-                sample_count.value += (t+1)
-                episode_count.value += 1
-                lock.release() # L[]
+                with self.lock:
+                    self.sample_count.value += (t+1)
+                    self.episode_count.value += 1
 
                 self.log.ep_lengths.append(t+1)
                 self.log.ep_rewards.append(sum(self.memory.rewards))
@@ -152,10 +158,10 @@ class Sampler(mp.Process):
         return
 
 class Task(object):
-    def __init__(self, model_state):
-        self.model_state = model_state
+    def __init__(self, signal=None):
+        self.signal = signal
     def __call__(self):
-        return self.model_state
+        return self.signal
 
 class Result(object):
     def __init__(self, memory, log):
@@ -164,12 +170,20 @@ class Result(object):
     def __call__(self):
         return (self.memory, self.log)
 
-#############################################
+#####################################################
+#                   TRAINING LOOP                   #
+#####################################################
 
-def train_cpu_async(args, env, model):
+def train_gpu_async(args, env, model, manager):
     # initiate subprocesses
+    lock = manager.Lock()
+    tasks = manager.JoinableQueue()
+    results = manager.Queue()
+    episode_count = manager.Value("i", 0)
+    sample_count = manager.Value("i", 0)
+
     print('Creating %d processes' % args.nb_procs)
-    workers = [Sampler(args, env, tasks, results,
+    workers = [Sampler(args, env, model, lock, tasks, results, episode_count, sample_count,
                 args.max_episodes, args.max_timesteps, args.update_timesteps) for i in range(args.nb_procs)]
     for w in workers:
         w.start()
@@ -200,7 +214,7 @@ def train_cpu_async(args, env, model):
         model.to_device(torch.device("cpu"))
         # Enqueue jobs
         for i in range(args.nb_procs):
-            tasks.put(Task(model.state_dict()))
+            tasks.put(Task("sample"))
         # Wait for all of the tasks to finish
         tasks.join()
         # Start unpacking results
@@ -210,7 +224,6 @@ def train_cpu_async(args, env, model):
             log.extend(result.log)
 
         i_episode += episode_count.value
-        model.to_device(args.device)
 
         # log results
         for i in reversed(range(episode_count.value)):
@@ -262,5 +275,5 @@ def train_cpu_async(args, env, model):
     writer.close()
     # Add a poison pill for each process
     for i in range(args.nb_procs):
-        tasks.put(None)
+        tasks.put(Task())
     tasks.join()
