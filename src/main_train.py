@@ -4,8 +4,14 @@ import argparse
 import torch
 import torch.multiprocessing as mp
 
-from dgapn.train import train_gpu_sync, train_serial
+from dgapn.DGAPN import DGAPN, load_DGAPN
+from dgapn.train.train_serial import train_serial
+from dgapn.train.train_cpu_async import train_cpu_async
+from dgapn.train.train_gpu_sync import train_gpu_sync
+from dgapn.train.train_gpu_async import train_gpu_async
+
 from utils.general_utils import load_model
+
 from environment.env import CReM_Env
 
 def read_args():
@@ -22,6 +28,7 @@ def read_args():
     add_arg('--use_cpu', action='store_true')
     add_arg('--gpu', default='0')
     add_arg('--nb_procs', type=int, default=4)
+    add_arg('--mode', default='gpu_sync', help='cpu_async;gpu_sync;gpu_async')
     #add_arg('--seed', help='RNG seed', type=int, default=666)
 
     add_arg('--warm_start_dataset', default='')
@@ -29,7 +36,7 @@ def read_args():
     add_arg('--log_interval', type=int, default=20)         # print avg reward in the interval
     add_arg('--save_interval', type=int, default=400)       # save model in the interval
 
-    add_arg('--reward_type', type=str, default='plogp', help='plogp;logp;dock')
+    add_arg('--reward_type', type=str, default='plogp', help='logp;plogp;dock')
 
     add_arg('--iota', type=float, default=0.05, help='relative weight for innovation reward')
     add_arg('--innovation_reward_episode_delay', type=int, default=100)
@@ -76,10 +83,19 @@ def read_args():
 
     return parser.parse_args()
 
-def main():
+if __name__ == '__main__':
     args = read_args()
+    print("====args====\n", args)
+
+    # Process
     #args.nb_procs = mp.cpu_count()
 
+    # Optimizer
+    args.lr = (args.actor_lr, args.critic_lr, args.rnd_lr)
+    args.betas = (args.beta1, args.beta2)
+    print("lr:", args.lr, "beta:", args.betas, "eps:", args.eps)
+
+    # Input
     embed_state = None
     if args.embed_model_url != '' or args.embed_model_path != '':
         embed_state = load_model(args.artifact_path,
@@ -91,19 +107,58 @@ def main():
             assert not args.use_3d
         args.input_size = embed_state['nb_hidden']
         args.nb_edge_types = embed_state['nb_edge_types']
-
-    env = CReM_Env(args.data_path, args.warm_start_dataset, mode='mol')
-    #ob, _, _ = env.reset()
-    #args.input_size = ob.x.shape[1]
-
-    print("====args====\n", args)
     args.embed_state = embed_state
 
-    if args.nb_procs > 1:
-        train_gpu_sync(args, env)
-    else:
-        train_serial(args, env)
+    # Environment
+    env = CReM_Env(args.data_path, args.warm_start_dataset, mode='mol')
+    #ob, _, _ = env.reset(return_type='pyg')
+    #assert ob.x.shape[1] == args.input_size
 
-if __name__ == '__main__':
-    mp.set_start_method('fork', force=True)
-    main()
+    # Model
+    if args.running_model_path != '':
+        model = load_DGAPN(args.running_model_path)
+    else:
+        model = DGAPN(args.lr,
+                        args.betas,
+                        args.eps,
+                        args.eta,
+                        args.gamma,
+                        args.eps_clip,
+                        args.k_epochs,
+                        args.embed_state,
+                        args.emb_nb_inherit,
+                        args.input_size,
+                        args.nb_edge_types,
+                        args.use_3d,
+                        args.gnn_nb_layers,
+                        args.gnn_nb_shared,
+                        args.gnn_nb_hidden,
+                        args.enc_num_layers,
+                        args.enc_num_hidden,
+                        args.enc_num_output,
+                        args.rnd_num_layers,
+                        args.rnd_num_hidden,
+                        args.rnd_num_output)
+
+    # Device
+    args.device = torch.device("cpu") if args.use_cpu else torch.device(
+        'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
+    model.to_device(args.device)
+
+    # Training
+    if args.nb_procs > 1:
+        if args.mode == 'cpu_async':
+            mp.set_start_method('fork', force=True)
+            train_cpu_async(args, env, model)
+        elif args.mode == 'gpu_sync':
+            mp.set_start_method('fork', force=True)
+            train_gpu_sync(args, env, model)
+        elif args.mode == 'gpu_async':
+            mp.set_start_method('spawn', force=True)
+            manager = mp.Manager()
+            model.share_memory()
+            train_gpu_async(args, env, model, manager)
+        else:
+            raise ValueError("Mode not recognized.")
+    else:
+        train_serial(args, env, model)

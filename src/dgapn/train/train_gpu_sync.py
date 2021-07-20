@@ -12,7 +12,7 @@ import torch
 import torch.multiprocessing as mp
 from torch.utils.tensorboard import SummaryWriter
 
-from .DGAPN import DGAPN, load_DGAPN, save_DGAPN
+from ..DGAPN import DGAPN, Memory, save_DGAPN
 
 from reward.get_main_reward import get_main_reward
 
@@ -23,45 +23,13 @@ from utils.graph_utils import mols_to_pyg_batch
 #                   HELPER MODULES                  #
 #####################################################
 
-class Memory:
-    def __init__(self):
-        self.states = []        # state representations: pyg graph
-        self.candidates = []    # next state (candidate) representations: pyg graph
-        self.states_next = []   # next state (chosen) representations: pyg graph
-        self.actions = []       # action index: long
-        self.logprobs = []      # action log probabilities: float
-        self.rewards = []       # rewards: float
-        self.terminals = []     # trajectory status: logical
-
-    def extend(self, memory):
-        self.states.extend(memory.states)
-        self.candidates.extend(memory.candidates)
-        self.states_next.extend(memory.states_next)
-        self.actions.extend(memory.actions)
-        self.logprobs.extend(memory.logprobs)
-        self.rewards.extend(memory.rewards)
-        self.terminals.extend(memory.terminals)
-
-    def clear(self):
-        del self.states[:]
-        del self.candidates[:]
-        del self.states_next[:]
-        del self.actions[:]
-        del self.logprobs[:]
-        del self.rewards[:]
-        del self.terminals[:]
-
-#####################################################
-#                      PROCESS                      #
-#####################################################
-
 tasks = mp.JoinableQueue()
 results = mp.Queue()
 
 
-class Worker(mp.Process):
+class Sampler(mp.Process):
     def __init__(self, env, task_queue, result_queue, max_timesteps):
-        super(Worker, self).__init__()
+        super(Sampler, self).__init__()
         self.task_queue = task_queue
         self.result_queue = result_queue
 
@@ -134,14 +102,10 @@ class Result(object):
 #                   TRAINING LOOP                   #
 #####################################################
 
-def train_gpu_sync(args, env):
-    lr = (args.actor_lr, args.critic_lr, args.rnd_lr)
-    betas = (args.beta1, args.beta2)
-    eps = args.eps
-    print("lr:", lr, "beta:", betas, "eps:", eps)  # parameters for Adam optimizer
-
+def train_gpu_sync(args, env, model):
+    # initiate subprocesses
     print('Creating %d processes' % args.nb_procs)
-    workers = [Worker(env, tasks, results, args.max_timesteps) for i in range(args.nb_procs)]
+    workers = [Sampler(env, tasks, results, args.max_timesteps) for i in range(args.nb_procs)]
     for w in workers:
         w.start()
 
@@ -151,35 +115,6 @@ def train_gpu_sync(args, env):
     save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + '_' + dt)
     os.makedirs(save_dir, exist_ok=True)
     initialize_logger(save_dir)
-
-    device = torch.device("cpu") if args.use_cpu else torch.device(
-        'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
-
-    if args.running_model_path != '':
-        model = load_DGAPN(args.running_model_path)
-    else:
-        model = DGAPN(lr,
-                    betas,
-                    eps,
-                    args.eta,
-                    args.gamma,
-                    args.eps_clip,
-                    args.k_epochs,
-                    args.embed_state,
-                    args.emb_nb_inherit,
-                    args.input_size,
-                    args.nb_edge_types,
-                    args.use_3d,
-                    args.gnn_nb_layers,
-                    args.gnn_nb_shared,
-                    args.gnn_nb_hidden,
-                    args.enc_num_layers,
-                    args.enc_num_hidden,
-                    args.enc_num_output,
-                    args.rnd_num_layers,
-                    args.rnd_num_hidden,
-                    args.rnd_num_output)
-    model.to_device(device)
     logging.info(model)
 
     sample_count = 0
@@ -187,7 +122,7 @@ def train_gpu_sync(args, env):
     save_counter = 0
     log_counter = 0
 
-    avg_length = 0
+    running_length = 0
     running_reward = 0
     running_main_reward = 0
 
@@ -306,8 +241,8 @@ def train_gpu_sync(args, env):
                     memories[idx].rewards[-1] += inno_reward
 
             sample_count += len(notdone_idx)
-            avg_length += len(notdone_idx)
             episode_count += len(nowdone_idx)
+            running_length += len(notdone_idx)
 
             done_idx = new_done_idx
             notdone_idx = new_notdone_idx
@@ -315,6 +250,7 @@ def train_gpu_sync(args, env):
         for m in memories:
             memory.extend(m)
             m.clear()
+
         # update model
         logging.info("\nupdating model @ episode %d..." % i_episode)
         model.update(memory)
@@ -339,15 +275,12 @@ def train_gpu_sync(args, env):
         save_DGAPN(model, os.path.join(save_dir, 'running_dgapn.pt'))
 
         if log_counter >= args.log_interval:
-            avg_length = int(avg_length / log_counter)
-            running_reward = running_reward / log_counter
-            running_main_reward = running_main_reward / log_counter
-
             logging.info('Episode {} \t Avg length: {} \t Avg reward: {:5.3f} \t Avg main reward: {:5.3f}'.format(
-                i_episode, avg_length, running_reward, running_main_reward))
+                i_episode, running_length/log_counter, running_reward/log_counter, running_main_reward/log_counter))
+
+            running_length = 0
             running_reward = 0
             running_main_reward = 0
-            avg_length = 0
             log_counter = 0
 
         episode_count = 0
@@ -359,142 +292,3 @@ def train_gpu_sync(args, env):
     for i in range(args.nb_procs):
         tasks.put(None)
     tasks.join()
-
-def train_serial(args, env):
-    lr = (args.actor_lr, args.critic_lr, args.rnd_lr)
-    betas = (args.beta1, args.beta2)
-    eps = args.eps
-    print("lr:", lr, "beta:", betas, "eps:", eps) # parameters for Adam optimizer
-
-    # logging variables
-    dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
-    writer = SummaryWriter(log_dir=os.path.join(args.artifact_path, 'runs/' + args.name + '_' + dt))
-    save_dir = os.path.join(args.artifact_path, 'saves/' + args.name + '_' + dt)
-    os.makedirs(save_dir, exist_ok=True)
-    initialize_logger(save_dir)
-
-    device = torch.device("cpu") if args.use_cpu else torch.device(
-        'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
-
-    if args.running_model_path != '':
-        model = load_DGAPN(args.running_model_path)
-    else:
-        model = DGAPN(lr,
-                    betas,
-                    eps,
-                    args.eta,
-                    args.gamma,
-                    args.eps_clip,
-                    args.k_epochs,
-                    args.embed_state,
-                    args.emb_nb_inherit,
-                    args.input_size,
-                    args.nb_edge_types,
-                    args.use_3d,
-                    args.gnn_nb_layers,
-                    args.gnn_nb_shared,
-                    args.gnn_nb_hidden,
-                    args.enc_num_layers,
-                    args.enc_num_hidden,
-                    args.enc_num_output,
-                    args.rnd_num_layers,
-                    args.rnd_num_hidden,
-                    args.rnd_num_output)
-    model.to_device(device)
-    logging.info(model)
-
-    time_step = 0
-
-    avg_length = 0
-    running_reward = 0
-    running_main_reward = 0
-
-    memory = Memory()
-    rewbuffer_env = deque(maxlen=100)
-    molbuffer_env = deque(maxlen=1000)
-    # training loop
-    for i_episode in range(1, args.max_episodes+1):
-        if time_step == 0:
-            logging.info("\n\ncollecting rollouts")
-        state, candidates, done = env.reset()
-
-        for t in range(args.max_timesteps):
-            time_step += 1
-            # Running policy:
-            state_emb, candidates_emb, action_logprob, action = model.select_action(
-                mols_to_pyg_batch(state, model.emb_3d, device=model.device),
-                mols_to_pyg_batch(candidates, model.emb_3d, device=model.device))
-            memory.states.append(state_emb[0])
-            memory.candidates.append(candidates_emb)
-            memory.states_next.append(candidates_emb[action])
-            memory.actions.append(action)
-            memory.logprobs.append(action_logprob)
-
-            state, candidates, done = env.step(action)
-
-            # done and reward may not be needed anymore
-            reward = 0
-
-            if (t==(args.max_timesteps-1)) or done:
-                main_reward = get_main_reward(state, reward_type=args.reward_type, args=args)[0]
-                reward = main_reward
-                running_main_reward += main_reward
-                done = True
-
-            if (args.iota > 0 and 
-                i_episode > args.innovation_reward_episode_delay and 
-                i_episode < args.innovation_reward_episode_cutoff):
-                inno_reward = model.get_inno_reward(mols_to_pyg_batch(state, model.emb_3d, device=model.device))
-                reward += inno_reward
-
-            # Saving rewards and terminals:
-            memory.rewards.append(reward)
-            memory.terminals.append(done)
-
-            running_reward += reward
-            if done:
-                break
-
-        # update if it's time
-        if time_step >= args.update_timesteps:
-            logging.info("\nupdating model @ episode %d..." % i_episode)
-            time_step = 0
-            model.update(memory)
-            memory.clear()
-
-        writer.add_scalar("EpMainRew", main_reward, i_episode-1)
-        rewbuffer_env.append(main_reward) # reward
-        molbuffer_env.append((Chem.MolToSmiles(state), main_reward))
-        avg_length += (t+1)
-
-        # write to Tensorboard
-        writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode-1)
-
-        # stop training if avg_reward > solved_reward
-        if np.mean(rewbuffer_env) > args.solved_reward:
-            logging.info("########## Solved! ##########")
-            save_DGAPN(model, os.path.join(save_dir, 'DGAPN_continuous_solved_{}.pt'.format('test')))
-            break
-
-        # save every save_interval episodes
-        if (i_episode-1) % args.save_interval == 0:
-            save_DGAPN(model, os.path.join(save_dir, '{:05d}_dgapn.pt'.format(i_episode)))
-            deque_to_csv(molbuffer_env, os.path.join(save_dir, 'mol_dgapn.csv'))
-
-        # save running model
-        save_DGAPN(model, os.path.join(save_dir, 'running_dgapn.pt'))
-
-        # logging
-        if i_episode % args.log_interval == 0:
-            avg_length = int(avg_length/args.log_interval)
-            running_reward = running_reward/args.log_interval
-            running_main_reward = running_main_reward/args.log_interval
-            
-            logging.info('Episode {} \t Avg length: {} \t Avg reward: {:5.3f} \t Avg main reward: {:5.3f}'.format(
-                i_episode, avg_length, running_reward, running_main_reward))
-            running_reward = 0
-            running_main_reward = 0
-            avg_length = 0
-
-    close_logger()
-    writer.close()
