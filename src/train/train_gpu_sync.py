@@ -4,6 +4,7 @@ import logging
 import numpy as np
 from rdkit import Chem
 from collections import deque, OrderedDict
+from copy import deepcopy
 
 import time
 from datetime import datetime
@@ -65,6 +66,7 @@ class Sampler(mp.Process):
         self.task_queue = task_queue
         self.result_queue = result_queue
 
+        #self.env = deepcopy(env)
         self.env = env
 
         self.max_timesteps = max_timesteps

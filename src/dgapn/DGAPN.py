@@ -162,9 +162,9 @@ class DGAPN(nn.Module):
         if not isinstance(states, list):
             states = [states]
             candidates = [candidates]
-        states = [states[i].to_data_list() for i in range(1+self.use_3d)]
+        states = [states[i].cpu().to_data_list() for i in range(1+self.use_3d)]
         states = list(zip(*states))
-        candidates = [candidates[i].to_data_list() for i in range(1+self.use_3d)]
+        candidates = [candidates[i].cpu().to_data_list() for i in range(1+self.use_3d)]
         candidates = list(zip(*candidates))
 
         return states, candidates, action_logprobs, actions

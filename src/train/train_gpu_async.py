@@ -4,6 +4,7 @@ import logging
 import numpy as np
 from rdkit import Chem
 from collections import deque, OrderedDict
+from copy import deepcopy
 
 import time
 from datetime import datetime
@@ -76,9 +77,10 @@ class Log:
 #####################################################
 
 class Sampler(mp.Process):
-    def __init__(self, env, model, lock, task_queue, result_queue, episode_count, sample_count,
+    def __init__(self, args, env, model, lock, task_queue, result_queue, episode_count, sample_count,
                 max_episodes, max_timesteps, update_timesteps):
         super(Sampler, self).__init__()
+        self.args = args
         self.lock = lock
         self.task_queue = task_queue
         self.result_queue = result_queue
