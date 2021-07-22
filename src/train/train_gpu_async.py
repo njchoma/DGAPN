@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 
 import torch
-import torch.multiprocessing as mp
+import torch.multiprocessing as tmp
 from torch.utils.tensorboard import SummaryWriter
 
 from dgapn.DGAPN import DGAPN, save_DGAPN
@@ -76,7 +76,7 @@ class Log:
 #                     SUBPROCESS                    #
 #####################################################
 
-class Sampler(mp.Process):
+class Sampler(tmp.Process):
     def __init__(self, args, env, model, lock, task_queue, result_queue, episode_count, sample_count,
                 max_episodes, max_timesteps, update_timesteps):
         super(Sampler, self).__init__()
