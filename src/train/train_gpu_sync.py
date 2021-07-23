@@ -66,11 +66,11 @@ class Sampler(mp.Process):
         self.task_queue = task_queue
         self.result_queue = result_queue
 
+        self.max_timesteps = max_timesteps
+        self.timestep_count = 0
+
         #self.env = deepcopy(env)
         self.env = env
-
-        self.max_timesteps = max_timesteps
-        self.timestep_counter = 0
 
     def run(self):
         # input:
@@ -97,12 +97,12 @@ class Sampler(mp.Process):
                 continue
             # print('%s: Working' % proc_name)
             if done:
-                self.timestep_counter = 0
+                self.timestep_count = 0
                 state, candidates, done = self.env.reset(return_type='smiles')
             else:
-                self.timestep_counter += 1
+                self.timestep_count += 1
                 state, candidates, done = self.env.reset(state, return_type='smiles')
-                if self.timestep_counter >= self.max_timesteps:
+                if self.timestep_count >= self.max_timesteps:
                     done = True
 
             self.result_queue.put((index, state, candidates, done))

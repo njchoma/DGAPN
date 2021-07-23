@@ -7,6 +7,7 @@ import multiprocessing as mp
 import torch.multiprocessing as tmp
 
 from train.train_serial import train_serial
+from train.train_cpu_sync import train_cpu_sync
 from train.train_cpu_async import train_cpu_async
 from train.train_gpu_sync import train_gpu_sync
 from train.train_gpu_async import train_gpu_async
@@ -150,6 +151,9 @@ if __name__ == '__main__':
 
     # Training
     if args.nb_procs > 1:
+        if args.mode == 'cpu_sync':
+            mp.set_start_method('fork', force=True)
+            train_cpu_sync(args, env, model)
         if args.mode == 'cpu_async':
             mp.set_start_method('fork', force=True)
             train_cpu_async(args, env, model)
@@ -157,9 +161,9 @@ if __name__ == '__main__':
             mp.set_start_method('fork', force=True)
             train_gpu_sync(args, env, model)
         elif args.mode == 'gpu_async':
-            #rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-            #resource.setrlimit(resource.RLIMIT_NOFILE, (10000, rlimit[1]))
-            tmp.set_sharing_strategy('file_system')
+            rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+            resource.setrlimit(resource.RLIMIT_NOFILE, (10000, rlimit[1]))
+            #tmp.set_sharing_strategy('file_system')
 
             tmp.set_start_method('spawn', force=True)
             manager = mp.Manager()

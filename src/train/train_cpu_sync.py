@@ -76,26 +76,23 @@ class Log:
 #                     SUBPROCESS                    #
 #####################################################
 
-lock = mp.Lock()
-
 tasks = mp.JoinableQueue()
 results = mp.Queue()
-
-episode_count = mp.Value("i", 0)
-sample_count = mp.Value("i", 0)
 
 
 class Sampler(mp.Process):
     def __init__(self, args, env, task_queue, result_queue,
-                    max_episodes, max_timesteps, update_timesteps):
+                    nb_procs, max_timesteps, update_timesteps):
         super(Sampler, self).__init__()
         self.args = args
         self.task_queue = task_queue
         self.result_queue = result_queue
 
-        self.max_episodes = max_episodes
+        self.nb_procs = nb_procs
         self.max_timesteps = max_timesteps
         self.update_timesteps = update_timesteps
+        self.sample_count = 0
+        self.episode_count = 0
 
         #self.env = deepcopy(env)
         self.env = env
@@ -134,15 +131,17 @@ class Sampler(mp.Process):
                 self.task_queue.task_done()
                 break
 
-            model_state = next_task()
+            i_episode, model_state = next_task()
             self.model.load_state_dict(model_state)
             self.memory.clear()
             self.log.clear()
+            self.sample_count = 0
+            self.episode_count = 0
 
             print('%s: Sampling' % proc_name)
             state, candidates, done = self.env.reset()
 
-            while sample_count.value < self.update_timesteps and episode_count.value < self.max_episodes:
+            while self.sample_count*self.nb_procs < self.update_timesteps:
                 for t in range(self.max_timesteps):
                     # Running policy:
                     state_emb, candidates_emb, action_logprob, action = self.model.select_action(
@@ -162,8 +161,8 @@ class Sampler(mp.Process):
                         reward = main_reward
                         done = True
                     if (self.args.iota > 0 and 
-                        episode_count.value > self.args.innovation_reward_episode_delay and 
-                        episode_count.value < self.args.innovation_reward_episode_cutoff):
+                        i_episode + self.episode_count*self.nb_procs > self.args.innovation_reward_episode_delay and 
+                        i_episode + self.episode_count*self.nb_procs < self.args.innovation_reward_episode_cutoff):
                         inno_reward = self.model.get_inno_reward(mols_to_pyg_batch(state, self.model.emb_3d, device=self.model.device))
                         reward += inno_reward
 
@@ -174,42 +173,46 @@ class Sampler(mp.Process):
                     if done:
                         break
 
-                lock.acquire() # C[]
-                sample_count.value += (t+1)
-                episode_count.value += 1
-                lock.release() # L[]
+                self.sample_count += (t+1)
+                self.episode_count += 1
 
                 self.log.ep_lengths.append(t+1)
                 self.log.ep_rewards.append(sum(self.memory.rewards))
                 self.log.ep_main_rewards.append(main_reward)
                 self.log.ep_mols.append(Chem.MolToSmiles(state))
 
-            self.result_queue.put(Result(self.memory, self.log))
+            self.result_queue.put(Result(self.episode_count, self.memory, self.log))
             self.task_queue.task_done()
         return
 
 class Task(object):
-    def __init__(self, model_state):
+    def __init__(self, i_episode, model_state):
+        self.i_episode = i_episode
         self.model_state = model_state
     def __call__(self):
-        return self.model_state
+        return (self.i_episode, self.model_state)
+    def __str__(self):
+        return '%d' % self.i_episode
 
 class Result(object):
-    def __init__(self, memory, log):
+    def __init__(self, episode_count, memory, log):
+        self.episode_count = episode_count
         self.memory = memory
         self.log = log
     def __call__(self):
         return (self.memory, self.log)
+    def __str__(self):
+        return '%d' % self.episode_count
 
 #####################################################
 #                   TRAINING LOOP                   #
 #####################################################
 
-def train_cpu_async(args, env, model):
+def train_cpu_sync(args, env, model):
     # initiate subprocesses
     print('Creating %d processes' % args.nb_procs)
     workers = [Sampler(args, env, tasks, results,
-                args.max_episodes, args.max_timesteps, args.update_timesteps) for i in range(args.nb_procs)]
+                args.nb_procs, args.max_timesteps, args.update_timesteps) for i in range(args.nb_procs)]
     for w in workers:
         w.start()
 
@@ -221,6 +224,7 @@ def train_cpu_async(args, env, model):
     initialize_logger(save_dir)
     logging.info(model)
 
+    episode_count = 0
     save_counter = 0
     log_counter = 0
 
@@ -239,20 +243,21 @@ def train_cpu_async(args, env, model):
         model.to_device(torch.device("cpu"))
         # Enqueue jobs
         for i in range(args.nb_procs):
-            tasks.put(Task(model.state_dict()))
+            tasks.put(Task(i_episode, model.state_dict()))
         # Wait for all of the tasks to finish
         tasks.join()
         # Start unpacking results
         for i in range(args.nb_procs):
             result = results.get()
+            episode_count += result.episode_count
             memory.extend(result.memory)
             log.extend(result.log)
 
-        i_episode += episode_count.value
+        i_episode += episode_count
         model.to_device(args.device)
 
         # log results
-        for i in reversed(range(episode_count.value)):
+        for i in reversed(range(episode_count)):
             running_length += log.ep_lengths[i]
             running_reward += log.ep_rewards[i]
             running_main_reward += log.ep_main_rewards[i]
@@ -267,8 +272,8 @@ def train_cpu_async(args, env, model):
         model.update(memory)
         memory.clear()
 
-        save_counter += episode_count.value
-        log_counter += episode_count.value
+        save_counter += episode_count
+        log_counter += episode_count
 
         # stop training if avg_reward > solved_reward
         if np.mean(rewbuffer_env) > args.solved_reward:
@@ -294,8 +299,7 @@ def train_cpu_async(args, env, model):
             running_length = 0
             log_counter = 0
 
-        episode_count.value = 0
-        sample_count.value = 0
+        episode_count = 0
 
     close_logger()
     writer.close()
