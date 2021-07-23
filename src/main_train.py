@@ -32,7 +32,7 @@ def read_args():
     add_arg('--use_cpu', action='store_true')
     add_arg('--gpu', default='0')
     add_arg('--nb_procs', type=int, default=4)
-    add_arg('--mode', default='gpu_sync', help='cpu_async;gpu_sync;gpu_async')
+    add_arg('--mode', default='gpu_sync', help='cpu_sync;cpu_async;gpu_sync;gpu_async')
     #add_arg('--seed', help='RNG seed', type=int, default=666)
 
     add_arg('--warm_start_dataset', default='')

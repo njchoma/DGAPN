@@ -9,7 +9,6 @@ import time
 from datetime import datetime
 
 import torch
-import torch.multiprocessing as mp
 from torch.utils.tensorboard import SummaryWriter
 
 from dgapn.DGAPN import DGAPN, save_DGAPN
