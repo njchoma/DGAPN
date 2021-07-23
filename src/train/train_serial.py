@@ -103,12 +103,12 @@ def train_serial(args, env, model):
                 i_episode < args.innovation_reward_episode_cutoff):
                 inno_reward = model.get_inno_reward(mols_to_pyg_batch(state, model.emb_3d, device=model.device))
                 reward += inno_reward
+            running_reward += reward
 
             # Saving rewards and terminals:
             memory.rewards.append(reward)
             memory.terminals.append(done)
 
-            running_reward += reward
             if done:
                 break
 

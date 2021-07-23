@@ -154,7 +154,7 @@ if __name__ == '__main__':
         if args.mode == 'cpu_sync':
             mp.set_start_method('fork', force=True)
             train_cpu_sync(args, env, model)
-        if args.mode == 'cpu_async':
+        elif args.mode == 'cpu_async':
             mp.set_start_method('fork', force=True)
             train_cpu_async(args, env, model)
         elif args.mode == 'gpu_sync':
