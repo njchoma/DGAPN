@@ -200,7 +200,7 @@ class Result(object):
         self.memory = memory
         self.log = log
     def __call__(self):
-        return (self.memory, self.log)
+        return (self.episode_count, self.memory, self.log)
     def __str__(self):
         return '%d' % self.episode_count
 
@@ -249,9 +249,10 @@ def train_cpu_sync(args, env, model):
         # Start unpacking results
         for i in range(args.nb_procs):
             result = results.get()
-            episode_count += result.episode_count
-            memory.extend(result.memory)
-            log.extend(result.log)
+            e, m, l = result()
+            episode_count += e
+            memory.extend(m)
+            log.extend(l)
 
         i_episode += episode_count
         model.to_device(args.device)

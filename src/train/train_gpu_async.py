@@ -222,8 +222,9 @@ def train_gpu_async(args, env, model, manager):
         # Start unpacking results
         for i in range(args.nb_procs):
             result = results.get()
-            memory.extend(result.memory)
-            log.extend(result.log)
+            m, l = result()
+            memory.extend(m)
+            log.extend(l)
 
         i_episode += episode_count.value
 

@@ -245,8 +245,9 @@ def train_cpu_async(args, env, model):
         # Start unpacking results
         for i in range(args.nb_procs):
             result = results.get()
-            memory.extend(result.memory)
-            log.extend(result.log)
+            m, l = result()
+            memory.extend(m)
+            log.extend(l)
 
         i_episode += episode_count.value
         model.to_device(args.device)
