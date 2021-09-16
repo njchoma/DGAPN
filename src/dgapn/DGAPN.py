@@ -188,7 +188,6 @@ class DGAPN(nn.Module):
 
         # Normalizing the rewards:
         rewards = torch.tensor(rewards).to(self.device)
-        rewards = (rewards - rewards.mean()) / (rewards.std() + eps)
 
         # candidates batch
         batch_idx = []

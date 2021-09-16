@@ -295,6 +295,7 @@ class GAPN_Actor(nn.Module):
         # Finding the ratio (pi_theta / pi_theta_old):
         ratios = torch.exp(logprobs - old_logprobs)
         advantages = rewards - old_values
+        advantages = (advantages - advantages.mean()) / (advantages.std() + eps)
 
         surr1 = ratios * advantages
         surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
