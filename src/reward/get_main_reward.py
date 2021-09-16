@@ -10,8 +10,8 @@ def get_main_reward(states, reward_type, args=None):
     elif reward_type == 'dock':
         return get_dock_score(states, args=args)
     elif reward_type == 'gsk3':
-        return get_gsk3(states, args=args)
+        return get_gsk3(states)
     elif reward_type == 'jnk3':
-        return get_jnk3(states, args=args)
+        return get_jnk3(states)
     else:
         raise ValueError("Reward type not recognized.")

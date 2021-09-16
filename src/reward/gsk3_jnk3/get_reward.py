@@ -16,6 +16,7 @@ from chemprop.utils import load_args, load_checkpoint, load_scalers
 
 rdBase.DisableLog('rdApp.error')
 
+REW_SCALE_FACTOR = 15.0
 
 class gsk3_model():
     """Scores based on an ECFP classifier for activity."""
@@ -38,7 +39,7 @@ class gsk3_model():
         fps = np.concatenate(fps, axis=0)
         scores = self.clf.predict_proba(fps)[:, 1]
         scores = scores * np.array(mask)
-        return np.float32(scores)
+        return np.float32(scores).tolist()
 
     @classmethod
     def fingerprints_from_mol(cls, mol):  # use ECFP4
@@ -69,7 +70,7 @@ class jnk3_model():
         fps = np.concatenate(fps, axis=0)
         scores = self.clf.predict_proba(fps)[:, 1]
         scores = scores * np.array(mask)
-        return np.float32(scores)
+        return np.float32(scores).tolist()
 
     @classmethod
     def fingerprints_from_mol(cls, mol):  # use ECFP4
@@ -82,7 +83,7 @@ class jnk3_model():
 def score_mols(states, scorer):
     if not isinstance(states, list):
         states = [states]
-    return [scorer(state) for state in states]
+    return [s * REW_SCALE_FACTOR for s in scorer(states)]
 
 
 def get_jnk3(states):
