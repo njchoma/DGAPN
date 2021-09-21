@@ -2,7 +2,7 @@ import os
 import gym
 import random
 from rdkit import Chem
-from crem.crem import mutate_mol
+from crem.crem import mutate_mol, grow_mol
 
 from dataset.get_dataset import download_dataset, unpack_dataset
 from dataset import preprocess
@@ -14,11 +14,15 @@ DATASET_NAME = 'replacements02_sc2.db'
 class CReM_Env(object):
     def __init__(self,
                  data_path,
-                 warm_start_dataset,
+                 warm_start_dataset = None,
                  nb_sample_crem = 16,
                  nb_cores = 1,
                  mode = 'mol'):
-        self.scores, self.smiles = preprocess.main(os.path.join(data_path, warm_start_dataset))
+        
+        self.grow = True if warm_start_dataset is None else False
+        if not self.grow:
+            self.scores, self.smiles = preprocess.main(os.path.join(data_path, warm_start_dataset))
+
         self.nb_sample_crem = nb_sample_crem
         self.nb_cores = nb_cores
         self.mode = mode
@@ -35,8 +39,15 @@ class CReM_Env(object):
         if return_type is None:
             return_type = self.mode
         if mol is None:
-            idx = random.randrange(len(self.scores))
-            mol = Chem.MolFromSmiles(self.smiles[idx])
+            if self.grow:
+                carbon = Chem.MolFromSmiles("C")
+                smiles = list(grow_mol(carbon, 
+                                        db_name=self.db_fname,
+                                        ncores=self.nb_cores))
+                mol = Chem.MolFromSmiles(random.choice(smiles))
+            else:
+                idx = random.randrange(len(self.scores))
+                mol = Chem.MolFromSmiles(self.smiles[idx])
         if isinstance(mol, str):
             mol = Chem.MolFromSmiles(mol)
         return self.mol_to_candidates(mol, include_current_state, return_type)
