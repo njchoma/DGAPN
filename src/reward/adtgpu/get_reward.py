@@ -76,7 +76,7 @@ def get_dock_score(states, args=None):
             except:
                 print('invalid chemistry')
                 VALID=False
-   
+
         if(VALID):
             try: 
                 #Prepare SMILES for conversion, convert to pdb
@@ -95,7 +95,7 @@ def get_dock_score(states, args=None):
             tmp_file=run_dir+ligands_dir+"/ligand"+str(sm_counter)+".pdb"
             with open(tmp_file,'w') as f:
                 f.write(Chem.MolToPDBBlock(my_embedded_mol))
-            
+
             #Create name for output pdbqt file
             ligand_out=run_dir+ligands_dir+"/ligand"+str(sm_counter)+".pdbqt"
 
@@ -106,7 +106,7 @@ def get_dock_score(states, args=None):
             if(DEBUG): subprocess.Popen(cmd,shell=True).wait()
             else: subprocess.Popen(cmd,shell=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).wait()
             if(DEBUG): print("Done!")
-        
+
             #Clean up and increment smile counter
             os.remove(tmp_file)
             ligand_store_file=ligand_out.split('/')[-1][:-6]
@@ -115,7 +115,7 @@ def get_dock_score(states, args=None):
             ligs_list.append(None)
         sm_counter+=1
     if(DEBUG): print("ligs_list:\n{}".format(ligs_list))
-    
+
     #Get stub name of receptor and field file
     receptor_dir='/'.join(receptor_file.split('/')[:-1])
     receptor_stub=receptor_file.split('/')[-1][:-6] #rm .pdbqt=6
@@ -164,7 +164,7 @@ def get_dock_score(states, args=None):
                 pred_docking_score.append(-float(grep_out.strip()))
         else:#invalid SMILES
             pred_docking_score.append(0.00)
-            
-    shutil.rmtree(run_dir)
+
+    shutil.rmtree(run_dir, ignore_errors=True)
     print("Reward Scores (-dock): {}".format(pred_docking_score))
     return (pred_docking_score)
