@@ -287,7 +287,7 @@ class GAPN_Actor(nn.Module):
         shifted_actions = actions + batch_shift
         return probs[shifted_actions]
 
-    def loss(self, states, candidates, actions, rewards, old_logprobs, old_values, batch_idx):
+    def loss(self, states, candidates, actions, rewards, old_logprobs, old_values, batch_idx, eps=1e-5):
         probs = self.evaluate(states, candidates, actions, batch_idx)
         logprobs = torch.log(probs)
         entropies = probs * logprobs

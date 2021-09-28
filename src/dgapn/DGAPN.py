@@ -176,7 +176,7 @@ class DGAPN(nn.Module):
         scores = self.explore_critic.get_score(states_next)
         return scores.squeeze().tolist()
 
-    def update(self, memory, eps=1e-5):
+    def update(self, memory):
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
