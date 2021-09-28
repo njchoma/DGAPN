@@ -123,6 +123,7 @@ class Sampler(mp.Process):
 
     def run(self):
         proc_name = self.name
+        self.args.run_id = self.args.run_id + proc_name
         while True:
             next_task = self.task_queue.get()
             if next_task is None:
