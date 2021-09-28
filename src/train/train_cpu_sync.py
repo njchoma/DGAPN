@@ -149,11 +149,12 @@ class Sampler(mp.Process):
             self.episode_count = 0
 
             print('%s: Sampling' % proc_name)
-            state, candidates, done = self.env.reset()
-            start_state = state
-            start_reward = get_main_reward(state, reward_type=self.args.reward_type, args=self.args)[0]
 
             while self.sample_count*self.nb_procs < self.update_timesteps:
+                state, candidates, done = self.env.reset()
+                start_state = state
+                start_reward = get_main_reward(state, reward_type=self.args.reward_type, args=self.args)[0]
+
                 for t in range(self.max_timesteps):
                     # Running policy:
                     state_emb, candidates_emb, action_logprob, action = self.model.select_action(

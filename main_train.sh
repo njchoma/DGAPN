@@ -22,5 +22,6 @@ PYARGS="$PYARGS --gnn_nb_layers 3"
 PYARGS="$PYARGS --gnn_nb_shared 3"
 PYARGS="$PYARGS --iota 0.1"
 PYARGS="$PYARGS --use_3d"
+PYARGS="$PYARGS --delta 0.2"
 
 python src/main_train.py $PYARGS
