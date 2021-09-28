@@ -2,7 +2,8 @@ import os
 import gym
 import logging
 import numpy as np
-from rdkit import Chem
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem
 from collections import deque, OrderedDict
 from copy import deepcopy
 
@@ -59,18 +60,27 @@ class Log:
         self.ep_lengths = []
         self.ep_rewards = []
         self.ep_main_rewards = []
+        self.ep_reward_gains = []
+        self.ep_similarities = []
+        self.ep_init_mols = []
 
     def extend(self, log):
         self.ep_mols.extend(log.ep_mols)
         self.ep_lengths.extend(log.ep_lengths)
         self.ep_rewards.extend(log.ep_rewards)
         self.ep_main_rewards.extend(log.ep_main_rewards)
+        self.ep_reward_gains.extend(log.ep_reward_gains)
+        self.ep_similarities.extend(log.ep_similarities)
+        self.ep_init_mols.extend(log.ep_init_mols)
 
     def clear(self):
         del self.ep_mols[:]
         del self.ep_lengths[:]
         del self.ep_rewards[:]
         del self.ep_main_rewards[:]
+        del self.ep_reward_gains[:]
+        del self.ep_similarities[:]
+        del self.ep_init_mols[:]
 
 #####################################################
 #                     SUBPROCESS                    #
@@ -140,6 +150,8 @@ class Sampler(mp.Process):
 
             print('%s: Sampling' % proc_name)
             state, candidates, done = self.env.reset()
+            start_state = state
+            start_reward = get_main_reward(state, reward_type=self.args.reward_type, args=self.args)[0]
 
             while self.sample_count*self.nb_procs < self.update_timesteps:
                 for t in range(self.max_timesteps):
@@ -158,7 +170,14 @@ class Sampler(mp.Process):
                     reward = 0
                     if (t==(self.max_timesteps-1)) or done:
                         main_reward = get_main_reward(state, reward_type=self.args.reward_type, args=self.args)[0]
-                        reward = main_reward
+                        try:
+                            curr_fp = AllChem.GetMorganFingerprint(state, radius=2)
+                            target_fp = AllChem.GetMorganFingerprint(start_state, radius=2)
+                            sim = DataStructs.TanimotoSimilarity(target_fp, curr_fp)
+                        except Exception as e:
+                            sim = 0.0
+
+                        reward = main_reward + self.args.constrain_factor * max(0, self.args.delta - sim)
                         done = True
                     if (self.args.iota > 0 and 
                         i_episode + self.episode_count*self.nb_procs > self.args.innovation_reward_episode_delay and 
@@ -179,7 +198,10 @@ class Sampler(mp.Process):
                 self.log.ep_lengths.append(t+1)
                 self.log.ep_rewards.append(sum(self.memory.rewards))
                 self.log.ep_main_rewards.append(main_reward)
+                self.log.ep_reward_gains.append(main_reward - start_reward)
+                self.log.ep_similarities.append(sim)
                 self.log.ep_mols.append(Chem.MolToSmiles(state))
+                self.log.ep_init_mols.append(Chem.MolToSmiles(start_state))
 
             self.result_queue.put(Result(self.episode_count, self.memory, self.log))
             self.task_queue.task_done()
@@ -263,7 +285,8 @@ def train_cpu_sync(args, env, model):
             running_reward += log.ep_rewards[i]
             running_main_reward += log.ep_main_rewards[i]
             rewbuffer_env.append(log.ep_main_rewards[i])
-            molbuffer_env.append(log.ep_mols[i])
+            molbuffer_env.append((log.ep_init_mols[i], log.ep_mols[i], 
+                                    log.ep_main_rewards[i], log.ep_reward_gains[i], log.ep_similarities[i]))
             writer.add_scalar("EpMainRew", log.ep_main_rewards[i], i_episode - 1)
             writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode - 1)
         log.clear()
