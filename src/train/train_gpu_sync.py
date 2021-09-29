@@ -2,7 +2,8 @@ import os
 import gym
 import logging
 import numpy as np
-from rdkit import Chem
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem
 from collections import deque, OrderedDict
 from copy import deepcopy
 
@@ -79,8 +80,8 @@ class Sampler(mp.Process):
         ## (index, state, done):                trajectory id, molecule smiles, trajectory status
         #
         # output:
-        ## (None, None, None, True):            dummy task
-        ## (index, state, candidates, done):    trajectory id, molecule smiles, candidate smiles, trajectory status
+        ## (None, None, None, True, False):            dummy task
+        ## (index, state, candidates, done, init):    trajectory id, molecule smiles, candidate smiles, trajectory status
         proc_name = self.name
         while True:
             next_task = self.task_queue.get()
@@ -92,20 +93,22 @@ class Sampler(mp.Process):
 
             index, state, done = next_task
             if index is None:
-                self.result_queue.put((None, None, None, True))
+                self.result_queue.put((None, None, None, True, False))
                 self.task_queue.task_done()
                 continue
             # print('%s: Working' % proc_name)
             if done:
                 self.timestep_count = 0
                 state, candidates, done = self.env.reset(return_type='smiles')
+                init = True
             else:
                 self.timestep_count += 1
                 state, candidates, done = self.env.reset(state, return_type='smiles')
                 if self.timestep_count >= self.max_timesteps:
                     done = True
+                init = False
 
-            self.result_queue.put((index, state, candidates, done))
+            self.result_queue.put((index, state, candidates, done, init))
             self.task_queue.task_done()
         return
 
@@ -173,16 +176,20 @@ def train_gpu_sync(args, env, model):
         tasks.join()
         # unpack results
         states = [None] * args.nb_procs
+        init_states = [None] * args.nb_procs
         done_idx = []
         notdone_idx, candidates, batch_idx = [], [], []
         for i in range(args.nb_procs):
-            index, state, cands, done = results.get()
+            index, state, cands, done, _ = results.get()
 
             states[index] = state
+            init_states[index] = state
 
             notdone_idx.append(index)
             candidates.append(cands)
             batch_idx.extend([index] * len(cands))
+        init_rewards = get_main_reward(
+                    [Chem.MolFromSmiles(state) for state in init_states], reward_type=args.reward_type, args=args)
         while True:
             # action selections (for not done)
             if len(notdone_idx) > 0:
@@ -218,17 +225,27 @@ def train_gpu_sync(args, env, model):
             states = [None] * args.nb_procs
             new_done_idx = []
             new_notdone_idx, candidates, batch_idx = [], [], []
+            init_idx = []
             for i in range(args.nb_procs):
-                index, state, cands, done = results.get()
+                index, state, cands, done, init = results.get()
+                if init:
+                    init_idx.append(index)
 
                 if index is not None:
                     states[index] = state
+                    if init:
+                        init_states[index] = state
                 if done:
                     new_done_idx.append(index)
                 else:
                     new_notdone_idx.append(index)
                     candidates.append(cands)
                     batch_idx.extend([index] * len(cands))
+            if len(init_idx) > 0:
+                new_init_rewards = get_main_reward(
+                        [Chem.MolFromSmiles(init_states[idx]) for idx in init_idx], reward_type=args.reward_type, args=args)
+            for i, idx in enumerate(init_idx):
+                init_rewards[idx] = new_init_rewards[i]
             # get final rewards (for previously not done but now done)
             nowdone_idx = [idx for idx in notdone_idx if idx in new_done_idx]
             stillnotdone_idx = [idx for idx in notdone_idx if idx in new_notdone_idx]
@@ -238,18 +255,33 @@ def train_gpu_sync(args, env, model):
                 if not isinstance(main_rewards, list):
                     main_rewards = [main_rewards]
 
+                sims = []
+                for idx in nowdone_idx:
+                    try:
+                        curr_fp = AllChem.GetMorganFingerprint(Chem.MolFromSmiles(states[idx]), radius=2)
+                        target_fp = AllChem.GetMorganFingerprint(Chem.MolFromSmiles(init_states[idx]), radius=2)
+                        sim = DataStructs.TanimotoSimilarity(target_fp, curr_fp)
+                    except Exception as e:
+                        sim = 0.0
+                    sims.append(sim)
+                rewards = [main_reward - args.constrain_factor * max(0, args.delta - sim)
+                            for main_reward, sim in zip(main_rewards, sims)]
+
             for i, idx in enumerate(nowdone_idx):
                 main_reward = main_rewards[i]
+                reward = rewards[i]
+                sim = sims[i]
 
                 i_episode += 1
-                running_reward += main_reward
+                running_reward += reward
                 running_main_reward += main_reward
                 writer.add_scalar("EpMainRew", main_reward, i_episode - 1)
                 rewbuffer_env.append(main_reward)
-                molbuffer_env.append((states[idx], main_reward))
+                molbuffer_env.append((init_states[idx], states[idx], main_reward, 
+                                        main_reward - init_rewards[idx], sim))
                 writer.add_scalar("EpRewEnvMean", np.mean(rewbuffer_env), i_episode - 1)
 
-                memories[idx].rewards.append(main_reward)
+                memories[idx].rewards.append(reward)
                 memories[idx].terminals.append(True)
             for idx in stillnotdone_idx:
                 running_reward += 0
