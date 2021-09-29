@@ -179,7 +179,7 @@ class Sampler(mp.Process):
                         except Exception as e:
                             sim = 0.0
 
-                        reward = main_reward + self.args.constrain_factor * max(0, self.args.delta - sim)
+                        reward = main_reward - self.args.constrain_factor * max(0, self.args.delta - sim)
                         done = True
                     if (self.args.iota > 0 and 
                         i_episode + self.episode_count*self.nb_procs > self.args.innovation_reward_episode_delay and 
