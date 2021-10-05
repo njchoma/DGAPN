@@ -17,7 +17,7 @@ def dgapn_rollout(save_path,
                     env,
                     reward_type,
                     K,
-                    max_rollout=20,
+                    max_rollout=25,
                     args=None):
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")

@@ -46,7 +46,7 @@ def read_args():
     add_arg('--innovation_reward_episode_delay', type=int, default=100)
     add_arg('--innovation_reward_episode_cutoff', type=int, default=1000)
 
-    add_arg('--constrain_factor', type=float, default=10.0)
+    add_arg('--constrain_factor', type=float, default=100.0)
     add_arg('--delta', type=float, default=0.2)
 
     # TRAINING PARAMETERS
