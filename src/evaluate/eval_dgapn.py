@@ -4,7 +4,8 @@ import numpy as np
 import time
 from datetime import datetime
 
-from rdkit import Chem
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem
 
 import torch
 
@@ -12,12 +13,14 @@ from reward.get_main_reward import get_main_reward
 
 from utils.graph_utils import mols_to_pyg_batch
 
+SIM_THRESHOLD = 0.4
+
 def dgapn_rollout(save_path,
                     model,
                     env,
                     reward_type,
                     K,
-                    max_rollout=25,
+                    max_rollout,
                     args=None):
     device = torch.device("cpu") if args.use_cpu else torch.device(
         'cuda:' + str(args.gpu) if torch.cuda.is_available() else "cpu")
@@ -26,7 +29,13 @@ def dgapn_rollout(save_path,
     model.eval()
 
     mol, mol_candidates, done = env.reset()
-    smile_best = Chem.MolToSmiles(mol, isomericSmiles=False)
+    mol_start = mol
+    try:
+        target_fp = AllChem.GetMorganFingerprint(mol_start, radius=2)
+    except Exception as e:
+        return 0., 0.
+    smile_start = Chem.MolToSmiles(mol, isomericSmiles=False)
+    smile_best = smile_start
     emb_model_3d = model.emb_model.use_3d if model.emb_model is not None else model.use_3d
 
     g = mols_to_pyg_batch(mol, emb_model_3d, device=device)
@@ -41,14 +50,28 @@ def dgapn_rollout(save_path,
     for i in range(max_rollout):
         print("  {:3d} {:2d} {:4.1f}".format(i+1, steps_remaining, best_rew))
         steps_remaining -= 1
-        g_candidates = mols_to_pyg_batch(mol_candidates, emb_model_3d, device=device)
+
+        sims = []
+        qual_candidates = []
+        for new_mol in mol_candidates:
+            try:
+                curr_fp = AllChem.GetMorganFingerprint(new_mol, radius=2)
+                sim = DataStructs.TanimotoSimilarity(target_fp, curr_fp)
+            except Exception as e:
+                sim = 0.0
+            if sim >= SIM_THRESHOLD - 0.1:
+            #if sim >= -1:
+                sims.append(sim)
+                qual_candidates.append(new_mol)
+
+        g_candidates = mols_to_pyg_batch(qual_candidates, emb_model_3d, device=device)
         if model.emb_model is not None:
             with torch.autograd.no_grad():
                 g_candidates = model.emb_model.get_embedding(g_candidates, n_layers=model.emb_nb_shared, return_3d=model.use_3d, aggr=False)
         # next_rewards = get_main_reward(mol_candidates, reward_type, args=args)
 
         with torch.autograd.no_grad():
-            probs, _, _ = model.policy.actor(g, g_candidates, torch.zeros(len(mol_candidates), dtype=torch.long).to(device))
+            probs, _, _ = model.policy.actor(g, g_candidates, torch.zeros(len(qual_candidates), dtype=torch.long).to(device))
         probs = probs.cpu().numpy()
 
         max_action = np.argmax(probs)
@@ -64,7 +87,8 @@ def dgapn_rollout(save_path,
         # exit()
 
         action = max_action
-        mol, mol_candidates, done = env.step(action, include_current_state=False)
+        sim = sims[action]
+        mol, mol_candidates, done = env.step(action, qual_candidates, include_current_state=False)
 
         try:
             # new_rew = next_rewards[action]
@@ -90,12 +114,12 @@ def dgapn_rollout(save_path,
         print("Writing SMILE molecules!")
 
         print(smile_best, best_rew)
-        row = ''.join(['{},'] * 2)[:-1] + '\n'
-        f.write(row.format(smile_best, best_rew))
+        row = ''.join(['{},'] * 5)[:-1] + '\n'
+        f.write(row.format(smile_start, smile_best, best_rew, best_rew - start_rew, sim))
 
     return start_rew, best_rew
 
-def eval_dgapn(artifact_path, model, env, reward_type, N=120, K=1, args=None):
+def eval_dgapn(artifact_path, model, env, reward_type, N=120, K=1, max_rollout=25, args=None):
     # logging variables
     dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
     save_path = os.path.join(artifact_path, dt + '_dgapn.csv')
@@ -109,6 +133,7 @@ def eval_dgapn(artifact_path, model, env, reward_type, N=120, K=1, args=None):
                                             env,
                                             reward_type,
                                             K,
+                                            max_rollout,
                                             args=args)
         improvement = best_rew - start_rew
         print("Improvement ", improvement)

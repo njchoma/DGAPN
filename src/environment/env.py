@@ -52,8 +52,11 @@ class CReM_Env(object):
             mol = Chem.MolFromSmiles(mol)
         return self.mol_to_candidates(mol, include_current_state, return_type)
 
-    def step(self, action, include_current_state=True, return_type=None):
-        mol = self.new_mols[action]
+    def step(self, action, mol_candidates=None, include_current_state=True, return_type=None):
+        if mol_candidates:
+            mol = mol_candidates[action]
+        else:
+            mol = self.new_mols[action]
         return self.mol_to_candidates(mol, include_current_state, return_type)
 
 

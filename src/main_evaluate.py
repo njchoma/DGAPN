@@ -35,6 +35,7 @@ def read_args():
 
     add_arg('--nb_test', type=int, default=50)
     add_arg('--nb_bad_steps', type=int, default=5)
+    add_arg('--max_rollout', type=int, default=2)
 
     # AUTODOCK PARAMETERS
     add_arg('--obabel_path', default='')
@@ -74,6 +75,7 @@ def main():
                     args.reward_type,
                     N = args.nb_test,
                     K = args.nb_bad_steps,
+                    max_rollout = args.max_rollout,
                     args = args)
 
 
